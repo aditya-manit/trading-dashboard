@@ -215,7 +215,7 @@ export function PositionsTable() {
 
   if (isLoading) {
     return (
-      <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, padding: '24px 26px 14px', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
+      <div style={{ background: 'linear-gradient(180deg,#fff7f0,#ffffff 42%)', border: '1px solid #f3d4c1', borderRadius: 20, padding: '24px 26px 14px', boxShadow: '0 12px 32px rgba(210,110,60,0.11)' }}>
         <Skeleton className="h-6 w-40 mb-4" />
         {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full mb-2 rounded-lg" />)}
       </div>
@@ -224,9 +224,12 @@ export function PositionsTable() {
 
   return (
     <>
-      <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, padding: '24px 26px 14px', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
+      <div style={{ background: 'linear-gradient(180deg,#fff7f0,#ffffff 42%)', border: '1px solid #f3d4c1', borderRadius: 20, padding: '24px 26px 14px', boxShadow: '0 12px 32px rgba(210,110,60,0.11)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
-          <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em', color: '#1a1813' }}>Open positions</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+            <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em', color: '#1a1813' }}>Open positions</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 700, fontSize: 10.5, letterSpacing: '0.07em', color: '#c2592f', background: '#fde7dc', padding: '4px 10px', borderRadius: 20 }}>LIVE</span>
+          </div>
           <span style={{ fontWeight: 600, fontSize: 13, color: '#9b988d' }}>
             {positions.length} open · uPnL{' '}
             <span style={{ color: totalUnrealPnl >= 0 ? '#1f9d55' : '#df5338', fontWeight: 700 }}>

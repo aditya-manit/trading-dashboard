@@ -5,11 +5,11 @@ import { usePositionHistory } from '@/hooks/usePositionHistory';
 import { computeTradeStats } from '@/lib/trade-stats';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Data-URI SVG motifs — each tinted to its card's hue
-const SVG_BARS = "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='150'%3E%3Cg%20fill='%234a73c8'%20opacity='0.15'%3E%3Crect%20x='128'%20y='116'%20width='18'%20height='34'%20rx='3'/%3E%3Crect%20x='156'%20y='92'%20width='18'%20height='58'%20rx='3'/%3E%3Crect%20x='184'%20y='66'%20width='18'%20height='84'%20rx='3'/%3E%3Crect%20x='212'%20y='34'%20width='18'%20height='116'%20rx='3'/%3E%3C/g%3E%3C/svg%3E\") right bottom no-repeat";
-const SVG_STRIPES = "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='150'%3E%3Cg%20stroke='%238366cc'%20stroke-width='9'%20opacity='0.12'%3E%3Cline%20x1='90'%20y1='150'%20x2='240'%20y2='0'/%3E%3Cline%20x1='130'%20y1='150'%20x2='240'%20y2='40'/%3E%3Cline%20x1='170'%20y1='150'%20x2='240'%20y2='80'/%3E%3Cline%20x1='210'%20y1='150'%20x2='240'%20y2='120'/%3E%3C/g%3E%3C/svg%3E\") right bottom no-repeat";
-const SVG_DOTS = "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='150'%3E%3Cg%20fill='%23cc6b9c'%20opacity='0.2'%3E%3Ccircle%20cx='156'%20cy='96'%20r='3.2'/%3E%3Ccircle%20cx='180'%20cy='96'%20r='3.2'/%3E%3Ccircle%20cx='204'%20cy='96'%20r='3.2'/%3E%3Ccircle%20cx='228'%20cy='96'%20r='3.2'/%3E%3Ccircle%20cx='156'%20cy='118'%20r='3.2'/%3E%3Ccircle%20cx='180'%20cy='118'%20r='3.2'/%3E%3Ccircle%20cx='204'%20cy='118'%20r='3.2'/%3E%3Ccircle%20cx='228'%20cy='118'%20r='3.2'/%3E%3Ccircle%20cx='156'%20cy='140'%20r='3.2'/%3E%3Ccircle%20cx='180'%20cy='140'%20r='3.2'/%3E%3Ccircle%20cx='204'%20cy='140'%20r='3.2'/%3E%3Ccircle%20cx='228'%20cy='140'%20r='3.2'/%3E%3C/g%3E%3C/svg%3E\") right bottom no-repeat";
-const SVG_RINGS = "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='150'%3E%3Cg%20fill='none'%20stroke='%233f9e6b'%20stroke-width='1.4'%20opacity='0.4'%3E%3Ccircle%20cx='208'%20cy='144'%20r='24'/%3E%3Ccircle%20cx='208'%20cy='144'%20r='48'/%3E%3Ccircle%20cx='208'%20cy='144'%20r='74'/%3E%3Ccircle%20cx='208'%20cy='144'%20r='102'/%3E%3C/g%3E%3C/svg%3E\") right bottom no-repeat";
+// Data-URI SVG motifs — exact shapes from design file
+const SVG_CALENDAR = "url(\"data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22240%22%20height=%22150%22%3E%3Cg%20transform=%22translate(150,48)%20scale(5)%22%20fill=%22none%22%20stroke=%22%234a73c8%22%20stroke-width=%220.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20opacity=%220.26%22%3E%3Crect%20x=%223%22%20y=%224%22%20width=%2218%22%20height=%2218%22%20rx=%222%22/%3E%3Cline%20x1=%223%22%20y1=%229%22%20x2=%2221%22%20y2=%229%22/%3E%3Cline%20x1=%228%22%20y1=%222%22%20x2=%228%22%20y2=%225%22/%3E%3Cline%20x1=%2216%22%20y1=%222%22%20x2=%2216%22%20y2=%225%22/%3E%3Cpolyline%20points=%229%2014.5%2011%2016.5%2015.5%2012.5%22/%3E%3C/g%3E%3C/svg%3E\") right bottom no-repeat";
+const SVG_TROPHY = "url(\"data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22240%22%20height=%22150%22%3E%3Cg%20transform=%22translate(150,46)%20scale(5)%22%20fill=%22none%22%20stroke=%22%238366cc%22%20stroke-width=%220.55%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%20opacity=%220.24%22%3E%3Cpath%20d=%22M6%209H4.5a2.5%202.5%200%200%201%200-5H6%22/%3E%3Cpath%20d=%22M18%209h1.5a2.5%202.5%200%200%200%200-5H18%22/%3E%3Cpath%20d=%22M4%2022h16%22/%3E%3Cpath%20d=%22M10%2014.66V17c0%20.55-.47.98-.97%201.21C7.85%2018.75%207%2020.24%207%2022%22/%3E%3Cpath%20d=%22M14%2014.66V17c0%20.55.47.98.97%201.21C16.15%2018.75%2017%2020.24%2017%2022%22/%3E%3Cpath%20d=%22M18%202H6v7a6%206%200%200%200%2012%200V2Z%22/%3E%3C/g%3E%3C/svg%3E\") right bottom no-repeat";
+const SVG_DOTS = "url(\"data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22240%22%20height=%22150%22%3E%3Cg%20fill=%22%23cc6b9c%22%20opacity=%220.2%22%3E%3Ccircle%20cx=%22156%22%20cy=%2296%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22180%22%20cy=%2296%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22204%22%20cy=%2296%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22228%22%20cy=%2296%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22156%22%20cy=%22118%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22180%22%20cy=%22118%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22204%22%20cy=%22118%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22228%22%20cy=%22118%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22156%22%20cy=%22140%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22180%22%20cy=%22140%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22204%22%20cy=%22140%22%20r=%223.2%22/%3E%3Ccircle%20cx=%22228%22%20cy=%22140%22%20r=%223.2%22/%3E%3C/g%3E%3C/svg%3E\") right bottom no-repeat";
+const SVG_DAILY_BARS = "url(\"data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22240%22%20height=%22150%22%3E%3Cg%20fill=%22%233f9e6b%22%20opacity=%220.16%22%3E%3Crect%20x=%22132%22%20y=%22116%22%20width=%2215%22%20height=%2234%22%20rx=%223%22/%3E%3Crect%20x=%22156%22%20y=%2292%22%20width=%2215%22%20height=%2258%22%20rx=%223%22/%3E%3Crect%20x=%22180%22%20y=%22106%22%20width=%2215%22%20height=%2244%22%20rx=%223%22/%3E%3Crect%20x=%22204%22%20y=%2278%22%20width=%2215%22%20height=%2272%22%20rx=%223%22/%3E%3Crect%20x=%22228%22%20y=%2296%22%20width=%2215%22%20height=%2254%22%20rx=%223%22/%3E%3C/g%3E%3C/svg%3E\") right bottom no-repeat";
 
 const SHEEN = 'radial-gradient(150px 130px at 84% 2%,rgba(255,255,255,0.72),transparent 60%)';
 const CARD_STYLE = { display: 'flex', flexDirection: 'column' as const, gap: 6, minHeight: 128, justifyContent: 'space-between', position: 'relative' as const, overflow: 'hidden', borderRadius: 18, padding: '20px 22px' };
@@ -32,8 +32,8 @@ export function HighlightCards() {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 18 }}>
-      {/* Blue — Best month — rising bars */}
-      <div style={{ ...CARD_STYLE, background: `${SVG_BARS},${SHEEN},linear-gradient(140deg,#ecf3ff,#dbe9ff)` }}>
+      {/* Blue — Best month — calendar + checkmark */}
+      <div style={{ ...CARD_STYLE, background: `${SVG_CALENDAR},${SHEEN},linear-gradient(140deg,#ecf3ff,#dbe9ff)` }}>
         <span style={{ fontWeight: 600, fontSize: 12.5, color: '#5b6b8a' }}>Best month</span>
         <div>
           <div style={{ fontWeight: 800, fontSize: 27, letterSpacing: '-0.02em', color: '#1c2c4a' }}>
@@ -43,8 +43,8 @@ export function HighlightCards() {
         </div>
       </div>
 
-      {/* Purple — Win streak — diagonal stripes */}
-      <div style={{ ...CARD_STYLE, background: `${SVG_STRIPES},${SHEEN},linear-gradient(140deg,#f2ecff,#e6dbff)` }}>
+      {/* Purple — Win streak — trophy */}
+      <div style={{ ...CARD_STYLE, background: `${SVG_TROPHY},${SHEEN},linear-gradient(140deg,#f2ecff,#e6dbff)` }}>
         <span style={{ fontWeight: 600, fontSize: 12.5, color: '#6f5b9a' }}>Best win streak</span>
         <div>
           <div style={{ fontWeight: 800, fontSize: 27, letterSpacing: '-0.02em', color: '#3a2c5a' }}>
@@ -65,8 +65,8 @@ export function HighlightCards() {
         </div>
       </div>
 
-      {/* Green — Avg daily P&L — concentric rings */}
-      <div style={{ ...CARD_STYLE, background: `${SVG_RINGS},${SHEEN},linear-gradient(140deg,#eafaf0,#d6f4e2)` }}>
+      {/* Green — Avg daily P&L — daily bars */}
+      <div style={{ ...CARD_STYLE, background: `${SVG_DAILY_BARS},${SHEEN},linear-gradient(140deg,#eafaf0,#d6f4e2)` }}>
         <span style={{ fontWeight: 600, fontSize: 12.5, color: '#3f8a5f' }}>Avg daily P&L</span>
         <div>
           <div style={{ fontWeight: 800, fontSize: 27, letterSpacing: '-0.02em', color: '#1f5a3a' }}>
