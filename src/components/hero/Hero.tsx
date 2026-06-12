@@ -90,7 +90,7 @@ export function Hero() {
               </div>
               <div style={{ width: 1, background: '#f0e3d6' }} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <span style={{ fontWeight: 600, fontSize: 11.5, color: '#a59683', textTransform: 'uppercase', letterSpacing: '0.06em' }}>uPnL</span>
+                <span style={{ fontWeight: 600, fontSize: 11.5, color: '#a59683', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Unrealized</span>
                 <span style={{ fontWeight: 800, fontSize: 20, color: unrealizedPnl >= 0 ? '#1f9d55' : '#df5338' }}>
                   {unrealizedPnl >= 0 ? '+$' : '-$'}{Math.abs(unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </span>
