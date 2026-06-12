@@ -194,7 +194,7 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
         overflow: 'hidden',
         borderRadius: 16,
         padding: '16px 18px',
-        border: `1px solid ${isUp ? '#86cba1' : '#e9ab97'}`,
+        border: `1px solid ${isUp ? '#d4ecdc' : '#f3d6cd'}`,
         background: bg,
         display: 'flex',
         flexDirection: 'column',
