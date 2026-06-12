@@ -21,6 +21,7 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 
 const W = 1000, H = 300, padL = 8, padR = 8, padT = 24, padB = 30;
 const GREEN = '#2faa63';
+const RED   = '#df5338';
 const FONT = "'Plus Jakarta Sans', sans-serif";
 
 function fmt(v: number) { return '$' + Math.round(v).toLocaleString('en-US'); }
@@ -70,6 +71,9 @@ export function EquityChart() {
   }
 
   const n = data.length;
+  const isUp = data.length >= 2 ? data[data.length - 1].balance >= data[0].balance : true;
+  const color = isUp ? GREEN : RED;
+
   const vals = data.map(p => p.balance);
   let mn = Math.min(...vals), mx = Math.max(...vals);
   const span = (mx - mn) || 1;
@@ -117,8 +121,8 @@ export function EquityChart() {
     const ty = Math.max(padT, hy - th - 12);
     const isNow = hover === n - 1 && data[hover].time === currentTs;
     hoverEls.push(
-      <line key="hl" x1={hx} x2={hx} y1={padT} y2={H - padB} stroke={GREEN} strokeWidth={1.5} strokeDasharray="3 4" opacity={0.5} />,
-      <circle key="hc" cx={hx} cy={hy} r={5.5} fill={GREEN} stroke="#fff" strokeWidth={2.5} />,
+      <line key="hl" x1={hx} x2={hx} y1={padT} y2={H - padB} stroke={color} strokeWidth={1.5} strokeDasharray="3 4" opacity={0.5} />,
+      <circle key="hc" cx={hx} cy={hy} r={5.5} fill={color} stroke="#fff" strokeWidth={2.5} />,
       <g key="tt" filter="url(#ttShadow)">
         <rect x={tx} y={ty} width={tw} height={th} rx={10} fill="#fff" stroke="#eceae5" />
         <text x={tx + 15} y={ty + 21} fill="#9b988d" fontSize={13} fontWeight={600} fontFamily={FONT}>
@@ -130,7 +134,6 @@ export function EquityChart() {
   }
 
   const RANGES: Range[] = ['1M', '3M', '6M', '1Y', 'ALL'];
-  const isUp = changePct >= 0;
 
   return (
     <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, padding: '24px 26px', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
@@ -169,8 +172,8 @@ export function EquityChart() {
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}>
           <defs>
             <linearGradient id="gradEq" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={GREEN} stopOpacity={0.20} />
-              <stop offset="100%" stopColor={GREEN} stopOpacity={0} />
+              <stop offset="0%" stopColor={color} stopOpacity={0.20} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
             <filter id="ttShadow" x="-30%" y="-30%" width="160%" height="180%">
               <feDropShadow dx={0} dy={4} stdDeviation={7} floodColor="rgba(20,20,12,0.14)" />
@@ -178,9 +181,8 @@ export function EquityChart() {
           </defs>
           {grids}
           <path d={area} fill="url(#gradEq)" />
-          <path d={line} fill="none" stroke={GREEN} strokeWidth={2.75} strokeLinejoin="round" strokeLinecap="round" />
-          {/* Live dot — always green, pulsing visually */}
-          <circle cx={X(n - 1)} cy={Y(data[n - 1].balance)} r={5} fill={GREEN} stroke="#fff" strokeWidth={2} />
+          <path d={line} fill="none" stroke={color} strokeWidth={2.75} strokeLinejoin="round" strokeLinecap="round" />
+          <circle cx={X(n - 1)} cy={Y(data[n - 1].balance)} r={5} fill={color} stroke="#fff" strokeWidth={2} />
           {xticks}
           {hoverEls}
           <rect x={0} y={0} width={W} height={H} fill="transparent" onMouseMove={handleMouseMove} onMouseLeave={() => setHover(null)} style={{ cursor: 'crosshair' }} />
