@@ -4,21 +4,51 @@ A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays li
 
 ## Stack
 
-- **Next.js** (App Router) + TypeScript
+- **Next.js 15** (App Router) + TypeScript
 - **Tailwind CSS v4** + shadcn/ui
-- **SWR** for data fetching with auto-refresh
-- **Gate.io Futures API v4** — HMAC-SHA512 signed, server-side only
+- **SWR** — client-side data fetching with 30s auto-refresh
+- **Gate.io Futures API v4** — HMAC-SHA512 signed, all calls server-side only
 
 ## Features
 
-- Live account balance with unrealized PnL badge
-- Milestone tracker toward $10M
-- Account equity chart (up to 180 days)
-- Open positions table with allocation bars and row hover
-- KPI strip: net P&L, win rate, profit factor, Sharpe ratio, max drawdown, avg R:R — each with a mini sparkline
-- Highlight cards: best month, win streak, most traded, avg daily P&L
-- Closed trade history paginated with color-coded outcome cards
-- Key metrics: win rate donut, best/worst trade, risk profile (Sortino, volatility, expectancy)
+### Overview
+- Hero card: live account balance, unrealized PnL badge, margin usage, open position count
+- Milestone progress tracker toward $10M with a slide-out drawer showing all milestones and proportional bar widths
+- Account equity chart: up to 180 days, green/red based on period direction, range picker (1M/3M/6M/1Y/ALL), hover crosshair tooltip
+- Highlight cards: best month P&L, best win streak, most traded instrument, avg daily P&L (trailing 90d)
+- KPI strip: net P&L, win rate, profit factor, Sharpe ratio, max drawdown, avg R:R — each tile includes a mini trend sparkline
+
+### Positions
+- Open positions table with allocation bars, unrealized PnL, hover highlight
+- **Details drawer** per position: uPnL hero + ROE% since entry, direction, leverage, size in BTC, notional value, margin used, entry/mark/liquidation price, hold duration
+
+### Reports
+- Win rate donut chart with wins/losses breakdown
+- Best & worst trade callout cards
+- Risk profile: Sortino ratio, annualised volatility, recovery factor, expectancy per trade, avg hold time
+
+### History
+- Closed trade cards (4-column grid, paginated): color-coded profit/loss, leverage badge, return on margin %, close date
+- **Details drawer** per trade: realized PnL hero, return on margin, direction, leverage, position size, notional, entry/exit price, trading fees, hold duration
+
+## API Routes
+
+All Gate.io calls are proxied through Next.js server-side routes — credentials never reach the browser.
+
+| Route | Gate.io endpoint |
+|---|---|
+| `/api/gate/account` | `GET /futures/usdt/accounts` |
+| `/api/gate/positions` | `GET /futures/usdt/positions` |
+| `/api/gate/position-history` | `GET /futures/usdt/position_close` (180-day window, paginated) |
+| `/api/gate/account-book` | `GET /futures/usdt/account_book?type=pnl` (6×30d windows) |
+| `/api/gate/trades` | `GET /futures/usdt/my_trades` |
+
+## Contract Maths
+
+Gate.io BTC_USDT perpetual: **1 contract = 0.0001 BTC**
+
+- `notional (USDT) = contracts × 0.0001 × price`
+- `return on margin = PnL ÷ (notional ÷ leverage)`
 
 ## Setup
 
@@ -48,7 +78,7 @@ A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays li
 | `GATE_API_KEY` | Gate.io API key (read-only permissions sufficient) |
 | `GATE_API_SECRET` | Gate.io API secret |
 
-**Never commit `.env.local`.** API keys are only used in Next.js server-side API routes and are never exposed to the browser.
+**Never commit `.env.local`.** It is gitignored by default.
 
 ## Deployment (Vercel)
 
@@ -59,4 +89,4 @@ A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays li
 
 ## Security
 
-All Gate.io API calls go through Next.js API routes (`/api/gate/*`). The browser never touches the Gate.io API directly or sees the API credentials.
+All Gate.io API calls go through Next.js API routes (`/api/gate/*`). The browser never touches the Gate.io API directly or sees the raw credentials.
