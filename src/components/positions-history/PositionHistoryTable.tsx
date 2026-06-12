@@ -70,6 +70,29 @@ function fmtUsd(n: number): string {
   return `$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// ─── Icon Chip ────────────────────────────────────────────────────────────────
+
+function Chip({ icon }: { icon: React.ReactNode }) {
+  return (
+    <span style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: '#f6f5f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a8a08e' }}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {icon}
+      </svg>
+    </span>
+  );
+}
+
+const ICONS = {
+  direction: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>,
+  leverage:  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+  layers:    <><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>,
+  dollar:    <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
+  login:     <><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></>,
+  logout:    <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
+  percent:   <><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></>,
+  clock:     <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+};
+
 // ─── Detail Drawer ────────────────────────────────────────────────────────────
 
 function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClose: () => void }) {
@@ -81,15 +104,15 @@ function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClos
   const notional = notionalUsd(p);
   const fee = Math.abs(parseFloat(p.pnl_fee) || 0);
 
-  const detailRows = [
-    { label: 'Direction', value: isLong ? 'Long' : 'Short', color: isLong ? '#1f9d55' : '#df5338' },
-    { label: 'Leverage', value: fmtLev(p.leverage), color: '#1a1813' },
-    { label: 'Position size', value: `${size.toLocaleString('en-US')} contracts`, color: '#1a1813' },
-    { label: 'Notional value', value: notional > 0 ? fmtUsd(notional) : '—', color: '#1a1813' },
-    { label: 'Entry price', value: fmtPrice(entryPrice(p)), color: '#1a1813' },
-    { label: 'Exit price', value: fmtPrice(exitPrice(p)), color: '#1a1813' },
-    { label: 'Trading fees', value: fee > 0 ? `-${fmtUsd(fee)}` : '—', color: '#df5338' },
-    { label: 'Hold duration', value: holdDuration(p), color: '#1a1813' },
+  const detailRows: { icon: React.ReactNode; label: string; value: string; color: string }[] = [
+    { icon: ICONS.direction, label: 'Direction',      value: isLong ? 'Long' : 'Short',              color: isLong ? '#1f9d55' : '#df5338' },
+    { icon: ICONS.leverage,  label: 'Leverage',       value: fmtLev(p.leverage),                     color: '#1a1813' },
+    { icon: ICONS.layers,    label: 'Position size',  value: `${size.toLocaleString('en-US')} contracts`, color: '#1a1813' },
+    { icon: ICONS.dollar,    label: 'Notional value', value: notional > 0 ? fmtUsd(notional) : '—', color: '#1a1813' },
+    { icon: ICONS.login,     label: 'Entry price',    value: fmtPrice(entryPrice(p)),                color: '#1a1813' },
+    { icon: ICONS.logout,    label: 'Exit price',     value: fmtPrice(exitPrice(p)),                 color: '#1a1813' },
+    { icon: ICONS.percent,   label: 'Trading fees',   value: fee > 0 ? `-${fmtUsd(fee)}` : '—',     color: '#df5338' },
+    { icon: ICONS.clock,     label: 'Hold duration',  value: holdDuration(p),                        color: '#1a1813' },
   ];
 
   return (
@@ -157,7 +180,10 @@ function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClos
                 key={row.label}
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: i < detailRows.length - 1 ? '1px solid #f5f4f1' : 'none' }}
               >
-                <span style={{ fontWeight: 500, fontSize: 13, color: '#9b988d' }}>{row.label}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 11, fontWeight: 500, fontSize: 13, color: '#9b988d' }}>
+                  <Chip icon={row.icon} />
+                  {row.label}
+                </span>
                 <span style={{ fontWeight: 700, fontSize: 13.5, color: row.color }}>{row.value}</span>
               </div>
             ))}
