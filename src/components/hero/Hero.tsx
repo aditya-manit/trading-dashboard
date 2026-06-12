@@ -56,7 +56,7 @@ export function Hero() {
               </span>
               {unrealizedPnl !== 0 && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 15, color: isUp ? '#1f9d55' : '#df5338', background: isUp ? 'rgba(47,170,99,0.13)' : 'rgba(223,83,56,0.13)', padding: '7px 13px', borderRadius: 10 }}>
-                  {isUp ? '▲' : '▼'} {isUp ? '+$' : '-$'}{Math.abs(unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} unrealized
+                  {isUp ? '▲' : '▼'} {isUp ? '+$' : '-$'}{Math.abs(unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} uPnL
                 </span>
               )}
             </div>
@@ -90,7 +90,7 @@ export function Hero() {
               </div>
               <div style={{ width: 1, background: '#f0e3d6' }} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <span style={{ fontWeight: 600, fontSize: 11.5, color: '#a59683', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Unrealized</span>
+                <span style={{ fontWeight: 600, fontSize: 11.5, color: '#a59683', textTransform: 'uppercase', letterSpacing: '0.06em' }}>uPnL</span>
                 <span style={{ fontWeight: 800, fontSize: 20, color: unrealizedPnl >= 0 ? '#1f9d55' : '#df5338' }}>
                   {unrealizedPnl >= 0 ? '+$' : '-$'}{Math.abs(unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </span>

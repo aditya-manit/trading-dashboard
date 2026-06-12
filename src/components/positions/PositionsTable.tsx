@@ -119,7 +119,7 @@ function PositionDetailDrawer({
 
           {/* uPnL hero */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>Unrealized P&amp;L</span>
+            <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>uPnL</span>
             <span style={{ fontWeight: 800, fontSize: 34, letterSpacing: '-0.02em', color: isUp ? '#1f9d55' : '#df5338' }}>
               {isUp ? '+$' : '-$'}{fmt(Math.abs(pnl), 2)}
             </span>
