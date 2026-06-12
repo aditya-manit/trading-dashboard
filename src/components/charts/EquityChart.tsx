@@ -60,11 +60,58 @@ export function EquityChart() {
   if (!data.length) {
     return (
       <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, padding: '24px 26px', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em', color: '#1a1813' }}>Account growth</span>
         </div>
-        <div style={{ width: '100%', aspectRatio: '1000/300', background: '#fafaf8', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ color: '#b3b1a7', fontSize: 14, fontWeight: 600 }}>Loading equity data…</span>
+        <div style={{ width: '100%', aspectRatio: '1000/300' }}>
+          <svg viewBox="0 0 1000 300" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <defs>
+              <linearGradient id="skelShimmer" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%"   stopColor="#f0efec" stopOpacity={1} />
+                <stop offset="45%"  stopColor="#e8e6e1" stopOpacity={1} />
+                <stop offset="55%"  stopColor="#f5f4f0" stopOpacity={1} />
+                <stop offset="100%" stopColor="#f0efec" stopOpacity={1} />
+                <animateTransform attributeName="gradientTransform" type="translate" from="-1 0" to="2 0" dur="1.6s" repeatCount="indefinite" />
+              </linearGradient>
+              <linearGradient id="skelFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor="#e8e6e1" stopOpacity={0.5} />
+                <stop offset="100%" stopColor="#e8e6e1" stopOpacity={0} />
+              </linearGradient>
+              <clipPath id="skelClip">
+                <rect x="8" y="24" width="984" height="246" />
+              </clipPath>
+            </defs>
+
+            {/* grid lines */}
+            {[0.18, 0.44, 0.70, 0.96].map((t, i) => (
+              <line key={i} x1={8} x2={992} y1={t * 270} y2={t * 270} stroke="#f0efec" strokeWidth={1.5} />
+            ))}
+
+            {/* y-axis label skeletons */}
+            {[0.18, 0.44, 0.70, 0.96].map((t, i) => (
+              <rect key={i} x={8} y={t * 270 - 14} width={62} height={11} rx={5} fill="url(#skelShimmer)" />
+            ))}
+
+            {/* fake chart area + line */}
+            <path
+              d="M8,210 C80,195 140,175 200,158 C260,140 300,155 360,138 C420,120 460,100 520,88 C580,75 630,92 690,78 C740,66 800,55 860,48 C900,44 940,50 992,42 L992,270 L8,270 Z"
+              fill="url(#skelFill)"
+              clipPath="url(#skelClip)"
+            />
+            <path
+              d="M8,210 C80,195 140,175 200,158 C260,140 300,155 360,138 C420,120 460,100 520,88 C580,75 630,92 690,78 C740,66 800,55 860,48 C900,44 940,50 992,42"
+              fill="none"
+              stroke="url(#skelShimmer)"
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {/* x-axis label skeletons */}
+            {[8, 248, 496, 744, 950].map((x, i) => (
+              <rect key={i} x={i === 4 ? x - 28 : x} y={278} width={i === 0 ? 52 : i === 4 ? 28 : 44} height={11} rx={5} fill="url(#skelShimmer)" />
+            ))}
+          </svg>
         </div>
       </div>
     );
