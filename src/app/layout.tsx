@@ -9,7 +9,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'BTCUSDT.P Dashboard',
+  title: 'Trading Dashboard',
   description: 'Gate.io Futures Trading Dashboard',
 };
 
