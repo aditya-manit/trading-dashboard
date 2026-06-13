@@ -272,12 +272,18 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
   const isUp = pnl >= 0;
   const isLong = p.side === 'long';
 
+  const GLOSS = 'linear-gradient(180deg,rgba(255,255,255,0.68) 0%,rgba(255,255,255,0) 52%)';
   const bg = hovered
-    ? (isUp ? 'linear-gradient(180deg,#fbfefc,#bce5cd)' : 'linear-gradient(180deg,#fffdfc,#f6cbbb)')
-    : (isUp ? 'linear-gradient(180deg,#fcfefd,#e3f3ea)'  : 'linear-gradient(180deg,#fffcfb,#fbe7e1)');
+    ? (isUp
+        ? `${GLOSS},linear-gradient(180deg,#f6fdf8,#cee9d9)`
+        : `${GLOSS},linear-gradient(180deg,#fffbfa,#f4ddd5)`)
+    : (isUp ? 'linear-gradient(180deg,#fcfefd,#e3f3ea)' : 'linear-gradient(180deg,#fffcfb,#fbe7e1)');
   const border = hovered
-    ? (isUp ? '#7ccfa0' : '#eebcad')
+    ? (isUp ? '#b5d9c6' : '#e4c0b0')
     : (isUp ? '#cfe8da' : '#f0d4ca');
+  const shadow = hovered
+    ? '0 6px 20px rgba(20,20,12,0.07),inset 0 1px 0 rgba(255,255,255,0.9)'
+    : 'none';
 
   return (
     <div
@@ -288,11 +294,13 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
         padding: '16px 18px',
         border: `1px solid ${border}`,
         background: bg,
+        boxShadow: shadow,
         display: 'flex',
         flexDirection: 'column',
         gap: 16,
         cursor: 'pointer',
-        transition: 'background .15s, border-color .15s',
+        transform: hovered ? 'translateY(-1px)' : 'none',
+        transition: 'background .18s, border-color .18s, box-shadow .18s, transform .18s',
       }}
       onClick={onOpen}
       onMouseEnter={() => setHovered(true)}
@@ -332,10 +340,14 @@ function TradePill({ p, onClick }: { p: GateFuturesPositionClose; onClick: () =>
   const pnl = parseFloat(p.pnl);
   const isUp = pnl >= 0;
   const isLong = p.side === 'long';
+  const GLOSS = 'linear-gradient(180deg,rgba(255,255,255,0.68) 0%,rgba(255,255,255,0) 52%)';
   const bg = hovered
-    ? (isUp ? 'linear-gradient(180deg,#fbfefc,#bce5cd)' : 'linear-gradient(180deg,#fffdfc,#f6cbbb)')
+    ? (isUp
+        ? `${GLOSS},linear-gradient(180deg,#f6fdf8,#cee9d9)`
+        : `${GLOSS},linear-gradient(180deg,#fffbfa,#f4ddd5)`)
     : (isUp ? 'linear-gradient(180deg,#fcfefd,#e3f3ea)' : 'linear-gradient(180deg,#fffcfb,#fbe7e1)');
-  const border = hovered ? (isUp ? '#7ccfa0' : '#eebcad') : (isUp ? '#cfe8da' : '#f0d4ca');
+  const border = hovered ? (isUp ? '#b5d9c6' : '#e4c0b0') : (isUp ? '#cfe8da' : '#f0d4ca');
+  const shadow = hovered ? '0 3px 10px rgba(20,20,12,0.06),inset 0 1px 0 rgba(255,255,255,0.9)' : 'none';
   return (
     <div
       onClick={e => { e.stopPropagation(); onClick(); }}
@@ -348,9 +360,10 @@ function TradePill({ p, onClick }: { p: GateFuturesPositionClose; onClick: () =>
         padding: '6px 9px 7px 11px',
         background: bg,
         border: `1px solid ${border}`,
+        boxShadow: shadow,
         cursor: 'pointer',
         marginBottom: 4,
-        transition: 'background .13s, border-color .13s',
+        transition: 'background .18s, border-color .18s, box-shadow .18s',
       }}
     >
       <span style={{ position: 'absolute', top: 0, left: 0, width: 3, height: '100%', background: isUp ? '#2faa63' : '#df5338' }} />
