@@ -297,8 +297,7 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
         flexDirection: 'column',
         gap: 16,
         cursor: 'pointer',
-        transform: hovered ? 'translateY(-1px)' : 'none',
-        transition: 'background .18s, border-color .18s, box-shadow .18s, transform .18s',
+        transition: 'background .18s, border-color .18s, box-shadow .18s',
       }}
       onClick={onOpen}
       onMouseEnter={() => setHovered(true)}
