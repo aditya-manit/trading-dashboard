@@ -328,21 +328,29 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
 // ─── Calendar Trade Pill ──────────────────────────────────────────────────────
 
 function TradePill({ p, onClick }: { p: GateFuturesPositionClose; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
   const pnl = parseFloat(p.pnl);
   const isUp = pnl >= 0;
   const isLong = p.side === 'long';
+  const bg = hovered
+    ? (isUp ? 'linear-gradient(180deg,#fbfefc,#bce5cd)' : 'linear-gradient(180deg,#fffdfc,#f6cbbb)')
+    : (isUp ? 'linear-gradient(180deg,#fcfefd,#e3f3ea)' : 'linear-gradient(180deg,#fffcfb,#fbe7e1)');
+  const border = hovered ? (isUp ? '#7ccfa0' : '#eebcad') : (isUp ? '#cfe8da' : '#f0d4ca');
   return (
     <div
       onClick={e => { e.stopPropagation(); onClick(); }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         position: 'relative',
         overflow: 'hidden',
         borderRadius: 8,
         padding: '6px 9px 7px 11px',
-        background: isUp ? 'linear-gradient(180deg,#fcfefd,#e3f3ea)' : 'linear-gradient(180deg,#fffcfb,#fbe7e1)',
-        border: `1px solid ${isUp ? '#cfe8da' : '#f0d4ca'}`,
+        background: bg,
+        border: `1px solid ${border}`,
         cursor: 'pointer',
         marginBottom: 4,
+        transition: 'background .13s, border-color .13s',
       }}
     >
       <span style={{ position: 'absolute', top: 0, left: 0, width: 3, height: '100%', background: isUp ? '#2faa63' : '#df5338' }} />

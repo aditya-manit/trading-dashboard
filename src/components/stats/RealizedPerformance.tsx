@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { usePositionHistory } from '@/hooks/usePositionHistory';
 import { computeTradeStats } from '@/lib/trade-stats';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const FONT = "'Plus Jakarta Sans', sans-serif";
 
 function smoothPath(pts: { x: number; y: number }[]): string {
   if (pts.length < 2) return pts.length ? `M${pts[0].x},${pts[0].y}` : '';
@@ -17,7 +19,13 @@ function smoothPath(pts: { x: number; y: number }[]): string {
   return d;
 }
 
-function Sparkline({ data, color, gradId }: { data: number[]; color: string; gradId: string }) {
+function Sparkline({ data, color, gradId, fmtVal }: {
+  data: number[];
+  color: string;
+  gradId: string;
+  fmtVal: (v: number) => string;
+}) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const W = 300, H = 90, pt = 12, pb = 12, pl = 4, pr = 8;
   const n = data.length;
   if (n < 2) return null;
@@ -28,17 +36,69 @@ function Sparkline({ data, color, gradId }: { data: number[]; color: string; gra
   const pts = data.map((v, i) => ({ x: X(i), y: Y(v) }));
   const line = smoothPath(pts);
   const area = line + ` L${X(n - 1).toFixed(1)},${H} L${X(0).toFixed(1)},${H} Z`;
+
+  const handleMouseMove = (e: React.MouseEvent<SVGRectElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - r.left) / r.width;
+    const idx = Math.max(0, Math.min(n - 1, Math.round(ratio * (n - 1))));
+    setHoverIdx(idx);
+  };
+
+  const dotLeftPct = hoverIdx !== null ? (X(hoverIdx) / W) * 100 : 0;
+  const dotTopPct  = hoverIdx !== null ? (Y(data[hoverIdx]) / H) * 100 : 0;
+  const tipLeftPct = hoverIdx !== null ? Math.max(14, Math.min(86, (X(hoverIdx) / W) * 100)) : 50;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.26} />
-          <stop offset="100%" stopColor={color} stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gradId})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.26} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <path d={area} fill={`url(#${gradId})`} />
+        <path d={line} fill="none" stroke={color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        <rect x={0} y={0} width={W} height={H} fill="transparent" onMouseMove={handleMouseMove} onMouseLeave={() => setHoverIdx(null)} style={{ cursor: 'crosshair' }} />
+      </svg>
+
+      {hoverIdx !== null && (
+        <>
+          <div style={{
+            position: 'absolute',
+            width: 9, height: 9,
+            borderRadius: '50%',
+            background: color,
+            border: '2px solid #fff',
+            boxShadow: `0 0 0 2px ${color}55`,
+            top: `${dotTopPct}%`,
+            left: `${dotLeftPct}%`,
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+            zIndex: 2,
+          }} />
+          <div style={{
+            position: 'absolute',
+            bottom: '90%',
+            left: `${tipLeftPct}%`,
+            transform: 'translateX(-50%)',
+            background: '#1a1813',
+            color: '#fff',
+            fontFamily: FONT,
+            fontWeight: 700,
+            fontSize: 11,
+            padding: '4px 8px',
+            borderRadius: 6,
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            letterSpacing: '-0.01em',
+            zIndex: 10,
+          }}>
+            {fmtVal(data[hoverIdx])}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -60,6 +120,7 @@ export function RealizedPerformance() {
   }
 
   const { grossProfit, grossLoss, profitFactor } = stats;
+  const fmtDollar = (v: number) => `$${Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 
   return (
     <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, padding: '24px 26px', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
@@ -85,8 +146,8 @@ export function RealizedPerformance() {
               {stats.wins} winning trades
             </span>
           </div>
-          <div style={{ width: '46%', height: 74, alignSelf: 'center' }}>
-            <Sparkline data={stats.profitSparkline} color="#2faa63" gradId="spUp" />
+          <div style={{ width: '46%', height: 74, alignSelf: 'center', position: 'relative' }}>
+            <Sparkline data={stats.profitSparkline} color="#2faa63" gradId="spUp" fmtVal={fmtDollar} />
           </div>
         </div>
 
@@ -101,8 +162,8 @@ export function RealizedPerformance() {
               {stats.losses} losing trades
             </span>
           </div>
-          <div style={{ width: '46%', height: 74, alignSelf: 'center' }}>
-            <Sparkline data={stats.lossSparkline} color="#df5338" gradId="spDown" />
+          <div style={{ width: '46%', height: 74, alignSelf: 'center', position: 'relative' }}>
+            <Sparkline data={stats.lossSparkline} color="#df5338" gradId="spDown" fmtVal={fmtDollar} />
           </div>
         </div>
       </div>

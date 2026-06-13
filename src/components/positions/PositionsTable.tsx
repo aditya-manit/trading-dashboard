@@ -335,7 +335,7 @@ export function PositionsTable() {
 
   if (isLoading) {
     return (
-      <div style={{ background: 'linear-gradient(180deg,#f7f3ff,#ffffff 42%)', border: '1px solid #e3d8f8', borderRadius: 20, padding: '24px 26px 14px', boxShadow: '0 12px 32px rgba(110,80,210,0.13)' }}>
+      <div style={{ background: 'linear-gradient(180deg,#f7f3ff,#ffffff 42%)', border: '1px solid #e3d8f8', borderRadius: 20, padding: '24px 26px 14px' }}>
         <Skeleton className="h-6 w-40 mb-4" />
         {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full mb-2 rounded-lg" />)}
       </div>
@@ -344,7 +344,7 @@ export function PositionsTable() {
 
   return (
     <>
-      <div style={{ background: 'linear-gradient(180deg,#f7f3ff,#ffffff 42%)', border: '1px solid #e3d8f8', borderRadius: 20, padding: '24px 26px 14px', boxShadow: '0 12px 32px rgba(110,80,210,0.13)' }}>
+      <div style={{ background: 'linear-gradient(180deg,#f7f3ff,#ffffff 42%)', border: '1px solid #e3d8f8', borderRadius: 20, padding: '24px 26px 14px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
             <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em', color: '#1a1813' }}>Open positions</span>
