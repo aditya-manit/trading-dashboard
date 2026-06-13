@@ -274,6 +274,20 @@ export function EquityChart() {
         </div>
       </div>
 
+      {/* Legend row — HTML div so it never overlaps SVG grid labels */}
+      {benchOn && benchLine && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 6 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 12, color: '#9b988d', fontFamily: FONT }}>
+            <span style={{ width: 18, height: 2.5, background: color, borderRadius: 2, display: 'inline-block' }} />
+            You
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 12, color: '#9b988d', fontFamily: FONT }}>
+            <span style={{ width: 18, display: 'inline-block', borderTop: '2px dashed #9b8cd9' }} />
+            BTC buy &amp; hold
+          </span>
+        </div>
+      )}
+
       <div style={{ width: '100%', aspectRatio: '1000/300' }}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}>
           <defs>
@@ -292,15 +306,6 @@ export function EquityChart() {
           )}
           <path d={line} fill="none" stroke={color} strokeWidth={2.75} strokeLinejoin="round" strokeLinecap="round" />
           <circle cx={X(n - 1)} cy={Y(data[n - 1].balance)} r={5} fill={color} stroke="#fff" strokeWidth={2} />
-          {/* Inline legend when benchmark is on */}
-          {benchOn && benchLine && (
-            <g>
-              <line x1={padL + 4} x2={padL + 22} y1={padT - 10} y2={padT - 10} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
-              <text x={padL + 28} y={padT - 6} fill="#9b988d" fontSize={11.5} fontWeight={600} fontFamily={FONT}>You</text>
-              <line x1={padL + 62} x2={padL + 80} y1={padT - 10} y2={padT - 10} stroke="#9b8cd9" strokeWidth={2} strokeDasharray="4 3" />
-              <text x={padL + 86} y={padT - 6} fill="#9b988d" fontSize={11.5} fontWeight={600} fontFamily={FONT}>BTC buy &amp; hold</text>
-            </g>
-          )}
           {xticks}
           {hoverEls}
           <rect x={0} y={0} width={W} height={H} fill="transparent" onMouseMove={handleMouseMove} onMouseLeave={() => setHover(null)} style={{ cursor: 'crosshair' }} />
