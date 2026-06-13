@@ -281,7 +281,9 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
   const border = hovered
     ? (isUp ? '#b5d9c6' : '#e4c0b0')
     : (isUp ? '#cfe8da' : '#f0d4ca');
-  const shadow = hovered ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'none';
+  const shadow = hovered
+    ? '0 6px 20px rgba(20,20,12,0.07),inset 0 1px 0 rgba(255,255,255,0.9)'
+    : 'none';
 
   return (
     <div
@@ -344,7 +346,9 @@ function TradePill({ p, onClick }: { p: GateFuturesPositionClose; onClick: () =>
         : `${GLOSS},linear-gradient(180deg,#fffbfa,#f4ddd5)`)
     : (isUp ? 'linear-gradient(180deg,#fcfefd,#e3f3ea)' : 'linear-gradient(180deg,#fffcfb,#fbe7e1)');
   const border = hovered ? (isUp ? '#b5d9c6' : '#e4c0b0') : (isUp ? '#cfe8da' : '#f0d4ca');
-  const shadow = hovered ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'none';
+  const shadow = hovered
+    ? '0 3px 10px rgba(20,20,12,0.06),inset 0 1px 0 rgba(255,255,255,0.9)'
+    : 'none';
   return (
     <div
       onClick={e => { e.stopPropagation(); onClick(); }}
