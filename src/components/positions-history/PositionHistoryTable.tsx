@@ -136,7 +136,7 @@ function buildTradeCalendar(positions: GateFuturesPositionClose[], year: number,
 
 // ─── Trade Detail Drawer ──────────────────────────────────────────────────────
 
-function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClose: () => void }) {
+export function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClose: () => void }) {
   const pnl = parseFloat(p.pnl);
   const isUp = pnl >= 0;
   const isLong = p.side === 'long';

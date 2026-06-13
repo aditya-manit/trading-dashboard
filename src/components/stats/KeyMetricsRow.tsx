@@ -5,7 +5,8 @@ import { usePositionHistory } from '@/hooks/usePositionHistory';
 import { useAccountBook } from '@/hooks/useAccountBook';
 import { computeTradeStats } from '@/lib/trade-stats';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { GateAccountBookEntry } from '@/types/gate';
+import { TradeDetailDrawer } from '@/components/positions-history/PositionHistoryTable';
+import type { GateAccountBookEntry, GateFuturesPositionClose } from '@/types/gate';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 
@@ -316,6 +317,18 @@ export function KeyMetricsRow() {
   const entries = Array.isArray(rawEntries) ? rawEntries : [];
   const stats = useMemo(() => computeTradeStats(positions, entries), [positions, entries]);
 
+  const [drawerTrade, setDrawerTrade] = useState<GateFuturesPositionClose | null>(null);
+
+  const { bestPos, worstPos } = useMemo(() => {
+    if (!positions.length) return { bestPos: null, worstPos: null };
+    const sorted = [...positions].sort((a, b) => a.time - b.time);
+    const pnls = sorted.map(p => parseFloat(p.pnl));
+    return {
+      bestPos: sorted[pnls.indexOf(Math.max(...pnls))],
+      worstPos: sorted[pnls.indexOf(Math.min(...pnls))],
+    };
+  }, [positions]);
+
   // Two health colors only — same as legend
   const HEALTHY = '#2faa63';
   const DOWNSIDE = '#df5338';
@@ -390,6 +403,7 @@ export function KeyMetricsRow() {
   const greenArc = winRate * circumference;
 
   return (
+    <>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
 
       {/* Section A — 2-column grid */}
@@ -436,14 +450,24 @@ export function KeyMetricsRow() {
         {/* Card 2: Best & worst */}
         <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, padding: 24, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.01em', color: '#1a1813' }}>Best &amp; worst</span>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: 14, background: '#f1faf4', border: '1px solid #cfe9da' }}>
+          <div
+            onClick={() => bestPos && setDrawerTrade(bestPos)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: 14, background: '#f1faf4', border: '1px solid #cfe9da', cursor: bestPos ? 'pointer' : 'default', transition: 'opacity .15s' }}
+            onMouseEnter={e => { if (bestPos) (e.currentTarget as HTMLDivElement).style.opacity = '0.8'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
+          >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1813' }}>BTC/USDT.P</span>
               <span style={{ fontWeight: 500, fontSize: 12.5, color: '#8c8a81' }}>{stats.bestTrade.date} · best trade</span>
             </div>
             <span style={{ fontWeight: 800, fontSize: 20, color: '#1f9d55' }}>+${stats.bestTrade.pnl.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: 14, background: '#fcf0ed', border: '1px solid #f5c4bc' }}>
+          <div
+            onClick={() => worstPos && setDrawerTrade(worstPos)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: 14, background: '#fcf0ed', border: '1px solid #f5c4bc', cursor: worstPos ? 'pointer' : 'default', transition: 'opacity .15s' }}
+            onMouseEnter={e => { if (worstPos) (e.currentTarget as HTMLDivElement).style.opacity = '0.8'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
+          >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1813' }}>BTC/USDT.P</span>
               <span style={{ fontWeight: 500, fontSize: 12.5, color: '#8c8a81' }}>{stats.worstTrade.date} · worst trade</span>
@@ -572,5 +596,8 @@ export function KeyMetricsRow() {
         </div>
       </div>
     </div>
+
+    {drawerTrade && <TradeDetailDrawer p={drawerTrade} onClose={() => setDrawerTrade(null)} />}
+    </>
   );
 }
