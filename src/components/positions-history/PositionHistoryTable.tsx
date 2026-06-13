@@ -464,12 +464,9 @@ function CalendarView({
               }}>
                 {cell.date.getDate()}
               </div>
-              {cell.trades.slice(0, 2).map((p, pi) => (
+              {cell.trades.map((p, pi) => (
                 <TradePill key={pi} p={p} onClick={() => onTradeClick(p)} />
               ))}
-              {cell.trades.length > 2 && (
-                <span style={{ fontWeight: 600, fontSize: 10.5, color: '#9b988d' }}>+{cell.trades.length - 2} more</span>
-              )}
             </div>
           );
         })}
