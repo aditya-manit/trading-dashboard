@@ -33,11 +33,17 @@ function fmtDate(ts: number) {
 export function EquityChart() {
   const { data: rawEntries } = useAccountBook();
   const { data: account } = useAccount();
-  const { data: btcCandles } = useBtcCandles(365);
   const entries = Array.isArray(rawEntries) ? rawEntries : [];
   const [range, setRange] = useState<Range>('ALL');
   const [hover, setHover] = useState<number | null>(null);
   const [benchOn, setBenchOn] = useState(false);
+
+  // Derive equity start time so candles cover the right window (not just newest 365 days)
+  const equityFrom = useMemo(() => {
+    const pts = buildEquityData(entries, range);
+    return pts.length > 0 ? pts[0].time : undefined;
+  }, [entries, range]);
+  const { data: btcCandles } = useBtcCandles(equityFrom);
 
   const currentBalance = parseFloat(account?.total ?? '0');
   const currentTs = Math.floor(Date.now() / 1000);
