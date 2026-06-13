@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { usePositionHistory } from '@/hooks/usePositionHistory';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GateFuturesPositionClose } from '@/types/gate';
@@ -8,6 +8,9 @@ import type { GateFuturesPositionClose } from '@/types/gate';
 const PAGE_SIZE = 8;
 const FONT = "'Plus Jakarta Sans', sans-serif";
 const BTC_CONTRACT_SIZE = 0.0001;
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 function entryPrice(p: GateFuturesPositionClose): string {
   return p.side === 'long' ? p.long_price : p.short_price;
@@ -89,6 +92,48 @@ function GrayChip({ icon }: { icon: React.ReactNode }) {
   );
 }
 
+// ─── Calendar helpers ─────────────────────────────────────────────────────────
+
+interface CalendarCell {
+  date: Date;
+  trades: GateFuturesPositionClose[];
+  inMonth: boolean;
+}
+
+function buildTradeCalendar(positions: GateFuturesPositionClose[], year: number, month: number): CalendarCell[][] {
+  const byDate = new Map<string, GateFuturesPositionClose[]>();
+  for (const p of positions) {
+    const d = new Date(p.time * 1000);
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const key = `${year}-${month}-${d.getDate()}`;
+      if (!byDate.has(key)) byDate.set(key, []);
+      byDate.get(key)!.push(p);
+    }
+  }
+
+  const firstDay = new Date(year, month, 1);
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  const cells: CalendarCell[] = [];
+
+  // Pad before month start
+  for (let i = firstDay.getDay(); i > 0; i--) {
+    cells.push({ date: new Date(year, month, 1 - i), trades: [], inMonth: false });
+  }
+  // Month days
+  for (let d = 1; d <= lastDate; d++) {
+    cells.push({ date: new Date(year, month, d), trades: byDate.get(`${year}-${month}-${d}`) ?? [], inMonth: true });
+  }
+  // Pad to complete last row
+  const rem = (7 - (cells.length % 7)) % 7;
+  for (let i = 1; i <= rem; i++) {
+    cells.push({ date: new Date(year, month + 1, i), trades: [], inMonth: false });
+  }
+
+  const weeks: CalendarCell[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
 // ─── Trade Detail Drawer ──────────────────────────────────────────────────────
 
 function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClose: () => void }) {
@@ -135,7 +180,7 @@ function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClos
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 22, overflowY: 'auto', flex: 1 }}>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* Two-column hero — side by side with vertical divider */}
+            {/* Two-column hero */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>Realized P&L</span>
@@ -193,21 +238,18 @@ function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClos
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <SectionDivider label="Exposure" />
             <div style={{ border: '1px solid #f0efec', borderRadius: 14, overflow: 'hidden' }}>
-              {/* Leverage */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #f5f4f1' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 11, fontWeight: 500, fontSize: 13, color: '#9b988d' }}>
                   <GrayChip icon={ICONS.leverage} />Leverage
                 </span>
                 <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1813' }}>{fmtLev(p.leverage)}</span>
               </div>
-              {/* Margin used */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #f5f4f1' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 11, fontWeight: 500, fontSize: 13, color: '#9b988d' }}>
                   <GrayChip icon={ICONS.shield} />Margin used
                 </span>
                 <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1813' }}>{marginEst > 0 ? fmtUsd(marginEst) : '—'}</span>
               </div>
-              {/* Notional */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 11, fontWeight: 500, fontSize: 13, color: '#9b988d' }}>
                   <GrayChip icon={ICONS.dollar} />Notional
@@ -231,8 +273,11 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
   const isLong = p.side === 'long';
 
   const bg = hovered
-    ? (isUp ? 'linear-gradient(155deg,#ecf8f1,#d7efe3)' : 'linear-gradient(155deg,#fcefea,#f9dccf)')
-    : (isUp ? 'linear-gradient(155deg,#f3faf6,#e6f6ed)'  : 'linear-gradient(155deg,#fdf4f1,#fbe7e1)');
+    ? (isUp ? 'linear-gradient(180deg,#fbfefc,#bce5cd)' : 'linear-gradient(180deg,#fffdfc,#f6cbbb)')
+    : (isUp ? 'linear-gradient(180deg,#fcfefd,#e3f3ea)'  : 'linear-gradient(180deg,#fffcfb,#fbe7e1)');
+  const border = hovered
+    ? (isUp ? '#7ccfa0' : '#eebcad')
+    : (isUp ? '#cfe8da' : '#f0d4ca');
 
   return (
     <div
@@ -241,13 +286,13 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
         overflow: 'hidden',
         borderRadius: 16,
         padding: '16px 18px',
-        border: `1px solid ${isUp ? '#d4ecdc' : '#f3d6cd'}`,
+        border: `1px solid ${border}`,
         background: bg,
         display: 'flex',
         flexDirection: 'column',
         gap: 16,
         cursor: 'pointer',
-        transition: 'background .15s',
+        transition: 'background .15s, border-color .15s',
       }}
       onClick={onOpen}
       onMouseEnter={() => setHovered(true)}
@@ -280,6 +325,148 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
   );
 }
 
+// ─── Calendar Trade Pill ──────────────────────────────────────────────────────
+
+function TradePill({ p, onClick }: { p: GateFuturesPositionClose; onClick: () => void }) {
+  const pnl = parseFloat(p.pnl);
+  const isUp = pnl >= 0;
+  const isLong = p.side === 'long';
+  return (
+    <div
+      onClick={e => { e.stopPropagation(); onClick(); }}
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: 8,
+        padding: '6px 9px 7px 11px',
+        background: isUp ? 'linear-gradient(180deg,#fcfefd,#e3f3ea)' : 'linear-gradient(180deg,#fffcfb,#fbe7e1)',
+        border: `1px solid ${isUp ? '#cfe8da' : '#f0d4ca'}`,
+        cursor: 'pointer',
+        marginBottom: 4,
+      }}
+    >
+      <span style={{ position: 'absolute', top: 0, left: 0, width: 3, height: '100%', background: isUp ? '#2faa63' : '#df5338' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+        <span style={{ fontWeight: 700, fontSize: 10, color: '#1a1813' }}>BTC.P</span>
+        <div style={{ display: 'flex', gap: 3 }}>
+          <span style={{ fontWeight: 700, fontSize: 9, color: '#7a715f', background: 'rgba(122,113,95,0.1)', padding: '2px 5px', borderRadius: 4 }}>{fmtLev(p.leverage)}</span>
+          <span style={{ fontWeight: 700, fontSize: 9, color: isLong ? '#1f9d55' : '#df5338', background: isLong ? '#e3f3ea' : '#fbe5df', padding: '2px 5px', borderRadius: 4 }}>{isLong ? 'L' : 'S'}</span>
+        </div>
+      </div>
+      <div>
+        <span style={{ fontWeight: 800, fontSize: 12.5, color: isUp ? '#1f9d55' : '#df5338' }}>
+          {isUp ? '+$' : '-$'}{Math.abs(pnl).toFixed(0)}
+        </span>
+        <span style={{ fontWeight: 700, fontSize: 9.5, color: isUp ? '#3a8a5a' : '#c04a2e', marginLeft: 4 }}>{retPct(p)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Calendar View ────────────────────────────────────────────────────────────
+
+function CalendarView({
+  positions,
+  viewDate,
+  setViewDate,
+  onTradeClick,
+}: {
+  positions: GateFuturesPositionClose[];
+  viewDate: Date;
+  setViewDate: (d: Date) => void;
+  onTradeClick: (p: GateFuturesPositionClose) => void;
+}) {
+  const today = new Date();
+  const y = viewDate.getFullYear(), m = viewDate.getMonth();
+  const isCurrentMonth = y === today.getFullYear() && m === today.getMonth();
+  const weeks = useMemo(() => buildTradeCalendar(positions, y, m), [positions, y, m]);
+  const offset = (today.getFullYear() - y) * 12 + (today.getMonth() - m);
+
+  const navBtn = (label: string, onClick: () => void, active?: boolean): React.CSSProperties => ({
+    fontFamily: FONT, fontWeight: 600, fontSize: 12.5, padding: '5px 11px', borderRadius: 8,
+    border: '1px solid #ececea', cursor: 'pointer',
+    background: active ? '#f3eefe' : '#fff',
+    color: active ? '#6a45c4' : '#56544b',
+    transition: 'all .13s',
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Month nav */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 800, fontSize: 15, color: '#1a1813' }}>{MONTH_NAMES[m]} {y}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button style={navBtn('‹', () => {})} onClick={() => setViewDate(new Date(y, m - 1, 1))}>‹</button>
+          <button
+            style={navBtn('Today', () => {}, isCurrentMonth)}
+            onClick={() => setViewDate(new Date(today.getFullYear(), today.getMonth(), 1))}
+          >
+            Today
+          </button>
+          <button style={navBtn('›', () => {})} onClick={() => setViewDate(new Date(y, m + 1, 1))}>›</button>
+        </div>
+      </div>
+
+      {/* Day headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 7 }}>
+        {DAY_NAMES.map(d => (
+          <span key={d} style={{ fontWeight: 600, fontSize: 11.5, color: '#b0aea3', textAlign: 'center' as const, paddingBottom: 4 }}>{d}</span>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 7 }}>
+        {weeks.flat().map((cell, i) => {
+          const isToday = cell.inMonth &&
+            cell.date.getDate() === today.getDate() &&
+            cell.date.getMonth() === today.getMonth() &&
+            cell.date.getFullYear() === today.getFullYear();
+
+          return (
+            <div
+              key={i}
+              style={{
+                minHeight: 116,
+                border: '1px solid #f0efec',
+                borderRadius: 9,
+                padding: '6px 7px',
+                background: !cell.inMonth ? '#fafaf8' : cell.trades.length > 0 ? '#fff' : '#fcfcfb',
+                opacity: !cell.inMonth ? 0.55 : 1,
+              }}
+            >
+              <div style={{
+                display: 'inline-flex',
+                fontWeight: 700,
+                fontSize: 12.5,
+                color: isToday ? '#7c5cff' : '#1a1813',
+                background: isToday ? '#f3eefe' : 'transparent',
+                borderRadius: 5,
+                padding: isToday ? '1px 6px' : '1px 2px',
+                marginBottom: 5,
+              }}>
+                {cell.date.getDate()}
+              </div>
+              {cell.trades.slice(0, 2).map((p, pi) => (
+                <TradePill key={pi} p={p} onClick={() => onTradeClick(p)} />
+              ))}
+              {cell.trades.length > 2 && (
+                <span style={{ fontWeight: 600, fontSize: 10.5, color: '#9b988d' }}>+{cell.trades.length - 2} more</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Empty month note */}
+      {weeks.flat().every(c => c.trades.length === 0) && (
+        <div style={{ textAlign: 'center' as const, padding: '20px 0', fontWeight: 600, fontSize: 13.5, color: '#b3b1a7' }}>
+          No trades in {MONTH_NAMES[m]} {y}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function PositionHistoryTable() {
@@ -287,6 +474,11 @@ export function PositionHistoryTable() {
   const positions = Array.isArray(raw) ? raw : [];
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<GateFuturesPositionClose | null>(null);
+  const [view, setView] = useState<'gallery' | 'calendar'>('gallery');
+  const [calDate, setCalDate] = useState<Date>(() => {
+    const t = new Date();
+    return new Date(t.getFullYear(), t.getMonth(), 1);
+  });
 
   const totalPages = Math.ceil(positions.length / PAGE_SIZE);
   const safePage = Math.min(page, Math.max(0, totalPages - 1));
@@ -323,20 +515,61 @@ export function PositionHistoryTable() {
             <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em', color: '#1a1813' }}>Recent trades</span>
             <span style={{ fontWeight: 500, fontSize: 13, color: '#9b988d' }}>Closed trades, color-coded by outcome</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 600, fontSize: 12.5, color: '#8c8a81' }}>
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#2faa63', display: 'inline-block' }} />Profit
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 600, fontSize: 12.5, color: '#8c8a81' }}>
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#df5338', display: 'inline-block' }} />Loss
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Legend */}
+            {view === 'gallery' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 600, fontSize: 12.5, color: '#8c8a81' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 3, background: '#2faa63', display: 'inline-block' }} />Profit
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 600, fontSize: 12.5, color: '#8c8a81' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 3, background: '#df5338', display: 'inline-block' }} />Loss
+                </span>
+              </div>
+            )}
+            {/* View toggle */}
+            <div style={{ display: 'flex', background: '#f4f4f2', borderRadius: 10, padding: 4, border: '1px solid #ececea' }}>
+              {(['gallery', 'calendar'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  style={{
+                    fontFamily: FONT, fontWeight: 600, fontSize: 12.5,
+                    padding: '6px 13px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    background: view === v ? '#ffffff' : 'transparent',
+                    color: view === v ? '#1a1813' : '#9b988d',
+                    boxShadow: view === v ? '0 1px 2px rgba(20,20,12,0.1)' : 'none',
+                    transition: 'all .15s',
+                    textTransform: 'capitalize' as const,
+                  }}
+                >
+                  {v === 'gallery' ? 'Gallery' : 'Calendar'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {positions.length === 0 ? (
-          <div style={{ padding: '60px 0', textAlign: 'center', color: '#b3b1a7', fontWeight: 600, fontSize: 14 }}>
-            No closed trades yet
+          <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#f3eefe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+                <polyline points="16 7 22 7 22 13"/>
+              </svg>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', textAlign: 'center' as const }}>
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#1a1813' }}>No closed trades yet</span>
+              <span style={{ fontWeight: 500, fontSize: 13.5, color: '#9b988d' }}>Completed positions will appear here once you close a trade</span>
+            </div>
           </div>
+        ) : view === 'calendar' ? (
+          <CalendarView
+            positions={positions}
+            viewDate={calDate}
+            setViewDate={setCalDate}
+            onTradeClick={setSelected}
+          />
         ) : (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>

@@ -1,12 +1,14 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAccount } from '@/hooks/useAccount';
 import { usePositionHistory } from '@/hooks/usePositionHistory';
 import { useAccountBook } from '@/hooks/useAccountBook';
 import { computeTradeStats } from '@/lib/trade-stats';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GateFuturesPositionClose } from '@/types/gate';
+
+const FONT = "'Plus Jakarta Sans', sans-serif";
 
 function smoothPath(pts: { x: number; y: number }[]): string {
   if (pts.length < 2) return '';
@@ -25,7 +27,13 @@ function smoothPath(pts: { x: number; y: number }[]): string {
   return d;
 }
 
-function KpiSparkline({ data, color, gradId }: { data: number[]; color: string; gradId: string }) {
+function KpiSparkline({ data, color, gradId, fmtVal }: {
+  data: number[];
+  color: string;
+  gradId: string;
+  fmtVal: (v: number) => string;
+}) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const W = 300, H = 90, pt = 12, pb = 12, pl = 4, pr = 8;
   const n = data.length;
   if (n < 2) return null;
@@ -36,17 +44,68 @@ function KpiSparkline({ data, color, gradId }: { data: number[]; color: string; 
   const line = smoothPath(pts);
   const area = `${line} L${X(n - 1).toFixed(1)},${H} L${X(0).toFixed(1)},${H} Z`;
 
+  const handleMouseMove = (e: React.MouseEvent<SVGRectElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - r.left) / r.width;
+    const idx = Math.max(0, Math.min(n - 1, Math.round(ratio * (n - 1))));
+    setHoverIdx(idx);
+  };
+
+  const dotLeftPct = hoverIdx !== null ? (X(hoverIdx) / W) * 100 : 0;
+  const dotTopPct  = hoverIdx !== null ? (Y(data[hoverIdx]) / H) * 100 : 0;
+  const tipLeftPct = hoverIdx !== null ? Math.max(14, Math.min(86, (X(hoverIdx) / W) * 100)) : 50;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.26} />
-          <stop offset="100%" stopColor={color} stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gradId})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.26} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <path d={area} fill={`url(#${gradId})`} />
+        <path d={line} fill="none" stroke={color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        <rect x={0} y={0} width={W} height={H} fill="transparent" onMouseMove={handleMouseMove} onMouseLeave={() => setHoverIdx(null)} style={{ cursor: 'crosshair' }} />
+      </svg>
+
+      {hoverIdx !== null && (
+        <>
+          <div style={{
+            position: 'absolute',
+            width: 8, height: 8,
+            borderRadius: '50%',
+            background: color,
+            border: '2px solid #fff',
+            boxShadow: `0 0 0 2px ${color}55`,
+            top: `${dotTopPct}%`,
+            left: `${dotLeftPct}%`,
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+            zIndex: 2,
+          }} />
+          <div style={{
+            position: 'absolute',
+            bottom: '88%',
+            left: `${tipLeftPct}%`,
+            transform: 'translateX(-50%)',
+            background: '#1a1813',
+            color: '#fff',
+            fontFamily: FONT,
+            fontWeight: 700,
+            fontSize: 10.5,
+            padding: '3px 7px',
+            borderRadius: 6,
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            letterSpacing: '-0.01em',
+            zIndex: 10,
+          }}>
+            {fmtVal(data[hoverIdx])}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -129,6 +188,7 @@ export function KpiStrip() {
       sparkData: sparks?.net,
       sparkColor: displayPnl >= 0 ? '#2faa63' : '#df5338',
       gradId: 'kNet',
+      fmtVal: (v: number) => `${v >= 0 ? '+' : ''}$${Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
     },
     {
       label: 'Win rate',
@@ -138,6 +198,7 @@ export function KpiStrip() {
       sparkData: sparks?.winRate,
       sparkColor: '#2faa63',
       gradId: 'kWin',
+      fmtVal: (v: number) => `${v.toFixed(1)}%`,
     },
     {
       label: 'Profit factor',
@@ -147,6 +208,7 @@ export function KpiStrip() {
       sparkData: sparks?.pf,
       sparkColor: '#2faa63',
       gradId: 'kPF',
+      fmtVal: (v: number) => v.toFixed(2),
     },
     {
       label: 'Sharpe ratio',
@@ -156,6 +218,7 @@ export function KpiStrip() {
       sparkData: sparks?.sharpe,
       sparkColor: '#2faa63',
       gradId: 'kSharpe',
+      fmtVal: (v: number) => v.toFixed(2),
     },
     {
       label: 'Max drawdown',
@@ -165,6 +228,7 @@ export function KpiStrip() {
       sparkData: sparks?.dd,
       sparkColor: '#df5338',
       gradId: 'kDD',
+      fmtVal: (v: number) => `${v.toFixed(1)}%`,
     },
     {
       label: 'Avg R:R',
@@ -174,6 +238,7 @@ export function KpiStrip() {
       sparkData: sparks?.rr,
       sparkColor: '#2faa63',
       gradId: 'kRR',
+      fmtVal: (v: number) => `${v.toFixed(1)}R`,
     },
   ];
 
@@ -184,9 +249,9 @@ export function KpiStrip() {
           <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>{cell.label}</span>
           <span style={{ fontWeight: 800, fontSize: 23, letterSpacing: '-0.02em', color: cell.color }}>{cell.value}</span>
           <span style={{ fontWeight: 500, fontSize: 11.5, color: '#b3b1a7' }}>{cell.sub}</span>
-          <div style={{ height: 26, marginTop: 3 }}>
+          <div style={{ height: 26, marginTop: 3, position: 'relative' }}>
             {cell.sparkData && cell.sparkData.length >= 2 && (
-              <KpiSparkline data={cell.sparkData} color={cell.sparkColor} gradId={cell.gradId} />
+              <KpiSparkline data={cell.sparkData} color={cell.sparkColor} gradId={cell.gradId} fmtVal={cell.fmtVal} />
             )}
           </div>
         </div>

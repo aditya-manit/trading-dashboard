@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useAccountBook } from '@/hooks/useAccountBook';
 import { useAccount } from '@/hooks/useAccount';
+import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { buildEquityData } from '@/lib/trade-stats';
 
 type Range = '1M' | '3M' | '6M' | '1Y' | 'ALL';
@@ -32,18 +33,18 @@ function fmtDate(ts: number) {
 export function EquityChart() {
   const { data: rawEntries } = useAccountBook();
   const { data: account } = useAccount();
+  const { data: btcCandles } = useBtcCandles(365);
   const entries = Array.isArray(rawEntries) ? rawEntries : [];
   const [range, setRange] = useState<Range>('ALL');
   const [hover, setHover] = useState<number | null>(null);
+  const [benchOn, setBenchOn] = useState(false);
 
   const currentBalance = parseFloat(account?.total ?? '0');
   const currentTs = Math.floor(Date.now() / 1000);
 
-  // Build chart data then append current live balance as final point
   const data = useMemo(() => {
     const pts = buildEquityData(entries, range);
     if (!pts.length) return [];
-    // Append current balance only if it's newer than the last entry and different
     if (currentBalance > 0) {
       const last = pts[pts.length - 1];
       if (currentTs > last.time + 60) {
@@ -52,6 +53,26 @@ export function EquityChart() {
     }
     return pts;
   }, [entries, range, currentBalance, currentTs]);
+
+  // BTC buy & hold benchmark line
+  const benchLine = useMemo(() => {
+    if (!benchOn || !btcCandles || !btcCandles.length || data.length < 2) return null;
+    const candles = [...btcCandles].sort((a, b) => a.t - b.t);
+
+    const findBtcPrice = (ts: number): number => {
+      let best = candles[0], bestDiff = Math.abs(ts - candles[0].t);
+      for (const c of candles) {
+        const d = Math.abs(ts - c.t);
+        if (d < bestDiff) { bestDiff = d; best = c; }
+      }
+      return parseFloat(best.c) || 0;
+    };
+
+    const initPrice = findBtcPrice(data[0].time);
+    if (!initPrice) return null;
+    const btcAmt = data[0].balance / initPrice;
+    return data.map(pt => ({ time: pt.time, value: btcAmt * findBtcPrice(pt.time) }));
+  }, [benchOn, btcCandles, data]);
 
   const firstBal = data[0]?.balance ?? 0;
   const lastBal = data[data.length - 1]?.balance ?? 0;
@@ -81,33 +102,20 @@ export function EquityChart() {
                 <rect x="8" y="24" width="984" height="246" />
               </clipPath>
             </defs>
-
-            {/* grid lines */}
             {[0.18, 0.44, 0.70, 0.96].map((t, i) => (
               <line key={i} x1={8} x2={992} y1={t * 270} y2={t * 270} stroke="#f0efec" strokeWidth={1.5} />
             ))}
-
-            {/* y-axis label skeletons */}
             {[0.18, 0.44, 0.70, 0.96].map((t, i) => (
               <rect key={i} x={8} y={t * 270 - 14} width={62} height={11} rx={5} fill="url(#skelShimmer)" />
             ))}
-
-            {/* fake chart area + line */}
             <path
               d="M8,210 C80,195 140,175 200,158 C260,140 300,155 360,138 C420,120 460,100 520,88 C580,75 630,92 690,78 C740,66 800,55 860,48 C900,44 940,50 992,42 L992,270 L8,270 Z"
-              fill="url(#skelFill)"
-              clipPath="url(#skelClip)"
+              fill="url(#skelFill)" clipPath="url(#skelClip)"
             />
             <path
               d="M8,210 C80,195 140,175 200,158 C260,140 300,155 360,138 C420,120 460,100 520,88 C580,75 630,92 690,78 C740,66 800,55 860,48 C900,44 940,50 992,42"
-              fill="none"
-              stroke="url(#skelShimmer)"
-              strokeWidth={3}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              fill="none" stroke="url(#skelShimmer)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"
             />
-
-            {/* x-axis label skeletons */}
             {[8, 248, 496, 744, 950].map((x, i) => (
               <rect key={i} x={i === 4 ? x - 28 : x} y={278} width={i === 0 ? 52 : i === 4 ? 28 : 44} height={11} rx={5} fill="url(#skelShimmer)" />
             ))}
@@ -121,7 +129,9 @@ export function EquityChart() {
   const isUp = data.length >= 2 ? data[data.length - 1].balance >= data[0].balance : true;
   const color = isUp ? GREEN : RED;
 
+  // Y scale includes benchmark so both lines stay in view
   const vals = data.map(p => p.balance);
+  if (benchLine) benchLine.forEach(p => vals.push(p.value));
   let mn = Math.min(...vals), mx = Math.max(...vals);
   const span = (mx - mn) || 1;
   mn -= span * 0.12; mx += span * 0.08;
@@ -131,6 +141,9 @@ export function EquityChart() {
   const pts = data.map((p, i) => ({ x: X(i), y: Y(p.balance) }));
   const line = smoothPath(pts);
   const area = line + ` L${X(n - 1).toFixed(1)},${H - padB} L${X(0).toFixed(1)},${H - padB} Z`;
+
+  const benchPts = benchLine ? benchLine.map((pt, i) => ({ x: X(i), y: Y(pt.value) })) : null;
+  const benchPath = benchPts ? smoothPath(benchPts) : null;
 
   const grids = [0, 0.33, 0.66, 1].map((t, k) => {
     const gv = mx - (mx - mn) * t, gy = Y(gv);
@@ -162,20 +175,39 @@ export function EquityChart() {
   const hoverEls: React.ReactNode[] = [];
   if (hover != null && hover >= 0 && hover < n) {
     const hx = X(hover), hy = Y(data[hover].balance);
-    const tw = 168, th = 52;
+    const tw = 176;
+    const hbv = benchLine ? benchLine[hover].value : null;
+    const th = hbv ? 78 : 52;
     let tx = hx + 14;
     if (tx + tw > W - padR) tx = hx - 14 - tw;
     const ty = Math.max(padT, hy - th - 12);
     const isNow = hover === n - 1 && data[hover].time === currentTs;
+    const delta = hbv ? data[hover].balance - hbv : 0;
+
     hoverEls.push(
       <line key="hl" x1={hx} x2={hx} y1={padT} y2={H - padB} stroke={color} strokeWidth={1.5} strokeDasharray="3 4" opacity={0.5} />,
       <circle key="hc" cx={hx} cy={hy} r={5.5} fill={color} stroke="#fff" strokeWidth={2.5} />,
+    );
+    if (hbv) {
+      hoverEls.push(
+        <circle key="hbc" cx={hx} cy={Y(hbv)} r={4} fill="#9b8cd9" stroke="#fff" strokeWidth={2} />
+      );
+    }
+    hoverEls.push(
       <g key="tt" filter="url(#ttShadow)">
         <rect x={tx} y={ty} width={tw} height={th} rx={10} fill="#fff" stroke="#eceae5" />
-        <text x={tx + 15} y={ty + 21} fill="#9b988d" fontSize={13} fontWeight={600} fontFamily={FONT}>
+        <text x={tx + 14} y={ty + 20} fill="#9b988d" fontSize={12} fontWeight={600} fontFamily={FONT}>
           {isNow ? 'Live · Now' : fmtDate(data[hover].time)}
         </text>
-        <text x={tx + 15} y={ty + 41} fill="#1a1813" fontSize={18} fontWeight={800} fontFamily={FONT}>{fmt(data[hover].balance)}</text>
+        <text x={tx + 14} y={ty + 40} fill="#1a1813" fontSize={18} fontWeight={800} fontFamily={FONT}>{fmt(data[hover].balance)}</text>
+        {hbv && (
+          <>
+            <text x={tx + 14} y={ty + 58} fill="#6a45c4" fontSize={12} fontWeight={600} fontFamily={FONT}>BTC hold: {fmt(hbv)}</text>
+            <text x={tx + 14} y={ty + 74} fill={delta >= 0 ? '#1f9d55' : '#df5338'} fontSize={11} fontWeight={700} fontFamily={FONT}>
+              {delta >= 0 ? '+' : ''}{fmt(delta)} vs hold
+            </text>
+          </>
+        )}
       </g>
     );
   }
@@ -193,7 +225,34 @@ export function EquityChart() {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const }}>
+          {/* BTC HODL benchmark toggle */}
+          <button
+            onClick={() => setBenchOn(b => !b)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '6px 12px', borderRadius: 9,
+              border: `1px solid ${benchOn ? '#cdbcff' : '#ececea'}`,
+              background: benchOn ? '#f3eefe' : '#fff',
+              color: benchOn ? '#6a45c4' : '#9b988d',
+              fontFamily: FONT, fontWeight: 600, fontSize: 12.5, cursor: 'pointer',
+              transition: 'all .15s',
+            }}
+          >
+            <span style={{
+              width: 15, height: 15, borderRadius: 4, flexShrink: 0,
+              border: `1.5px solid ${benchOn ? '#7c5cff' : '#cfccc4'}`,
+              background: benchOn ? '#7c5cff' : '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {benchOn && (
+                <svg width="9" height="7" viewBox="0 0 9 7" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="1 3.5 3.5 6 8 1"/>
+                </svg>
+              )}
+            </span>
+            vs BTC HODL
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>Connected</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 12, color: '#2f8a55', background: '#eaf6ef', padding: '5px 10px', borderRadius: 8 }}>
@@ -222,14 +281,26 @@ export function EquityChart() {
               <stop offset="0%" stopColor={color} stopOpacity={0.20} />
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
-            <filter id="ttShadow" x="-30%" y="-30%" width="160%" height="180%">
+            <filter id="ttShadow" x="-30%" y="-30%" width="160%" height="200%">
               <feDropShadow dx={0} dy={4} stdDeviation={7} floodColor="rgba(20,20,12,0.14)" />
             </filter>
           </defs>
           {grids}
           <path d={area} fill="url(#gradEq)" />
+          {benchPath && (
+            <path d={benchPath} fill="none" stroke="#9b8cd9" strokeWidth={2} strokeDasharray="5 5" opacity={0.9} />
+          )}
           <path d={line} fill="none" stroke={color} strokeWidth={2.75} strokeLinejoin="round" strokeLinecap="round" />
           <circle cx={X(n - 1)} cy={Y(data[n - 1].balance)} r={5} fill={color} stroke="#fff" strokeWidth={2} />
+          {/* Inline legend when benchmark is on */}
+          {benchOn && benchLine && (
+            <g>
+              <line x1={padL + 4} x2={padL + 22} y1={padT - 10} y2={padT - 10} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+              <text x={padL + 28} y={padT - 6} fill="#9b988d" fontSize={11.5} fontWeight={600} fontFamily={FONT}>You</text>
+              <line x1={padL + 62} x2={padL + 80} y1={padT - 10} y2={padT - 10} stroke="#9b8cd9" strokeWidth={2} strokeDasharray="4 3" />
+              <text x={padL + 86} y={padT - 6} fill="#9b988d" fontSize={11.5} fontWeight={600} fontFamily={FONT}>BTC buy &amp; hold</text>
+            </g>
+          )}
           {xticks}
           {hoverEls}
           <rect x={0} y={0} width={W} height={H} fill="transparent" onMouseMove={handleMouseMove} onMouseLeave={() => setHover(null)} style={{ cursor: 'crosshair' }} />

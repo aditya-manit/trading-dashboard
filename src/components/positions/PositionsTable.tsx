@@ -359,7 +359,19 @@ export function PositionsTable() {
         </div>
 
         {positions.length === 0 ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', color: '#b3b1a7', fontWeight: 600, fontSize: 14 }}>No open positions</div>
+          <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#f3eefe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                <polyline points="2 17 12 22 22 17"/>
+                <polyline points="2 12 12 17 22 12"/>
+              </svg>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', textAlign: 'center' as const }}>
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#1a1813' }}>No open positions</span>
+              <span style={{ fontWeight: 500, fontSize: 13.5, color: '#9b988d' }}>Your open futures contracts will appear here</span>
+            </div>
+          </div>
         ) : (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr .8fr .9fr .9fr .9fr 1.5fr 1fr 30px', gap: 12, padding: '13px 4px', fontWeight: 600, fontSize: 11, letterSpacing: '0.05em', color: '#b0aea3', textTransform: 'uppercase' as const, borderBottom: '1px solid #f2f1ee' }}>
