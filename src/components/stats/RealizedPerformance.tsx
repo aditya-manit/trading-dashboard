@@ -102,6 +102,55 @@ function Sparkline({ data, color, gradId, fmtVal }: {
   );
 }
 
+function DefLabel({ text, def, fontSize = 13 }: { text: string; def: string; fontSize?: number }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-block', alignSelf: 'flex-start' }}>
+      <span
+        style={{
+          fontWeight: 600,
+          fontSize,
+          color: show ? '#56544b' : '#9b988d',
+          fontFamily: FONT,
+          cursor: 'help',
+          borderBottom: `1px dashed ${show ? '#9b988d' : '#dcdad2'}`,
+          paddingBottom: 1.5,
+          transition: 'color .15s, border-color .15s',
+          whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+      >
+        {text}
+      </span>
+      {show && (
+        <span style={{
+          position: 'absolute',
+          bottom: 'calc(100% + 9px)',
+          left: 0,
+          width: 186,
+          background: '#1a1813',
+          color: '#fbfbf9',
+          fontSize: 11.5,
+          fontWeight: 500,
+          lineHeight: 1.45,
+          padding: '9px 12px',
+          borderRadius: 10,
+          fontFamily: FONT,
+          boxShadow: '0 10px 26px rgba(20,18,12,0.22)',
+          zIndex: 30,
+          textAlign: 'left',
+          whiteSpace: 'normal',
+          pointerEvents: 'none',
+          display: 'block',
+        }}>
+          {def}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function RealizedPerformance() {
   const { data: raw, isLoading } = usePositionHistory();
   const positions = Array.isArray(raw) ? raw : [];
@@ -130,14 +179,15 @@ export function RealizedPerformance() {
           <span style={{ fontWeight: 500, fontSize: 13, color: '#9b988d' }}>Closed trades · all time</span>
         </div>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 700, fontSize: 13, color: '#3a3a34', background: '#f4f4f2', border: '1px solid #ececea', padding: '8px 13px', borderRadius: 10 }}>
-          Profit factor <span style={{ color: '#1f9d55' }}>{profitFactor.toFixed(2)}</span>
+          <DefLabel text="Profit factor" def="Gross profit divided by gross loss." fontSize={12.5} />
+          <span style={{ color: '#1f9d55' }}>{profitFactor.toFixed(2)}</span>
         </span>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
         <div style={{ background: '#fafaf8', border: '1px solid #f0efec', borderRadius: 16, padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-            <span style={{ fontWeight: 600, fontSize: 13, color: '#9b988d' }}>Gross profit</span>
+            <DefLabel text="Gross profit" def="Sum of all winning trades, before losses." fontSize={13} />
             <span style={{ fontWeight: 800, fontSize: 30, letterSpacing: '-0.02em', color: '#16140f' }}>
               ${grossProfit.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </span>
@@ -153,7 +203,7 @@ export function RealizedPerformance() {
 
         <div style={{ background: '#fafaf8', border: '1px solid #f0efec', borderRadius: 16, padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-            <span style={{ fontWeight: 600, fontSize: 13, color: '#9b988d' }}>Gross loss</span>
+            <DefLabel text="Gross loss" def="Sum of all losing trades, before profits." fontSize={13} />
             <span style={{ fontWeight: 800, fontSize: 30, letterSpacing: '-0.02em', color: '#16140f' }}>
               ${grossLoss.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </span>

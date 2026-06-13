@@ -317,7 +317,7 @@ function PositionRow({ p, totalValue, onOpen }: { p: GateFuturesPosition; totalV
       <span style={{ textAlign: 'right' as const, fontWeight: 700, color: pnl >= 0 ? '#1f9d55' : '#df5338' }}>
         {pnl >= 0 ? '+$' : '-$'}{fmt(Math.abs(pnl), 0)}
       </span>
-      <span style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', color: '#d2a48d', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>›</span>
+      <span style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', color: '#7c5cff', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>›</span>
     </div>
   );
 }

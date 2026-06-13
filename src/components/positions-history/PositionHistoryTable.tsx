@@ -368,14 +368,14 @@ function TradePill({ p, onClick }: { p: GateFuturesPositionClose; onClick: () =>
         <span style={{ fontWeight: 700, fontSize: 10, color: '#1a1813' }}>BTC.P</span>
         <div style={{ display: 'flex', gap: 3 }}>
           <span style={{ fontWeight: 700, fontSize: 9, color: '#7a715f', background: 'rgba(122,113,95,0.1)', padding: '2px 5px', borderRadius: 4 }}>{fmtLev(p.leverage)}</span>
-          <span style={{ fontWeight: 700, fontSize: 9, color: isLong ? '#1f9d55' : '#df5338', background: isLong ? '#e3f3ea' : '#fbe5df', padding: '2px 5px', borderRadius: 4 }}>{isLong ? 'L' : 'S'}</span>
+          <span style={{ fontWeight: 700, fontSize: 9, color: isLong ? '#1f9d55' : '#df5338', background: isLong ? '#e3f3ea' : '#fbe5df', padding: '2px 5px', borderRadius: 4 }}>{isLong ? 'LONG' : 'SHORT'}</span>
         </div>
       </div>
-      <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontWeight: 800, fontSize: 12.5, color: isUp ? '#1f9d55' : '#df5338' }}>
           {isUp ? '+$' : '-$'}{Math.abs(pnl).toFixed(0)}
         </span>
-        <span style={{ fontWeight: 700, fontSize: 9.5, color: isUp ? '#3a8a5a' : '#c04a2e', marginLeft: 4 }}>{retPct(p)}</span>
+        <span style={{ fontWeight: 700, fontSize: 9.5, color: isUp ? '#3a8a5a' : '#c04a2e' }}>{retPct(p)}</span>
       </div>
     </div>
   );
@@ -489,7 +489,7 @@ export function PositionHistoryTable() {
   const positions = Array.isArray(raw) ? raw : [];
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<GateFuturesPositionClose | null>(null);
-  const [view, setView] = useState<'gallery' | 'calendar'>('gallery');
+  const [view, setView] = useState<'gallery' | 'calendar'>('calendar');
   const [calDate, setCalDate] = useState<Date>(() => {
     const t = new Date();
     return new Date(t.getFullYear(), t.getMonth(), 1);

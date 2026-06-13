@@ -17,9 +17,15 @@ export interface TradeStats {
   avgHoldTimeDays: number;
   expectancy: number;
   sharpe: number;
+  sortino: number;
   maxDrawdownPct: number;
+  maxDrawdownDate: string;
   volatilityAnn: number;
   avgRR: number;
+  cagr: number;
+  totalReturn: number;
+  calmar: number;
+  riskOfRuin: number;
   profitSparkline: number[];
   lossSparkline: number[];
 }
@@ -38,7 +44,8 @@ export function computeTradeStats(
     bestTrade: { pnl: 0, date: '—' }, worstTrade: { pnl: 0, date: '—' },
     bestMonth: null, winStreak: null,
     avgDailyPnl90: 0, avgHoldTimeDays: 0, expectancy: 0,
-    sharpe: 0, maxDrawdownPct: 0, volatilityAnn: 0, avgRR: 0,
+    sharpe: 0, sortino: 0, maxDrawdownPct: 0, maxDrawdownDate: '', volatilityAnn: 0, avgRR: 0,
+    cagr: 0, totalReturn: 0, calmar: 0, riskOfRuin: 0,
     profitSparkline: Array(13).fill(0), lossSparkline: Array(13).fill(0),
   };
 
@@ -97,29 +104,72 @@ export function computeTradeStats(
   const expectancy = avgWin * winRate - avgLoss * (1 - winRate);
   const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
-  let sharpe = 0, maxDrawdownPct = 0, volatilityAnn = 0;
+  let sharpe = 0, sortino = 0, maxDrawdownPct = 0, maxDrawdownDate = '', volatilityAnn = 0, cagr = 0, totalReturn = 0;
   if (entries.length > 1) {
-    const balances = entries.map(e => parseFloat(e.balance)).filter(v => v > 0);
+    const byDay: Record<string, number> = {};
+    for (const e of entries) {
+      const day = new Date(e.time * 1000).toISOString().slice(0, 10);
+      byDay[day] = parseFloat(e.balance);
+    }
+
+    const sortedDays = Object.keys(byDay).sort();
+    const filledBalances: number[] = [];
+    const filledDates: string[] = [];
+    if (sortedDays.length > 0) {
+      const start = new Date(sortedDays[0]);
+      const end = new Date(sortedDays[sortedDays.length - 1]);
+      let lastBal = byDay[sortedDays[0]];
+      for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const key = d.toISOString().slice(0, 10);
+        if (byDay[key] !== undefined) lastBal = byDay[key];
+        if (lastBal > 0) { filledBalances.push(lastBal); filledDates.push(key); }
+      }
+    }
+
     const dailyReturns: number[] = [];
-    for (let i = 1; i < balances.length; i++) {
-      dailyReturns.push((balances[i] - balances[i - 1]) / balances[i - 1]);
+    for (let i = 1; i < filledBalances.length; i++) {
+      dailyReturns.push((filledBalances[i] - filledBalances[i - 1]) / filledBalances[i - 1]);
     }
     if (dailyReturns.length > 0) {
       const mean = dailyReturns.reduce((s, v) => s + v, 0) / dailyReturns.length;
       const variance = dailyReturns.reduce((s, v) => s + (v - mean) ** 2, 0) / dailyReturns.length;
       const std = Math.sqrt(variance);
-      volatilityAnn = std * Math.sqrt(252) * 100;
-      sharpe = std > 0 ? (mean / std) * Math.sqrt(252) : 0;
+      volatilityAnn = std * Math.sqrt(365) * 100;
+      sharpe = std > 0 ? (mean / std) * Math.sqrt(365) : 0;
+      const downsideVariance = dailyReturns.reduce((s, v) => s + (v < 0 ? v * v : 0), 0) / dailyReturns.length;
+      const downsideStd = Math.sqrt(downsideVariance);
+      sortino = downsideStd > 0 ? (mean / downsideStd) * Math.sqrt(365) : 0;
     }
-    let peak = balances[0];
-    for (const b of balances) {
+    let peak = filledBalances[0];
+    for (let bi = 0; bi < filledBalances.length; bi++) {
+      const b = filledBalances[bi];
       if (b > peak) peak = b;
       else if (peak > 0) {
         const dd = Math.abs((b - peak) / peak) * 100;
-        if (dd > maxDrawdownPct) maxDrawdownPct = dd;
+        if (dd > maxDrawdownPct) {
+          maxDrawdownPct = dd;
+          maxDrawdownDate = new Date(filledDates[bi]).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        }
+      }
+    }
+
+    if (filledBalances.length > 1) {
+      const startBal = filledBalances[0];
+      const endBal = filledBalances[filledBalances.length - 1];
+      const days = filledBalances.length - 1;
+      if (startBal > 0 && endBal > 0 && days > 0) {
+        cagr = (Math.pow(endBal / startBal, 365 / days) - 1) * 100;
+        totalReturn = ((endBal - startBal) / startBal) * 100;
       }
     }
   }
+
+  const calmar = cagr !== 0 && maxDrawdownPct !== 0 ? cagr / maxDrawdownPct : 0;
+
+  const rr = avgLoss > 0 ? avgWin / avgLoss : 0;
+  const edge = rr > 0 ? (rr * winRate - (1 - winRate)) / (rr + 1) : -1;
+  const N = 50;
+  const riskOfRuin = edge > 0 ? Math.max(0, Math.min(100, Math.exp(-2 * edge * N) * 100)) : 100;
 
   const profitSparkline: number[] = [];
   const lossSparkline: number[] = [];
@@ -139,7 +189,8 @@ export function computeTradeStats(
     bestMonth: bestMonthEntry ? { label: bestMonthEntry[0], pnl: bestMonthEntry[1] } : null,
     winStreak: maxStreak > 0 ? { count: maxStreak, startDate: fmtDate(streakStart), endDate: fmtDate(streakEnd) } : null,
     avgDailyPnl90, avgHoldTimeDays, expectancy, avgRR,
-    sharpe, maxDrawdownPct, volatilityAnn,
+    sharpe, sortino, maxDrawdownPct, maxDrawdownDate, volatilityAnn,
+    cagr, totalReturn, calmar, riskOfRuin,
     profitSparkline, lossSparkline,
   };
 }

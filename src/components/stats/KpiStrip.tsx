@@ -109,19 +109,67 @@ function KpiSparkline({ data, color, gradId, fmtVal }: {
   );
 }
 
+function CellLabel({ label, tooltip }: { label: string; tooltip: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-block', alignSelf: 'flex-start' }}>
+      <span
+        style={{
+          fontWeight: 600,
+          fontSize: 12.5,
+          color: show ? '#56544b' : '#9b988d',
+          fontFamily: FONT,
+          cursor: 'help',
+          borderBottom: `1px dashed ${show ? '#9b988d' : '#dcdad2'}`,
+          paddingBottom: 1.5,
+          transition: 'color .15s, border-color .15s',
+          whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+      >
+        {label}
+      </span>
+      {show && (
+        <span style={{
+          position: 'absolute',
+          bottom: 'calc(100% + 9px)',
+          left: 0,
+          width: 186,
+          background: '#1a1813',
+          color: '#fbfbf9',
+          fontSize: 11.5,
+          fontWeight: 500,
+          lineHeight: 1.45,
+          padding: '9px 12px',
+          borderRadius: 10,
+          fontFamily: FONT,
+          boxShadow: '0 10px 26px rgba(20,18,12,0.22)',
+          zIndex: 50,
+          textAlign: 'left',
+          whiteSpace: 'normal',
+          pointerEvents: 'none',
+          display: 'block',
+        }}>
+          {tooltip}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function buildKpiSparks(positions: GateFuturesPositionClose[]) {
   const N = 11;
   if (positions.length < 3) return null;
   const sorted = [...positions].sort((a, b) => a.time - b.time);
 
-  const net: number[] = [], winRate: number[] = [], pf: number[] = [], dd: number[] = [];
-  let cumPnl = 0, peak = 0, wins = 0, gp = 0, gl = 0;
+  const net: number[] = [], winRate: number[] = [], pf: number[] = [];
+  let cumPnl = 0, wins = 0, gp = 0, gl = 0;
   const step = sorted.length / N;
 
   for (let i = 0; i < sorted.length; i++) {
     const pnlVal = parseFloat(sorted[i].pnl);
     cumPnl += pnlVal;
-    peak = Math.max(peak, cumPnl);
     if (pnlVal > 0) { wins++; gp += pnlVal; } else { gl += Math.abs(pnlVal); }
 
     if (i >= Math.round((net.length + 1) * step) - 1 || i === sorted.length - 1) {
@@ -129,7 +177,6 @@ function buildKpiSparks(positions: GateFuturesPositionClose[]) {
       net.push(cumPnl);
       winRate.push((wins / total) * 100);
       pf.push(gp / Math.max(1, gl));
-      dd.push(peak > 0 ? -((peak - cumPnl) / peak) * 100 : 0);
       if (net.length >= N) break;
     }
   }
@@ -138,20 +185,27 @@ function buildKpiSparks(positions: GateFuturesPositionClose[]) {
     net.push(net[net.length - 1] ?? 0);
     winRate.push(winRate[winRate.length - 1] ?? 50);
     pf.push(pf[pf.length - 1] ?? 1);
-    dd.push(dd[dd.length - 1] ?? 0);
   }
 
   return {
     net: net.slice(0, N),
     winRate: winRate.slice(0, N),
     pf: pf.slice(0, N),
-    sharpe: pf.slice(0, N).map(v => v * 0.85),
-    dd: dd.slice(0, N),
     rr: pf.slice(0, N).map(v => v * 0.9),
   };
 }
 
+const TOOLTIPS = {
+  netPnl: 'Total realized profit or loss across all closed trades, net of fees.',
+  cagr: 'Compound Annual Growth Rate — how fast your account compounds each year.',
+  expectancy: 'Average expected profit per trade, factoring in win rate and avg win/loss size.',
+  profitFactor: 'Ratio of gross profit to gross loss. Above 1.0 means the strategy is net profitable.',
+  winRate: 'Percentage of closed trades that were profitable.',
+  avgRR: 'Average reward-to-risk ratio across all closed trades.',
+};
+
 export function KpiStrip() {
+  const [hoverCell, setHoverCell] = useState<number | null>(null);
   const { data: account } = useAccount();
   const { data: rawPositions, isLoading } = usePositionHistory();
   const { data: rawEntries } = useAccountBook();
@@ -164,7 +218,7 @@ export function KpiStrip() {
 
   if (isLoading) {
     return (
-      <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, overflow: 'hidden', display: 'grid', gridTemplateColumns: 'repeat(6,1fr)' }}>
+      <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, display: 'grid', gridTemplateColumns: 'repeat(6,1fr)' }}>
         {[0, 1, 2, 3, 4, 5].map(i => (
           <div key={i} style={{ padding: '20px 22px', borderRight: i < 5 ? '1px solid #f2f1ee' : 'none' }}>
             <Skeleton className="h-4 w-20 mb-2" />
@@ -178,12 +232,14 @@ export function KpiStrip() {
 
   const totalPnlFromAccount = parseFloat(account?.history?.pnl ?? '0');
   const displayPnl = totalPnlFromAccount !== 0 ? totalPnlFromAccount : stats.totalPnl;
+  const allTimeReturn = stats.totalReturn;
 
   const cells = [
     {
       label: 'Net P&L',
+      tooltip: TOOLTIPS.netPnl,
       value: `${displayPnl >= 0 ? '+' : ''}$${Math.abs(displayPnl).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
-      sub: `${stats.winRate > 0 ? ((displayPnl / Math.max(1, Math.abs(displayPnl))) * 100).toFixed(0) : '0'}% all-time`,
+      sub: `${allTimeReturn >= 0 ? '+' : ''}${allTimeReturn.toFixed(1)}% all-time`,
       color: displayPnl >= 0 ? '#1f9d55' : '#df5338',
       sparkData: sparks?.net,
       sparkColor: displayPnl >= 0 ? '#2faa63' : '#df5338',
@@ -191,17 +247,30 @@ export function KpiStrip() {
       fmtVal: (v: number) => `${v >= 0 ? '+' : ''}$${Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
     },
     {
-      label: 'Win rate',
-      value: `${(stats.winRate * 100).toFixed(1)}%`,
-      sub: `${stats.wins}W · ${stats.losses}L`,
-      color: '#1a1813',
-      sparkData: sparks?.winRate,
-      sparkColor: '#2faa63',
-      gradId: 'kWin',
+      label: 'CAGR',
+      tooltip: TOOLTIPS.cagr,
+      value: `${stats.cagr >= 0 ? '+' : ''}${stats.cagr.toFixed(1)}%`,
+      sub: 'annualized',
+      color: stats.cagr >= 0 ? '#1f9d55' : '#df5338',
+      sparkData: sparks?.net,
+      sparkColor: stats.cagr >= 0 ? '#2faa63' : '#df5338',
+      gradId: 'kCagr',
       fmtVal: (v: number) => `${v.toFixed(1)}%`,
     },
     {
+      label: 'Expectancy',
+      tooltip: TOOLTIPS.expectancy,
+      value: `${stats.expectancy >= 0 ? '+$' : '-$'}${Math.abs(stats.expectancy).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+      sub: 'per-trade avg',
+      color: stats.expectancy >= 0 ? '#1f9d55' : '#df5338',
+      sparkData: sparks?.net,
+      sparkColor: stats.expectancy >= 0 ? '#2faa63' : '#df5338',
+      gradId: 'kExp',
+      fmtVal: (v: number) => `${v >= 0 ? '+$' : '-$'}${Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+    },
+    {
       label: 'Profit factor',
+      tooltip: TOOLTIPS.profitFactor,
       value: stats.profitFactor > 0 ? stats.profitFactor.toFixed(2) : '—',
       sub: 'gross win / loss',
       color: '#1a1813',
@@ -211,27 +280,19 @@ export function KpiStrip() {
       fmtVal: (v: number) => v.toFixed(2),
     },
     {
-      label: 'Sharpe ratio',
-      value: stats.sharpe !== 0 ? stats.sharpe.toFixed(2) : '—',
-      sub: 'risk-adjusted',
+      label: 'Win rate',
+      tooltip: TOOLTIPS.winRate,
+      value: `${(stats.winRate * 100).toFixed(1)}%`,
+      sub: `${stats.wins}W · ${stats.losses}L`,
       color: '#1a1813',
-      sparkData: sparks?.sharpe,
+      sparkData: sparks?.winRate,
       sparkColor: '#2faa63',
-      gradId: 'kSharpe',
-      fmtVal: (v: number) => v.toFixed(2),
-    },
-    {
-      label: 'Max drawdown',
-      value: stats.maxDrawdownPct > 0 ? `−${stats.maxDrawdownPct.toFixed(1)}%` : '—',
-      sub: 'peak to trough',
-      color: '#df5338',
-      sparkData: sparks?.dd,
-      sparkColor: '#df5338',
-      gradId: 'kDD',
+      gradId: 'kWin',
       fmtVal: (v: number) => `${v.toFixed(1)}%`,
     },
     {
       label: 'Avg R:R',
+      tooltip: TOOLTIPS.avgRR,
       value: stats.avgRR > 0 ? `${stats.avgRR.toFixed(1)}R` : '—',
       sub: 'per trade',
       color: '#1a1813',
@@ -243,19 +304,42 @@ export function KpiStrip() {
   ];
 
   return (
-    <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', overflow: 'hidden' }}>
-      {cells.map((cell, i) => (
-        <div key={cell.label} style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 7, borderRight: i < 5 ? '1px solid #f2f1ee' : 'none' }}>
-          <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>{cell.label}</span>
-          <span style={{ fontWeight: 800, fontSize: 23, letterSpacing: '-0.02em', color: cell.color }}>{cell.value}</span>
-          <span style={{ fontWeight: 500, fontSize: 11.5, color: '#b3b1a7' }}>{cell.sub}</span>
-          <div style={{ height: 26, marginTop: 3, position: 'relative' }}>
-            {cell.sparkData && cell.sparkData.length >= 2 && (
-              <KpiSparkline data={cell.sparkData} color={cell.sparkColor} gradId={cell.gradId} fmtVal={cell.fmtVal} />
-            )}
+    <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
+      {/* Section header */}
+      <div style={{ padding: '22px 24px 0', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em', color: '#1a1813' }}>Performance &amp; edge</span>
+        <span style={{ fontWeight: 500, fontSize: 13, color: '#9b988d' }}>Returns, consistency &amp; edge per trade</span>
+      </div>
+
+      {/* Cells grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', marginTop: 18, borderTop: '1px solid #f2f1ee' }}>
+        {cells.map((cell, i) => (
+          <div
+            key={cell.label}
+            onMouseEnter={() => setHoverCell(i)}
+            onMouseLeave={() => setHoverCell(null)}
+            style={{
+              padding: '18px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 7,
+              borderRight: i < 5 ? '1px solid #f2f1ee' : 'none',
+              borderRadius: i === 0 ? '0 0 0 19px' : i === 5 ? '0 0 19px 0' : 0,
+              background: hoverCell === i ? '#fafaf8' : 'transparent',
+              transition: 'background .15s',
+            }}
+          >
+            <CellLabel label={cell.label} tooltip={cell.tooltip} />
+            <span style={{ fontWeight: 800, fontSize: 23, letterSpacing: '-0.02em', color: cell.color }}>{cell.value}</span>
+            <span style={{ fontWeight: 500, fontSize: 11.5, color: '#b3b1a7' }}>{cell.sub}</span>
+            <div style={{ height: 26, marginTop: 3, position: 'relative' }}>
+              {cell.sparkData && cell.sparkData.length >= 2 && (
+                <KpiSparkline data={cell.sparkData} color={cell.sparkColor} gradId={cell.gradId} fmtVal={cell.fmtVal} />
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
