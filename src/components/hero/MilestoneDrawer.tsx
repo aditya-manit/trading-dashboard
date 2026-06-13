@@ -34,7 +34,7 @@ export function MilestoneDrawer({ balance, onClose }: Props) {
       <div style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: 444, maxWidth: '92vw', background: '#ffffff', zIndex: 91, boxShadow: '-24px 0 60px rgba(20,18,12,0.2)', display: 'flex', flexDirection: 'column', animation: 'drawerIn .28s cubic-bezier(.22,.8,.3,1)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '22px 24px', borderBottom: '1px solid #f0efec' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontWeight: 700, fontSize: 10.5, color: '#c2724e', letterSpacing: '0.07em' }}>$500K → $10M · 20× · +55% → +50%</span>
+            <span style={{ fontWeight: 700, fontSize: 10.5, color: '#7c5cff', letterSpacing: '0.07em' }}>$500K → $10M · 20× · +55% → +50%</span>
             <span style={{ fontWeight: 800, fontSize: 18, color: '#1a1813', letterSpacing: '-0.01em' }}>Leverage road to $10M</span>
           </div>
           <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid #ececea', background: '#f6f5f2', color: '#56544b', fontSize: 15, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>✕</button>
@@ -46,11 +46,11 @@ export function MilestoneDrawer({ balance, onClose }: Props) {
               <span style={{ fontWeight: 800, fontSize: 30, color: '#16140f', letterSpacing: '-0.02em' }}>${balance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
               <span style={{ fontWeight: 700, fontSize: 15, color: '#9b988d' }}>/ ${nextMilestone.target.toLocaleString('en-US')}</span>
             </div>
-            <div style={{ height: 12, background: '#f1e3d8', borderRadius: 99, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${progressPct.toFixed(1)}%`, background: 'linear-gradient(90deg,#ff8a5b,#ef5f33)', borderRadius: 99 }} />
+            <div style={{ height: 12, background: '#eae2fb', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${progressPct.toFixed(1)}%`, background: 'linear-gradient(90deg,#9d82ff,#7c5cff)', borderRadius: 99 }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 800, fontSize: 15, color: '#ef5f33' }}>{progressPct.toFixed(1)}% there</span>
+              <span style={{ fontWeight: 800, fontSize: 15, color: '#7c5cff' }}>{progressPct.toFixed(1)}% there</span>
               <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>${toGo.toLocaleString('en-US', { maximumFractionDigits: 0 })} to go</span>
             </div>
           </div>
@@ -58,7 +58,7 @@ export function MilestoneDrawer({ balance, onClose }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <span style={{ fontWeight: 700, fontSize: 12, color: '#9b988d', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Road to $10M · monthly targets</span>
-              <span style={{ fontWeight: 700, fontSize: 11, color: '#8b7bd8' }}>+55% → +50%</span>
+              <span style={{ fontWeight: 700, fontSize: 11, color: '#7c5cff' }}>+55% → +50%</span>
             </div>
 
             {MILESTONES.map((m, idx) => {
@@ -73,22 +73,22 @@ export function MilestoneDrawer({ balance, onClose }: Props) {
                   style={{
                     padding: isCurrent ? '13px 14px' : '13px 2px',
                     borderRadius: isCurrent ? 12 : 0,
-                    background: isCurrent ? '#fff4ef' : 'transparent',
-                    border: isCurrent ? '1px solid #f7dac9' : 'none',
+                    background: isCurrent ? '#f6f2ff' : 'transparent',
+                    border: isCurrent ? '1px solid #e2d6fb' : 'none',
                     marginBottom: isCurrent ? 8 : 0,
                     borderBottom: !isCurrent ? '1px solid #f5f4f1' : 'none',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9 }}>
-                    <span style={{ fontWeight: 700, fontSize: 11.5, color: isCurrent ? '#c2724e' : done ? '#2faa63' : '#a8a69b', width: 26, flexShrink: 0 }}>{m.month}</span>
+                    <span style={{ fontWeight: 700, fontSize: 11.5, color: isCurrent ? '#7e63c8' : done ? '#2faa63' : '#a8a69b', width: 26, flexShrink: 0 }}>{m.month}</span>
                     <span style={{ fontWeight: 800, fontSize: 14.5, color: '#1a1813' }}>{fmtK(m.target)}</span>
-                    {isCurrent && <span style={{ fontWeight: 700, fontSize: 9.5, color: '#fff', background: '#ef5f33', padding: '2px 7px', borderRadius: 6, letterSpacing: '0.05em' }}>NOW</span>}
+                    {isCurrent && <span style={{ fontWeight: 700, fontSize: 9.5, color: '#fff', background: '#7c5cff', padding: '2px 7px', borderRadius: 6, letterSpacing: '0.05em' }}>NOW</span>}
                     {isGoal && !isCurrent && <span style={{ fontWeight: 700, fontSize: 9.5, color: '#fff', background: '#22a35a', padding: '2px 7px', borderRadius: 6, letterSpacing: '0.05em' }}>GOAL</span>}
                     {done && !isGoal && <span style={{ fontWeight: 700, fontSize: 9.5, color: '#fff', background: '#2faa63', padding: '2px 7px', borderRadius: 6, letterSpacing: '0.05em' }}>DONE</span>}
                     {!isCurrent && !isGoal && !done && <span style={{ fontWeight: 600, fontSize: 11.5, color: '#b0aea3' }}>{m.pct}%</span>}
-                    <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 12, color: '#8b7bd8' }}>{idx < 5 ? '+55%' : '+50%'}</span>
+                    <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 12, color: '#7c5cff' }}>{idx < 5 ? '+55%' : '+50%'}</span>
                   </div>
-                  <div style={{ height: 8, background: isCurrent ? '#f3ddd0' : '#f0efeb', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: 8, background: isCurrent ? '#e6dff6' : '#f0efeb', borderRadius: 99, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${Math.min(100, barPct)}%`, background: m.color, borderRadius: 99, transition: 'width 0.5s ease' }} />
                   </div>
                   <div style={{ fontWeight: 500, fontSize: 12, color: isCurrent ? '#7a715f' : '#8c8a81', marginTop: 8, lineHeight: 1.45 }}>{m.note}</div>

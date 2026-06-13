@@ -7,7 +7,6 @@ import type { GateFuturesPositionClose } from '@/types/gate';
 
 const PAGE_SIZE = 8;
 const FONT = "'Plus Jakarta Sans', sans-serif";
-// Gate.io BTC_USDT perpetual: 1 contract = 0.0001 BTC
 const BTC_CONTRACT_SIZE = 0.0001;
 
 function entryPrice(p: GateFuturesPositionClose): string {
@@ -27,8 +26,6 @@ function notionalUsd(p: GateFuturesPositionClose): number {
   const entry = parseFloat(entryPrice(p)) || 0;
   return size * BTC_CONTRACT_SIZE * entry;
 }
-// Return on margin = PnL / (notional / leverage).
-// Falls back to leveraged price-return when notional is unavailable.
 function retPct(p: GateFuturesPositionClose): string {
   const pnl = parseFloat(p.pnl);
   const lev = parseFloat(p.leverage) || 0;
@@ -39,7 +36,6 @@ function retPct(p: GateFuturesPositionClose): string {
     const pct = (pnl / margin) * 100;
     return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
   }
-  // cross-margin fallback: use price return
   const entry = parseFloat(entryPrice(p));
   const exit = parseFloat(exitPrice(p));
   if (!entry || !exit) return '';
@@ -70,30 +66,30 @@ function fmtUsd(n: number): string {
   return `$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// ─── Icon Chip ────────────────────────────────────────────────────────────────
+const ICONS = {
+  leverage: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+  shield:   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+  dollar:   <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
+};
 
-function Chip({ icon }: { icon: React.ReactNode }) {
+function SectionDivider({ label }: { label: string }) {
   return (
-    <span style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: '#f6f5f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a8a08e' }}>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        {icon}
-      </svg>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontWeight: 700, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: '#b0aea3' }}>{label}</span>
+      <span style={{ flex: 1, height: 1, background: '#f2f1ee' }} />
+    </div>
+  );
+}
+
+function GrayChip({ icon }: { icon: React.ReactNode }) {
+  return (
+    <span style={{ width: 28, height: 28, borderRadius: 8, background: '#f6f5f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#a8a08e' }}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
     </span>
   );
 }
 
-const ICONS = {
-  direction: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>,
-  leverage:  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
-  layers:    <><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>,
-  dollar:    <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
-  login:     <><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></>,
-  logout:    <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
-  percent:   <><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></>,
-  clock:     <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
-};
-
-// ─── Detail Drawer ────────────────────────────────────────────────────────────
+// ─── Trade Detail Drawer ──────────────────────────────────────────────────────
 
 function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClose: () => void }) {
   const pnl = parseFloat(p.pnl);
@@ -101,99 +97,124 @@ function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClos
   const isLong = p.side === 'long';
   const ret = retPct(p);
   const size = Math.abs(parseFloat(p.max_size) || 0);
+  const btcSize = (size * BTC_CONTRACT_SIZE).toFixed(2);
   const notional = notionalUsd(p);
   const fee = Math.abs(parseFloat(p.pnl_fee) || 0);
-
-  const detailRows: { icon: React.ReactNode; label: string; value: string; color: string }[] = [
-    { icon: ICONS.direction, label: 'Direction',      value: isLong ? 'Long' : 'Short',              color: isLong ? '#1f9d55' : '#df5338' },
-    { icon: ICONS.leverage,  label: 'Leverage',       value: fmtLev(p.leverage),                     color: '#1a1813' },
-    { icon: ICONS.layers,    label: 'Position size',  value: `${size.toLocaleString('en-US')} contracts`, color: '#1a1813' },
-    { icon: ICONS.dollar,    label: 'Notional value', value: notional > 0 ? fmtUsd(notional) : '—', color: '#1a1813' },
-    { icon: ICONS.login,     label: 'Entry price',    value: fmtPrice(entryPrice(p)),                color: '#1a1813' },
-    { icon: ICONS.logout,    label: 'Exit price',     value: fmtPrice(exitPrice(p)),                 color: '#1a1813' },
-    { icon: ICONS.percent,   label: 'Trading fees',   value: fee > 0 ? `-${fmtUsd(fee)}` : '—',     color: '#df5338' },
-    { icon: ICONS.clock,     label: 'Hold duration',  value: holdDuration(p),                        color: '#1a1813' },
-  ];
+  const lev = parseFloat(p.leverage) || 0;
+  const marginEst = lev > 0 && notional > 0 ? notional / lev : 0;
 
   return (
     <>
-      {/* backdrop */}
-      <div
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(20,18,12,0.3)', backdropFilter: 'blur(2px)' }}
-      />
-      {/* drawer */}
-      <div style={{
-        position: 'fixed', top: 0, right: 0, height: '100vh', width: 434, maxWidth: '92vw',
-        background: '#ffffff', zIndex: 91,
-        boxShadow: '-24px 0 60px rgba(20,18,12,0.2)',
-        display: 'flex', flexDirection: 'column',
-        fontFamily: FONT,
-        animation: 'drawerIn .28s cubic-bezier(.22,.8,.3,1)',
-      }}>
-        <style>{`@keyframes drawerIn{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(20,18,12,0.34)', animation: 'fadeIn .2s ease' }} />
+      <div style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: 434, maxWidth: '92vw', background: '#ffffff', zIndex: 91, boxShadow: '-24px 0 60px rgba(20,18,12,0.2)', display: 'flex', flexDirection: 'column', fontFamily: FONT, animation: 'drawerIn .28s cubic-bezier(.22,.8,.3,1)' }}>
+        <style>{`
+          @keyframes drawerIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+          @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+        `}</style>
 
-        {/* header */}
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '22px 24px', borderBottom: '1px solid #f0efec' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <span style={{ fontWeight: 800, fontSize: 20, color: '#1a1813', letterSpacing: '-0.01em' }}>BTC/USDT.P</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, fontSize: 11, color: isLong ? '#1f9d55' : '#df5338', background: isLong ? '#e9f6ee' : '#fbeae6', padding: '4px 10px', borderRadius: 7, letterSpacing: '0.04em' }}>
-                {isLong ? 'LONG' : 'SHORT'}
-              </span>
-              <span style={{ fontWeight: 700, fontSize: 11, color: '#7a715f', background: '#f1ede6', padding: '4px 10px', borderRadius: 7 }}>
-                {fmtLev(p.leverage)} leverage
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <span style={{ fontWeight: 800, fontSize: 20, color: '#1a1813', letterSpacing: '-0.01em' }}>BTC/USDT.P</span>
+              <span style={{ fontWeight: 700, fontSize: 10, color: '#8c8a81', background: '#f1f0ed', padding: '3px 8px', borderRadius: 6, letterSpacing: '0.05em' }}>CLOSED</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' as const }}>
+              {isLong
+                ? <span style={{ fontWeight: 700, fontSize: 11, color: '#1f9d55', background: '#e9f6ee', padding: '4px 10px', borderRadius: 7, letterSpacing: '0.04em' }}>LONG</span>
+                : <span style={{ fontWeight: 700, fontSize: 11, color: '#df5338', background: '#fbeae6', padding: '4px 10px', borderRadius: 7, letterSpacing: '0.04em' }}>SHORT</span>
+              }
+              <span style={{ fontWeight: 700, fontSize: 11, color: '#7a715f', background: '#efebf8', padding: '4px 10px', borderRadius: 7 }}>{fmtLev(p.leverage)} leverage</span>
               <span style={{ fontWeight: 500, fontSize: 12.5, color: '#9b988d' }}>{fmtDateLong(p.time)}</span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid #ececea', background: '#f6f5f2', color: '#56544b', fontSize: 15, cursor: 'pointer', fontFamily: FONT, flexShrink: 0 }}
-          >
-            ✕
-          </button>
+          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid #ececea', background: '#f6f5f2', color: '#56544b', fontSize: 15, cursor: 'pointer', fontFamily: FONT, flexShrink: 0 }}>✕</button>
         </div>
 
-        {/* body */}
+        {/* Body */}
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 22, overflowY: 'auto', flex: 1 }}>
-          {/* PnL hero */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>Realized P&amp;L</span>
-            <span style={{ fontWeight: 800, fontSize: 34, letterSpacing: '-0.02em', color: isUp ? '#1f9d55' : '#df5338' }}>
-              {isUp ? '+$' : '-$'}{Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              {ret && (
-                <span style={{ fontWeight: 700, fontSize: 13, color: isUp ? '#1f9d55' : '#df5338', background: isUp ? '#e9f6ee' : '#fbeae6', padding: '4px 10px', borderRadius: 8 }}>
-                  {ret}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Two-column hero — side by side with vertical divider */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: 20 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>Realized P&L</span>
+                <span style={{ fontWeight: 800, fontSize: 34, letterSpacing: '-0.02em', color: isUp ? '#1f9d55' : '#df5338' }}>
+                  {isUp ? '+$' : '-$'}{Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-              )}
-              <span style={{ fontWeight: 500, fontSize: 12.5, color: '#9b988d' }}>return on margin</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: isUp ? '#1f9d55' : '#df5338', background: isUp ? '#e9f6ee' : '#fbeae6', padding: '4px 10px', borderRadius: 8 }}>
+                    {ret || '—'}
+                  </span>
+                  <span style={{ fontWeight: 500, fontSize: 12.5, color: '#9b988d' }}>Held for</span>
+                  <span style={{ fontWeight: 700, fontSize: 12.5, color: '#1a1813' }}>{holdDuration(p)}</span>
+                </div>
+              </div>
+              <div style={{ width: 1, background: '#f0efec', flexShrink: 0 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
+                <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>Outcome</span>
+                <span style={{ fontWeight: 800, fontSize: 34, letterSpacing: '-0.02em', color: isUp ? '#1f9d55' : '#df5338' }}>
+                  {isUp ? 'Win' : 'Loss'}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b0aea3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="8"/>
+                    <path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.9 2.5 2-1 2-2.5 2a2.5 2 0 0 1-2.5-1.5"/>
+                    <path d="M12 6.5v11"/>
+                  </svg>
+                  <span style={{ fontWeight: 500, fontSize: 12, color: '#9b988d' }}>Fees</span>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: '#56544b' }}>{fee > 0 ? `-${fmtUsd(fee)}` : '—'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Horizontal divider */}
+            <div style={{ height: 1, background: '#f0efec' }} />
+
+            {/* Entry → Exit */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>Entry → Exit</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' as const }}>
+                <span style={{ fontWeight: 800, fontSize: 27, letterSpacing: '-0.02em', color: '#7c5cff' }}>{fmtPrice(entryPrice(p))}</span>
+                <span style={{ fontWeight: 600, fontSize: 18, color: '#c7b8f5' }}>→</span>
+                <span style={{ fontWeight: 800, fontSize: 27, letterSpacing: '-0.02em', color: '#7c5cff' }}>{fmtPrice(exitPrice(p))}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                {isLong
+                  ? <span style={{ fontWeight: 700, fontSize: 13, color: '#1f9d55', background: '#e9f6ee', padding: '4px 10px', borderRadius: 8 }}>Long</span>
+                  : <span style={{ fontWeight: 700, fontSize: 13, color: '#df5338', background: '#fbeae6', padding: '4px 10px', borderRadius: 8 }}>Short</span>
+                }
+                <span style={{ fontWeight: 700, fontSize: 12.5, color: '#1a1813' }}>{btcSize} BTC</span>
+              </div>
             </div>
           </div>
 
-          {/* detail rows */}
-          <div style={{ border: '1px solid #f0efec', borderRadius: 14, overflow: 'hidden' }}>
-            {detailRows.map((row, i) => (
-              <div
-                key={row.label}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: i < detailRows.length - 1 ? '1px solid #f5f4f1' : 'none' }}
-              >
+          {/* Exposure */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <SectionDivider label="Exposure" />
+            <div style={{ border: '1px solid #f0efec', borderRadius: 14, overflow: 'hidden' }}>
+              {/* Leverage */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #f5f4f1' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 11, fontWeight: 500, fontSize: 13, color: '#9b988d' }}>
-                  <Chip icon={row.icon} />
-                  {row.label}
+                  <GrayChip icon={ICONS.leverage} />Leverage
                 </span>
-                <span style={{ fontWeight: 700, fontSize: 13.5, color: row.color }}>{row.value}</span>
+                <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1813' }}>{fmtLev(p.leverage)}</span>
               </div>
-            ))}
-          </div>
-
-          {/* footer note */}
-          <div style={{ background: '#fafaf8', border: '1px solid #f0efec', borderRadius: 13, padding: '14px 16px' }}>
-            <span style={{ fontWeight: 500, fontSize: 12.5, color: '#7a715f', lineHeight: 1.5 }}>
-              Executed on Gate.io USDT-M perpetuals. All figures are sourced live from the Gate.io position history API.
-            </span>
+              {/* Margin used */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #f5f4f1' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 11, fontWeight: 500, fontSize: 13, color: '#9b988d' }}>
+                  <GrayChip icon={ICONS.shield} />Margin used
+                </span>
+                <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1813' }}>{marginEst > 0 ? fmtUsd(marginEst) : '—'}</span>
+              </div>
+              {/* Notional */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 11, fontWeight: 500, fontSize: 13, color: '#9b988d' }}>
+                  <GrayChip icon={ICONS.dollar} />Notional
+                </span>
+                <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1813' }}>{notional > 0 ? fmtUsd(notional) : '—'}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -232,10 +253,8 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* left accent bar */}
       <span style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: isUp ? '#2faa63' : '#df5338' }} />
 
-      {/* row 1: contract + leverage + side */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
         <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1813' }}>BTC/USDT.P</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -248,7 +267,6 @@ function TradeCard({ p, onOpen }: { p: GateFuturesPositionClose; onOpen: () => v
         </div>
       </div>
 
-      {/* row 2: PnL + return % + date */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <span style={{ fontWeight: 800, fontSize: 23, letterSpacing: '-0.02em', color: isUp ? '#1f9d55' : '#df5338' }}>
           {isUp ? '+$' : '-$'}{Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -289,8 +307,8 @@ export function PositionHistoryTable() {
     fontFamily: FONT, fontWeight: 700, fontSize: 13, minWidth: 34, height: 34, padding: '0 12px',
     borderRadius: 9, cursor: disabled ? 'default' : 'pointer',
     border: active ? '1px solid transparent' : '1px solid #ececea',
-    background: active ? 'linear-gradient(135deg,#fdeadd,#fbd6c4)' : '#ffffff',
-    color: active ? '#d6532a' : disabled ? '#cfcdc4' : '#56544b',
+    background: active ? 'linear-gradient(135deg,#f1ecff,#e1d6ff)' : '#ffffff',
+    color: active ? '#6a45d8' : disabled ? '#cfcdc4' : '#56544b',
     opacity: disabled ? 0.55 : 1, transition: 'all .15s',
   });
 

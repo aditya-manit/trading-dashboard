@@ -40,12 +40,12 @@ export function Hero() {
 
   return (
     <>
-      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, border: '1px solid #f0efec', background: 'linear-gradient(100deg,#ffffff 0%,#fff7f1 42%,#ffeadf 70%,#ffdccd 100%)', padding: '34px 36px' }}>
-        <div style={{ position: 'absolute', top: -120, right: -60, width: 520, height: 340, background: 'radial-gradient(circle at 70% 30%,rgba(255,150,100,0.55),rgba(255,190,120,0.12) 55%,transparent 72%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, border: '1px solid #f0efec', background: 'linear-gradient(100deg,#ffffff 0%,#faf8ff 42%,#f1ebff 70%,#e7dcff 100%)', padding: '34px 36px' }}>
+        <div style={{ position: 'absolute', top: -120, right: -60, width: 520, height: 340, background: 'radial-gradient(circle at 70% 30%,rgba(150,120,255,0.5),rgba(170,140,255,0.12) 55%,transparent 72%)', pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 28 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
-            <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: '0.14em', color: '#c2724e', textTransform: 'uppercase' }}>Your portfolio</span>
+            <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: '0.14em', color: '#7e63c8', textTransform: 'uppercase' }}>Your portfolio</span>
             <span style={{ fontWeight: 800, fontSize: 30, letterSpacing: '-0.02em', color: '#1a1813', lineHeight: 1.1 }}>
               {greeting()} 👋
             </span>
@@ -68,34 +68,34 @@ export function Hero() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'stretch', minWidth: 300 }}>
             <button
               onClick={() => setDrawerOpen(true)}
-              style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(6px)', border: '1px solid #f4e7dc', borderRadius: 16, padding: '15px 18px', display: 'flex', flexDirection: 'column', gap: 11, boxShadow: '0 8px 24px rgba(120,70,30,0.07)', fontFamily: 'inherit' }}
+              style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(6px)', border: '1px solid #e6ddfb', borderRadius: 16, padding: '15px 18px', display: 'flex', flexDirection: 'column', gap: 11, boxShadow: '0 8px 24px rgba(70,50,150,0.08)', fontFamily: 'inherit' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 700, fontSize: 11.5, letterSpacing: '0.06em', color: '#a59683', textTransform: 'uppercase' }}>Next milestone</span>
-                <span style={{ fontWeight: 700, fontSize: 13, color: '#c2724e' }}>{fmtK(nextMilestone)} ›</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#7e63c8' }}>{fmtK(nextMilestone)} ›</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <span style={{ fontWeight: 800, fontSize: 22, color: '#16140f', letterSpacing: '-0.02em' }}>{progressPct.toFixed(1)}%</span>
                 <span style={{ fontWeight: 600, fontSize: 12.5, color: '#897f70' }}>· ${toGo.toLocaleString('en-US', { maximumFractionDigits: 0 })} to go</span>
               </div>
-              <div style={{ height: 9, background: '#f1e3d8', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${progressPct.toFixed(1)}%`, background: 'linear-gradient(90deg,#ff8a5b,#ef5f33)', borderRadius: 99 }} />
+              <div style={{ height: 9, background: '#eae2fb', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progressPct.toFixed(1)}%`, background: 'linear-gradient(90deg,#9d82ff,#7c5cff)', borderRadius: 99 }} />
               </div>
             </button>
 
-            <div style={{ background: 'rgba(255,255,255,0.78)', backdropFilter: 'blur(6px)', border: '1px solid #f4e7dc', borderRadius: 16, padding: '16px 18px', display: 'flex', gap: 24, boxShadow: '0 8px 24px rgba(120,70,30,0.07)' }}>
+            <div style={{ background: 'rgba(255,255,255,0.78)', backdropFilter: 'blur(6px)', border: '1px solid #e6ddfb', borderRadius: 16, padding: '16px 18px', display: 'flex', gap: 24, boxShadow: '0 8px 24px rgba(70,50,150,0.08)' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <span style={{ fontWeight: 600, fontSize: 11.5, color: '#a59683', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Open</span>
                 <span style={{ fontWeight: 800, fontSize: 20, color: '#1a1813' }}>{positions.length}</span>
               </div>
-              <div style={{ width: 1, background: '#f0e3d6' }} />
+              <div style={{ width: 1, background: '#e7def8' }} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <span style={{ fontWeight: 600, fontSize: 11.5, color: '#a59683', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Unrealized</span>
                 <span style={{ fontWeight: 800, fontSize: 20, color: unrealizedPnl >= 0 ? '#1f9d55' : '#df5338' }}>
                   {unrealizedPnl >= 0 ? '+$' : '-$'}{Math.abs(unrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </span>
               </div>
-              <div style={{ width: 1, background: '#f0e3d6' }} />
+              <div style={{ width: 1, background: '#e7def8' }} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <span style={{ fontWeight: 600, fontSize: 11.5, color: '#a59683', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Margin</span>
                 <span style={{ fontWeight: 800, fontSize: 20, color: '#1a1813' }}>{marginPct.toFixed(0)}%</span>
