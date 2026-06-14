@@ -511,7 +511,7 @@ export function KeyMetricsRow() {
             style={{
               borderRadius: 14,
               background: bestHover
-                ? 'linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0) 52%),linear-gradient(180deg,#f1faf4,#d7eee0)'
+                ? 'linear-gradient(180deg,rgba(255,255,255,0.68) 0%,rgba(255,255,255,0) 52%),linear-gradient(180deg,#f6fdf8,#cee9d9)'
                 : '#f1faf4',
               border: `1px solid ${bestHover ? '#b5d9c6' : '#d3ecdd'}`,
               boxShadow: bestHover ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'none',
@@ -564,7 +564,7 @@ export function KeyMetricsRow() {
             style={{
               borderRadius: 14,
               background: worstHover
-                ? 'linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0) 52%),linear-gradient(180deg,#fcf0ed,#f6ddd4)'
+                ? 'linear-gradient(180deg,rgba(255,255,255,0.68) 0%,rgba(255,255,255,0) 52%),linear-gradient(180deg,#fffbfa,#f4ddd5)'
                 : '#fcf0ed',
               border: `1px solid ${worstHover ? '#e4c0b0' : '#f3d6cd'}`,
               boxShadow: worstHover ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'none',
