@@ -89,3 +89,50 @@ src/
 #reports    → KeyMetricsRow
 #history    → PositionHistoryTable
 ```
+
+---
+
+## Handover for Opus — current state as of 2026-06-14
+
+### What was just built / polished (last ~2 sessions)
+
+**Open positions card (`PositionsTable.tsx`)**
+- Two-section layout: solid lavender header (`#ece8ff`) + white table body, `overflow:hidden` + `borderRadius:20`
+- Header: purple dot (8px, `#7c5cff`, static — no animation) · "Open positions" dark text · solid purple LIVE badge (`#7c5cff` bg, white text) · right side: "N open | uPnL ±$X" (plain text, green/red value)
+- The "sparkline" idea was dropped — `usePositions` only gives a current snapshot, no historical uPnL series exists
+- Purple theme tokens for this card: dot/badge `#7c5cff`, card border `#e0d5f5`, header bg `#ece8ff`
+
+**Max Drawdown chart gradient (`KeyMetricsRow.tsx` → `DrawdownChart`)**
+- Fill is *above* the line (fillUp path: `${line} L${X(n-1)},0 L${X(0)},0 Z`)
+- Vertical gradient: starts at 0 opacity at y=0, slow ramp to 0.04 at 2%, 0.08 at 15%, exponential to 1.0 at 100%
+- Horizontal mask: left fade 4%, right fade 4% (96%→100%), center fully opaque
+- Intent: fill is always faintly visible even at shallow dips, darkens dramatically at trough
+
+**Calendar month summary (`PositionHistoryTable.tsx`)**
+- Nav header now shows: Month/Year stacked | divider | trend circle + net P&L + trade count | divider | win/loss bar (92px, 5px) + W·L counts
+- All computed live from `monthPositions` (filtered by visible y/m)
+
+**Best & worst cards + Win rate card (`KeyMetricsRow.tsx`)**
+- Two-row card: header (icon + name + badge + date) + stats strip (Side / Lev / Return / P&L)
+- Cards are clickable → opens `TradeDetailDrawer` (exported from `PositionHistoryTable.tsx`)
+- Grid uses `alignItems: stretch` so both cards reach equal height
+- Win rate card: `flex:1` spacer + win/loss split bar anchored at bottom
+
+**Definition tooltips**
+- `DefLabel` pattern: `cursor:help`, dashed underline, hover shifts color, dark tooltip popup (`#1a1813` bg, 186px wide, `bottom:calc(100%+9px)`)
+- Applied in: `RealizedPerformance.tsx` (Gross profit, Gross loss, Profit factor), `KpiStrip.tsx` (`CellLabel`), `KeyMetricsRow.tsx` (`LabelWithTooltip`)
+
+### What still needs work (user has design zips to reference)
+
+The user works from Figma-exported design zips dropped into `/Users/aditya/Downloads/`. Each zip contains a `screenshots/` folder with numbered iterations (e.g. `openpos14.png`, `openpos15.png`, `openpos16.png`) where the highest number is the final chosen design. Always read all screenshots in sequence before implementing — the design evolves across iterations within a single zip.
+
+Outstanding / likely next areas:
+- The position history / trade history section (`#history`) may need further polish
+- The overview section hero / equity chart may still have open design items
+- User may share more zips for other sections
+
+### Key workflow notes
+- User shares design zips: extract to `/tmp/trading-handoff-N/`, read all `screenshots/` PNGs in order, then read the current component before touching code
+- Always screenshot with Playwright after changes: `node -e "const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();const p=await b.newPage();await p.setViewportSize({width:1400,height:900});await p.goto('http://localhost:3000/#SECTION',{waitUntil:'networkidle'});await p.waitForTimeout(2500);await p.evaluate(()=>{document.getElementById('SECTION')?.scrollIntoView()});await p.waitForTimeout(800);await p.screenshot({path:'/tmp/check.png'});await b.close();})()"`
+- Dev server runs on `http://localhost:3000` — user keeps it running
+- Commit and push after each logical unit of work (user always asks "commit and push")
