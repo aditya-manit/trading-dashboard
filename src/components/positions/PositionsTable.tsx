@@ -294,7 +294,7 @@ function PositionRow({ p, totalValue, onOpen }: { p: GateFuturesPosition; totalV
         color: '#56544b',
         borderRadius: 10,
         cursor: 'pointer',
-        background: hovered ? '#f8f6ff' : 'transparent',
+        background: hovered ? '#f7f3ff' : 'transparent',
         transition: 'background .13s',
       }}
     >
@@ -317,7 +317,7 @@ function PositionRow({ p, totalValue, onOpen }: { p: GateFuturesPosition; totalV
       <span style={{ textAlign: 'right' as const, fontWeight: 700, color: pnl >= 0 ? '#1f9d55' : '#df5338' }}>
         {pnl >= 0 ? '+$' : '-$'}{fmt(Math.abs(pnl), 0)}
       </span>
-      <span style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', color: '#7c5cff', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>›</span>
+      <span style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', color: '#9d8cf0', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>›</span>
     </div>
   );
 }
@@ -336,11 +336,11 @@ export function PositionsTable() {
 
   if (isLoading) {
     return (
-      <div style={{ border: '1px solid #e0d5f5', borderRadius: 20, overflow: 'hidden', fontFamily: FONT }}>
-        <div style={{ background: '#ece8ff', padding: '22px 24px 18px' }}>
+      <div style={{ background: '#ffffff', border: '1px solid #e3d8f8', borderRadius: 20, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden', fontFamily: FONT }}>
+        <div style={{ background: '#f1ecfb', borderBottom: '1px solid #e7dffa', padding: '16px 26px' }}>
           <Skeleton className="h-6 w-40" style={{ background: 'rgba(124,92,255,0.15)' }} />
         </div>
-        <div style={{ background: '#fff', padding: '0 16px 14px' }}>
+        <div style={{ padding: '6px 26px 14px' }}>
           {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full mb-2 rounded-lg mt-2" />)}
         </div>
       </div>
@@ -349,48 +349,51 @@ export function PositionsTable() {
 
   return (
     <>
-      <div style={{ border: '1px solid #e0d5f5', borderRadius: 20, overflow: 'hidden', fontFamily: FONT }}>
+      <style>{`
+        @keyframes posLivePulse {
+          0%   { box-shadow: 0 0 0 0 rgba(124,92,255,0.5); }
+          70%  { box-shadow: 0 0 0 7px rgba(124,92,255,0); }
+          100% { box-shadow: 0 0 0 0 rgba(124,92,255,0); }
+        }
+      `}</style>
+      <div style={{ background: '#ffffff', border: '1px solid #e3d8f8', borderRadius: 20, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden', fontFamily: FONT }}>
 
-        {/* ── Solid lavender header ── */}
-        <div style={{ background: '#ece8ff', padding: '18px 22px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: 12 }}>
+        {/* ── Lavender header ── */}
+        <div style={{ background: '#f1ecfb', borderBottom: '1px solid #e7dffa', padding: '16px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: 12 }}>
 
           {/* Left: dot + title + LIVE badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c5cff', flexShrink: 0, display: 'block' }} />
-            <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em', color: '#1a1813' }}>Open positions</span>
-            <span style={{ fontWeight: 700, fontSize: 10.5, letterSpacing: '0.07em', color: '#ffffff', background: '#7c5cff', padding: '4px 10px', borderRadius: 20 }}>
-              LIVE
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#7c5cff', flexShrink: 0, display: 'block', animation: 'posLivePulse 1.8s ease-out infinite' }} />
+            <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em', color: '#2a2342' }}>Open positions</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', fontWeight: 700, fontSize: 10.5, letterSpacing: '0.08em', color: '#ffffff', background: '#7c5cff', padding: '4px 10px', borderRadius: 20 }}>LIVE</span>
           </div>
 
           {/* Right: count | uPnL value */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 13, color: '#9b988d' }}>{positions.length} open</span>
-            <span style={{ color: '#d4d1c9', fontSize: 13, fontWeight: 400 }}>|</span>
-            <span style={{ fontWeight: 600, fontSize: 13, color: '#9b988d' }}>uPnL</span>
-            <span style={{ fontWeight: 700, fontSize: 13.5, color: isUp ? '#1f9d55' : '#df5338' }}>
-              {isUp ? '+$' : '-$'}{fmt(Math.abs(totalUnrealPnl), 0)}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, whiteSpace: 'nowrap' as const }}>
+            <span style={{ fontWeight: 600, fontSize: 13, color: '#8b80b3' }}>{positions.length} open</span>
+            <span style={{ width: 1, height: 16, background: '#d7d0ea', flexShrink: 0 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <span style={{ fontWeight: 600, fontSize: 13, color: '#8b80b3' }}>uPnL</span>
+              <span style={{ fontWeight: 800, fontSize: 13, color: isUp ? '#1f9d55' : '#df5338', letterSpacing: '-0.01em' }}>
+                {isUp ? '+$' : '-$'}{fmt(Math.abs(totalUnrealPnl), 0)}
+              </span>
+            </div>
           </div>
         </div>
-        </div>{/* end header */}
 
-        {/* ── White table body ── */}
-        <div style={{ background: '#ffffff', padding: '0 14px 10px' }}>
+        {/* ── Table body ── */}
+        <div style={{ padding: '6px 26px 14px' }}>
         {positions.length === 0 ? (
-          <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#f3eefe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 11, padding: '42px 20px 34px', textAlign: 'center' as const }}>
+            <span style={{ width: 48, height: 48, borderRadius: 14, background: '#f3eefe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c5cff', flexShrink: 0 }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="12 2 2 7 12 12 22 7 12 2"/>
                 <polyline points="2 17 12 22 22 17"/>
                 <polyline points="2 12 12 17 22 12"/>
               </svg>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', textAlign: 'center' as const }}>
-              <span style={{ fontWeight: 700, fontSize: 15, color: '#1a1813' }}>No open positions</span>
-              <span style={{ fontWeight: 500, fontSize: 13.5, color: '#9b988d' }}>Your open futures contracts will appear here</span>
-            </div>
+            </span>
+            <span style={{ fontWeight: 700, fontSize: 15, color: '#1a1813' }}>No open positions</span>
+            <span style={{ fontWeight: 500, fontSize: 13, color: '#9b988d', maxWidth: 280, lineHeight: 1.5 }}>When you open a position on Gate.io, it&#39;ll appear here with live P&amp;L and liquidation tracking.</span>
           </div>
         ) : (
           <>
