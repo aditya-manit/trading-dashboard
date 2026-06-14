@@ -398,30 +398,81 @@ function CalendarView({
   const y = viewDate.getFullYear(), m = viewDate.getMonth();
   const isCurrentMonth = y === today.getFullYear() && m === today.getMonth();
   const weeks = useMemo(() => buildTradeCalendar(positions, y, m), [positions, y, m]);
-  const offset = (today.getFullYear() - y) * 12 + (today.getMonth() - m);
 
-  const navBtn = (label: string, onClick: () => void, active?: boolean): React.CSSProperties => ({
-    fontFamily: FONT, fontWeight: 600, fontSize: 12.5, padding: '5px 11px', borderRadius: 8,
-    border: '1px solid #ececea', cursor: 'pointer',
-    background: active ? '#f3eefe' : '#fff',
-    color: active ? '#6a45c4' : '#56544b',
-    transition: 'all .13s',
+  const monthPositions = useMemo(() => positions.filter(p => {
+    const d = new Date(p.time * 1000);
+    return d.getFullYear() === y && d.getMonth() === m;
+  }), [positions, y, m]);
+
+  const monthNet   = monthPositions.reduce((s, p) => s + parseFloat(p.pnl), 0);
+  const monthCount = monthPositions.length;
+  const monthWins  = monthPositions.filter(p => parseFloat(p.pnl) > 0).length;
+  const monthLoss  = monthPositions.filter(p => parseFloat(p.pnl) < 0).length;
+  const winPct     = monthCount > 0 ? (monthWins / monthCount) * 100 : 0;
+  const monthNetStr = `${monthNet >= 0 ? '+' : '−'}$${Math.abs(monthNet).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+
+  const navBtnStyle = (active?: boolean): React.CSSProperties => ({
+    width: 32, height: 32, borderRadius: 9, border: '1px solid #ececea',
+    background: '#fff', color: '#56544b', fontSize: 15, fontWeight: 700,
+    cursor: 'pointer', fontFamily: FONT, display: 'flex', alignItems: 'center',
+    justifyContent: 'center', transition: 'all .15s',
   });
+
+  const divider = <span style={{ width: 1, height: 30, background: '#ebe9e3', flexShrink: 0 }} />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Month nav */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontWeight: 800, fontSize: 15, color: '#1a1813' }}>{MONTH_NAMES[m]} {y}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <button style={navBtn('‹', () => {})} onClick={() => setViewDate(new Date(y, m - 1, 1))}>‹</button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 }}>
+        {/* Left: month/year + stats */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18, minWidth: 0 }}>
+          {/* Month + year stacked */}
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1.1, whiteSpace: 'nowrap' }}>
+            <span style={{ fontWeight: 800, fontSize: 17, color: '#1a1813', fontFamily: FONT, letterSpacing: '-0.02em' }}>{MONTH_NAMES[m]}</span>
+            <span style={{ fontWeight: 600, fontSize: 11.5, color: '#a8a69b', fontFamily: FONT }}>{y}</span>
+          </span>
+
+          {monthCount > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 18, whiteSpace: 'nowrap' }}>
+              {divider}
+              {/* Trend circle + P&L + count */}
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: monthNet >= 0 ? '#e3f3ea' : '#fbe5df' }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={monthNet >= 0 ? '#1f9d55' : '#df5338'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: monthNet >= 0 ? 'none' : 'rotate(180deg)' }}>
+                    <line x1="12" y1="19" x2="12" y2="5" />
+                    <polyline points="5 12 12 5 19 12" />
+                  </svg>
+                </span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1.15 }}>
+                  <span style={{ fontWeight: 800, fontSize: 15, color: monthNet >= 0 ? '#1f9d55' : '#df5338', fontFamily: FONT, letterSpacing: '-0.015em' }}>{monthNetStr}</span>
+                  <span style={{ fontWeight: 600, fontSize: 11, color: '#a8a69b', fontFamily: FONT }}>{monthCount} trades this month</span>
+                </span>
+              </span>
+              {divider}
+              {/* Win/loss bar + W·L */}
+              <span style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
+                <span style={{ display: 'flex', width: 92, height: 5, borderRadius: 99, overflow: 'hidden', gap: 2 }}>
+                  <span style={{ width: `${winPct}%`, background: '#2faa63', borderRadius: 99 }} />
+                  <span style={{ flex: 1, background: '#ec6a52', borderRadius: 99 }} />
+                </span>
+                <span style={{ fontWeight: 600, fontSize: 11, color: '#a8a69b', fontFamily: FONT }}>
+                  <b style={{ color: '#2f8a55', fontWeight: 700 }}>{monthWins}W</b>
+                  {' · '}
+                  <b style={{ color: '#c0533e', fontWeight: 700 }}>{monthLoss}L</b>
+                </span>
+              </span>
+            </span>
+          )}
+        </div>
+
+        {/* Right: nav buttons */}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button style={navBtnStyle()} onClick={() => setViewDate(new Date(y, m - 1, 1))}>‹</button>
           <button
-            style={navBtn('Today', () => {}, isCurrentMonth)}
             onClick={() => setViewDate(new Date(today.getFullYear(), today.getMonth(), 1))}
-          >
-            Today
-          </button>
-          <button style={navBtn('›', () => {})} onClick={() => setViewDate(new Date(y, m + 1, 1))}>›</button>
+            style={{ height: 32, padding: '0 13px', borderRadius: 9, border: '1px solid #ececea', background: isCurrentMonth ? '#f3eefe' : '#fff', color: isCurrentMonth ? '#6a45c4' : '#56544b', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}
+          >Today</button>
+          <button style={navBtnStyle()} onClick={() => setViewDate(new Date(y, m + 1, 1))}>›</button>
         </div>
       </div>
 

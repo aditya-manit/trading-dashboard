@@ -150,7 +150,7 @@ function DrawdownChart({ entries }: { entries: GateAccountBookEntry[] }) {
   const Y = (v: number) => pt + (H - pt - pb) * (1 - (v - mn) / sp);
   const pts = drawdownSeries.map((v, i) => ({ x: X(i), y: Y(v) }));
   const line = smoothPath(pts);
-  const area = `${line} L${X(n - 1).toFixed(1)},${H - pb} L${X(0).toFixed(1)},${H - pb} Z`;
+  const area = `${line} L${X(n - 1).toFixed(1)},0 L${X(0).toFixed(1)},0 Z`;
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -166,11 +166,23 @@ function DrawdownChart({ entries }: { entries: GateAccountBookEntry[] }) {
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
         <defs>
           <linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#df5338" stopOpacity={0.22} />
-            <stop offset="100%" stopColor="#df5338" stopOpacity={0} />
+            <stop offset="0%"   stopColor="#df5338" stopOpacity={0}    />
+            <stop offset="60%"  stopColor="#df5338" stopOpacity={0}    />
+            <stop offset="80%"  stopColor="#df5338" stopOpacity={0.22} />
+            <stop offset="90%"  stopColor="#df5338" stopOpacity={0.60} />
+            <stop offset="96%"  stopColor="#df5338" stopOpacity={0.88} />
+            <stop offset="100%" stopColor="#df5338" stopOpacity={1}    />
           </linearGradient>
+          <linearGradient id="ddGrad-mx" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stopColor="#fff" stopOpacity={0} />
+            <stop offset="4%"   stopColor="#fff" stopOpacity={1} />
+            <stop offset="100%" stopColor="#fff" stopOpacity={1} />
+          </linearGradient>
+          <mask id="ddGrad-mask">
+            <rect x={0} y={0} width={W} height={H} fill="url(#ddGrad-mx)" />
+          </mask>
         </defs>
-        {area && <path d={area} fill="url(#ddGrad)" />}
+        {area && <path d={area} fill="url(#ddGrad)" mask="url(#ddGrad-mask)" />}
         <path d={line} fill="none" stroke="#df5338" strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       </svg>
       {/* Hover overlay — HTML elements match design's buildSpark pattern */}
