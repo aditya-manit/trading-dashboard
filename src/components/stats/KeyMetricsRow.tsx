@@ -540,7 +540,7 @@ export function KeyMetricsRow() {
             <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'stretch', borderTop: '1px solid #d3ecdd' }}>
               {[
                 { label: 'Side', value: bestPos?.side === 'long' ? 'Long' : 'Short', color: '#1f9d55' },
-                { label: 'Lev', value: bestPos ? bwFmtLev(bestPos.leverage) : '—', color: '#1a1813' },
+                { label: 'Leverage', value: bestPos ? bwFmtLev(bestPos.leverage) : '—', color: '#1a1813' },
                 { label: 'Return', value: bestPos ? bwRetPct(bestPos) : '—', color: '#1f9d55' },
               ].map((col, i) => (
                 <div key={col.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, padding: '10px 13px', borderLeft: i > 0 ? '1px solid #d3ecdd' : 'none' }}>
@@ -594,7 +594,7 @@ export function KeyMetricsRow() {
             <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'stretch', borderTop: '1px solid #f3d6cd' }}>
               {[
                 { label: 'Side', value: worstPos?.side === 'long' ? 'Long' : 'Short', color: worstPos?.side === 'long' ? '#1f9d55' : '#df5338' },
-                { label: 'Lev', value: worstPos ? bwFmtLev(worstPos.leverage) : '—', color: '#1a1813' },
+                { label: 'Leverage', value: worstPos ? bwFmtLev(worstPos.leverage) : '—', color: '#1a1813' },
                 { label: 'Return', value: worstPos ? bwRetPct(worstPos) : '—', color: '#df5338' },
               ].map((col, i) => (
                 <div key={col.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, padding: '10px 13px', borderLeft: i > 0 ? '1px solid #f3d6cd' : 'none' }}>
