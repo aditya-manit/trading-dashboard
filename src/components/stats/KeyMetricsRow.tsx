@@ -166,17 +166,19 @@ function DrawdownChart({ entries }: { entries: GateAccountBookEntry[] }) {
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
         <defs>
           <linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#df5338" stopOpacity={0}    />
-            <stop offset="60%"  stopColor="#df5338" stopOpacity={0}    />
-            <stop offset="80%"  stopColor="#df5338" stopOpacity={0.22} />
-            <stop offset="90%"  stopColor="#df5338" stopOpacity={0.60} />
-            <stop offset="96%"  stopColor="#df5338" stopOpacity={0.88} />
+            <stop offset="0%"   stopColor="#df5338" stopOpacity={0.04} />
+            <stop offset="30%"  stopColor="#df5338" stopOpacity={0.08} />
+            <stop offset="55%"  stopColor="#df5338" stopOpacity={0.18} />
+            <stop offset="70%"  stopColor="#df5338" stopOpacity={0.40} />
+            <stop offset="85%"  stopColor="#df5338" stopOpacity={0.70} />
+            <stop offset="93%"  stopColor="#df5338" stopOpacity={0.88} />
             <stop offset="100%" stopColor="#df5338" stopOpacity={1}    />
           </linearGradient>
           <linearGradient id="ddGrad-mx" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%"   stopColor="#fff" stopOpacity={0} />
             <stop offset="4%"   stopColor="#fff" stopOpacity={1} />
-            <stop offset="100%" stopColor="#fff" stopOpacity={1} />
+            <stop offset="99%"  stopColor="#fff" stopOpacity={1} />
+            <stop offset="100%" stopColor="#fff" stopOpacity={0} />
           </linearGradient>
           <mask id="ddGrad-mask">
             <rect x={0} y={0} width={W} height={H} fill="url(#ddGrad-mx)" />
