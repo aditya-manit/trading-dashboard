@@ -308,6 +308,25 @@ function SmallSparkCard({ label, tooltip, value, sparkData, sparkDates, color }:
   );
 }
 
+// ─── Best/worst helpers ───────────────────────────────────────────────────────
+
+function bwFmtLev(lev: string): string {
+  const n = parseFloat(lev);
+  return !n ? 'Cross' : `${n}×`;
+}
+function bwRetPct(p: GateFuturesPositionClose): string {
+  const pnl = parseFloat(p.pnl);
+  const entry = parseFloat(p.side === 'long' ? p.long_price : p.short_price) || 0;
+  const size = Math.abs(parseFloat(p.max_size) || 0);
+  const notional = size * 0.0001 * entry;
+  const lev = parseFloat(p.leverage) || 0;
+  if (lev > 0 && notional > 0) {
+    const pct = (pnl / (notional / lev)) * 100;
+    return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+  }
+  return '';
+}
+
 // ─── KeyMetricsRow ────────────────────────────────────────────────────────────
 
 export function KeyMetricsRow() {
@@ -407,12 +426,12 @@ export function KeyMetricsRow() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
 
       {/* Section A — 2-column grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'stretch' }}>
 
         {/* Card 1: Win rate donut */}
-        <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, padding: 24, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, padding: 24, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.01em', color: '#1a1813' }}>Win rate</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 26, marginTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 26, marginTop: 16, flex: 1 }}>
             <svg viewBox="0 0 120 120" style={{ width: 148, height: 148, flex: '0 0 auto' }}>
               <circle cx="60" cy="60" r="52" fill="none" stroke="#f0efeb" strokeWidth="13" />
               <circle
@@ -445,34 +464,110 @@ export function KeyMetricsRow() {
               </div>
             </div>
           </div>
+          {/* Win / loss split bar — anchored at bottom */}
+          <div style={{ marginTop: 'auto', paddingTop: 20, display: 'flex', flexDirection: 'column', gap: 9 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontWeight: 600, fontSize: 12, color: '#9b988d' }}>Win / loss split</span>
+              <span style={{ fontWeight: 700, fontSize: 12, color: '#8c8a81' }}>
+                <span style={{ color: '#1f9d55' }}>{stats.wins}W</span>
+                {' · '}
+                <span style={{ color: '#df5338' }}>{stats.losses}L</span>
+              </span>
+            </div>
+            <div style={{ display: 'flex', height: 12, gap: 3 }}>
+              <div style={{ width: `${(winRate * 100).toFixed(1)}%`, background: '#2faa63', borderRadius: 99 }} />
+              <div style={{ width: `${(100 - winRate * 100).toFixed(1)}%`, background: '#ec6a52', borderRadius: 99 }} />
+            </div>
+          </div>
         </div>
 
         {/* Card 2: Best & worst */}
         <div style={{ background: '#ffffff', border: '1px solid #f0efec', borderRadius: 20, padding: 24, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.01em', color: '#1a1813' }}>Best &amp; worst</span>
+          {/* Best trade card */}
           <div
             onClick={() => bestPos && setDrawerTrade(bestPos)}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: 14, background: '#f1faf4', border: '1px solid #cfe9da', cursor: bestPos ? 'pointer' : 'default', transition: 'opacity .15s' }}
-            onMouseEnter={e => { if (bestPos) (e.currentTarget as HTMLDivElement).style.opacity = '0.8'; }}
+            style={{ borderRadius: 14, background: '#f1faf4', border: '1px solid #d3ecdd', overflow: 'hidden', cursor: bestPos ? 'pointer' : 'default', transition: 'opacity .15s' }}
+            onMouseEnter={e => { if (bestPos) (e.currentTarget as HTMLDivElement).style.opacity = '0.82'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1813' }}>BTC/USDT.P</span>
-              <span style={{ fontWeight: 500, fontSize: 12.5, color: '#8c8a81' }}>{stats.bestTrade.date} · best trade</span>
+            {/* Header row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px' }}>
+              <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 11, background: '#ffffff', border: '1px solid #cfe9da', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1f9d55' }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" />
+                </svg>
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                <span style={{ fontWeight: 700, fontSize: 14.5, color: '#1a1813' }}>BTC/USDT.P</span>
+                <span style={{ fontWeight: 700, fontSize: 9, letterSpacing: '0.06em', color: '#1f9d55', background: '#e3f3ea', padding: '3px 7px', borderRadius: 6 }}>BEST</span>
+              </div>
+              <span style={{ fontWeight: 500, fontSize: 12, color: '#8c8a81' }}>
+                {bestPos ? new Date(bestPos.time * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : stats.bestTrade.date}
+              </span>
             </div>
-            <span style={{ fontWeight: 800, fontSize: 20, color: '#1f9d55' }}>+${stats.bestTrade.pnl.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+            {/* Stats strip */}
+            <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid #d3ecdd' }}>
+              {[
+                { label: 'Side', value: bestPos?.side === 'long' ? 'Long' : 'Short', color: '#1f9d55' },
+                { label: 'Lev', value: bestPos ? bwFmtLev(bestPos.leverage) : '—', color: '#1a1813' },
+                { label: 'Return', value: bestPos ? bwRetPct(bestPos) : '—', color: '#1f9d55' },
+              ].map((col, i) => (
+                <div key={col.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, padding: '10px 13px', borderLeft: i > 0 ? '1px solid #d3ecdd' : 'none' }}>
+                  <span style={{ fontWeight: 600, fontSize: 9, letterSpacing: '0.05em', textTransform: 'uppercase' as const, color: '#a3a196' }}>{col.label}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: col.color }}>{col.value}</span>
+                </div>
+              ))}
+              <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', gap: 3, padding: '10px 13px', borderLeft: '1px solid #d3ecdd' }}>
+                <span style={{ fontWeight: 600, fontSize: 9, letterSpacing: '0.05em', textTransform: 'uppercase' as const, color: '#a3a196' }}>P&L</span>
+                <span style={{ fontWeight: 800, fontSize: 14.5, letterSpacing: '-0.01em', color: '#1f9d55' }}>
+                  +${stats.bestTrade.pnl.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            </div>
           </div>
+
+          {/* Worst trade card */}
           <div
             onClick={() => worstPos && setDrawerTrade(worstPos)}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: 14, background: '#fcf0ed', border: '1px solid #f5c4bc', cursor: worstPos ? 'pointer' : 'default', transition: 'opacity .15s' }}
-            onMouseEnter={e => { if (worstPos) (e.currentTarget as HTMLDivElement).style.opacity = '0.8'; }}
+            style={{ borderRadius: 14, background: '#fcf0ed', border: '1px solid #f3d6cd', overflow: 'hidden', cursor: worstPos ? 'pointer' : 'default', transition: 'opacity .15s' }}
+            onMouseEnter={e => { if (worstPos) (e.currentTarget as HTMLDivElement).style.opacity = '0.82'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1813' }}>BTC/USDT.P</span>
-              <span style={{ fontWeight: 500, fontSize: 12.5, color: '#8c8a81' }}>{stats.worstTrade.date} · worst trade</span>
+            {/* Header row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px' }}>
+              <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 11, background: '#ffffff', border: '1px solid #f3d6cd', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#df5338' }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 7 9 13 13 9 21 17" /><polyline points="15 17 21 17 21 11" />
+                </svg>
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                <span style={{ fontWeight: 700, fontSize: 14.5, color: '#1a1813' }}>BTC/USDT.P</span>
+                <span style={{ fontWeight: 700, fontSize: 9, letterSpacing: '0.06em', color: '#df5338', background: '#fbe4de', padding: '3px 7px', borderRadius: 6 }}>WORST</span>
+              </div>
+              <span style={{ fontWeight: 500, fontSize: 12, color: '#8c8a81' }}>
+                {worstPos ? new Date(worstPos.time * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : stats.worstTrade.date}
+              </span>
             </div>
-            <span style={{ fontWeight: 800, fontSize: 20, color: '#df5338' }}>−${Math.abs(stats.worstTrade.pnl).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+            {/* Stats strip */}
+            <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid #f3d6cd' }}>
+              {[
+                { label: 'Side', value: worstPos?.side === 'long' ? 'Long' : 'Short', color: worstPos?.side === 'long' ? '#1f9d55' : '#df5338' },
+                { label: 'Lev', value: worstPos ? bwFmtLev(worstPos.leverage) : '—', color: '#1a1813' },
+                { label: 'Return', value: worstPos ? bwRetPct(worstPos) : '—', color: '#df5338' },
+              ].map((col, i) => (
+                <div key={col.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3, padding: '10px 13px', borderLeft: i > 0 ? '1px solid #f3d6cd' : 'none' }}>
+                  <span style={{ fontWeight: 600, fontSize: 9, letterSpacing: '0.05em', textTransform: 'uppercase' as const, color: '#a3a196' }}>{col.label}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: col.color }}>{col.value}</span>
+                </div>
+              ))}
+              <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', gap: 3, padding: '10px 13px', borderLeft: '1px solid #f3d6cd' }}>
+                <span style={{ fontWeight: 600, fontSize: 9, letterSpacing: '0.05em', textTransform: 'uppercase' as const, color: '#a3a196' }}>P&L</span>
+                <span style={{ fontWeight: 800, fontSize: 14.5, letterSpacing: '-0.01em', color: '#df5338' }}>
+                  −${Math.abs(stats.worstTrade.pnl).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
