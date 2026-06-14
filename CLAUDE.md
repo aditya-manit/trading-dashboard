@@ -92,47 +92,42 @@ src/
 
 ---
 
-## Handover for Opus — current state as of 2026-06-14
+## Session handover — current UI state (updated 2026-06-14)
 
-### What was just built / polished (last ~2 sessions)
+This is the source of truth for component-level styling decisions that aren't
+obvious from the code. Keep it current; delete entries once they're plainly
+encoded in the component and no longer surprising.
 
-**Open positions card (`PositionsTable.tsx`)**
-- Two-section layout: solid lavender header (`#ece8ff`) + white table body, `overflow:hidden` + `borderRadius:20`
-- Header: purple dot (8px, `#7c5cff`, static — no animation) · "Open positions" dark text · solid purple LIVE badge (`#7c5cff` bg, white text) · right side: "N open | uPnL ±$X" (plain text, green/red value)
-- The "sparkline" idea was dropped — `usePositions` only gives a current snapshot, no historical uPnL series exists
-- Purple theme tokens for this card: dot/badge `#7c5cff`, card border `#e0d5f5`, header bg `#ece8ff`
+### Open positions (`positions/PositionsTable.tsx`) — matches handoff-14 spec
+- Card: white bg, `1px solid #e3d8f8`, `borderRadius:20`, soft box-shadow, `overflow:hidden`
+- Header strip: `#f1ecfb` bg with `border-bottom:1px solid #e7dffa`, padding `16px 26px`
+- Dot: 9px `#7c5cff`, **pulsing** (`posLivePulse` keyframe, purple glow ring, 1.8s) — the pulse is intended; the user only objected to it being *green*
+- Title `#2a2342` weight 800 · solid purple LIVE badge (`#7c5cff` bg, white text, `0.08em`)
+- Right side: `#8b80b3` labels, a real 1px `#d7d0ea` divider element (not a "|" char), uPnL value weight 800 (green/red)
+- **No sparkline.** The design shows one, but `usePositions` is a point-in-time snapshot — there is no historical open-uPnL series to plot. Deliberately omitted; don't re-add a fake one.
 
-**Max Drawdown chart gradient (`KeyMetricsRow.tsx` → `DrawdownChart`)**
-- Fill is *above* the line (fillUp path: `${line} L${X(n-1)},0 L${X(0)},0 Z`)
-- Vertical gradient: starts at 0 opacity at y=0, slow ramp to 0.04 at 2%, 0.08 at 15%, exponential to 1.0 at 100%
-- Horizontal mask: left fade 4%, right fade 4% (96%→100%), center fully opaque
-- Intent: fill is always faintly visible even at shallow dips, darkens dramatically at trough
+### Best & worst + Win rate (`stats/KeyMetricsRow.tsx`)
+- Best/worst are two-row cards: header (icon + BTC/USDT.P + BEST/WORST badge + date) + stats strip (Side / **Leverage** / Return / P&L). Clickable → `TradeDetailDrawer`.
+- **Hover technique (important):** CSS can't transition `background-image` (gradients), so the gradient lives in an absolutely-positioned overlay `<span>` whose `opacity` animates 0→1 over `.2s`, in sync with `border-color` + inset `box-shadow`. Card content sits at `zIndex:1` above the `zIndex:0` overlay; resting bg stays flat. Best green `#f1faf4→#d7eee0`, worst red `#fcf0ed→#f6ddd4`, gloss `0.6`.
+- This hover is intentionally **softer** than the gallery `TradeCard` (which uses gloss `0.68` and a deeper `#cee9d9` end + gradient-at-rest). User compared them and preferred the softer version — do not "match" them.
+- Grid `alignItems:stretch` so both cards are equal height. Win rate card: `flex:1` spacer + win/loss split bar anchored at bottom.
 
-**Calendar month summary (`PositionHistoryTable.tsx`)**
-- Nav header now shows: Month/Year stacked | divider | trend circle + net P&L + trade count | divider | win/loss bar (92px, 5px) + W·L counts
-- All computed live from `monthPositions` (filtered by visible y/m)
+### Max Drawdown chart (`KeyMetricsRow.tsx` → `DrawdownChart`)
+- Fill is *above* the line (fillUp: `${line} L${X(n-1)},0 L${X(0)},0 Z`)
+- Vertical gradient `ddGrad`: 0 opacity at y=0, very slow ease-in (≈0.015 at 3%, 0.04 at 8%, 0.08 at 15%) then exponential to 1.0 at the trough — faint even at shallow dips, dark at the trough
+- Horizontal mask `ddGrad-mx`: fades 4% on the left and 4% on the right (96→100%), opaque in between
 
-**Best & worst cards + Win rate card (`KeyMetricsRow.tsx`)**
-- Two-row card: header (icon + name + badge + date) + stats strip (Side / Lev / Return / P&L)
-- Cards are clickable → opens `TradeDetailDrawer` (exported from `PositionHistoryTable.tsx`)
-- Grid uses `alignItems: stretch` so both cards reach equal height
-- Win rate card: `flex:1` spacer + win/loss split bar anchored at bottom
+### Other current patterns
+- **Calendar month summary** (`positions-history/PositionHistoryTable.tsx`): nav header = Month/Year stacked · divider · trend circle + net P&L + trade count · divider · win/loss bar (92px, 5px) + W·L counts, all from `monthPositions` (visible y/m). Calendar is the default view (not gallery).
+- **Gallery `TradeCard` hover** (same file): the canonical card hover — gloss `0.68` + deepening gradient + darker border + `inset 0 1px 0 rgba(255,255,255,0.9)`, transitioned `.18s`.
+- **Definition tooltips** (`DefLabel` / `LabelWithTooltip` / `CellLabel`): `cursor:help`, dashed underline, color shift on hover, dark popup (`#1a1813`, 186px, `bottom:calc(100%+9px)`). In `RealizedPerformance.tsx`, `KpiStrip.tsx`, `KeyMetricsRow.tsx`.
 
-**Definition tooltips**
-- `DefLabel` pattern: `cursor:help`, dashed underline, hover shifts color, dark tooltip popup (`#1a1813` bg, 186px wide, `bottom:calc(100%+9px)`)
-- Applied in: `RealizedPerformance.tsx` (Gross profit, Gross loss, Profit factor), `KpiStrip.tsx` (`CellLabel`), `KeyMetricsRow.tsx` (`LabelWithTooltip`)
-
-### What still needs work (user has design zips to reference)
-
-The user works from Figma-exported design zips dropped into `/Users/aditya/Downloads/`. Each zip contains a `screenshots/` folder with numbered iterations (e.g. `openpos14.png`, `openpos15.png`, `openpos16.png`) where the highest number is the final chosen design. Always read all screenshots in sequence before implementing — the design evolves across iterations within a single zip.
-
-Outstanding / likely next areas:
-- The position history / trade history section (`#history`) may need further polish
-- The overview section hero / equity chart may still have open design items
-- User may share more zips for other sections
-
-### Key workflow notes
-- User shares design zips: extract to `/tmp/trading-handoff-N/`, read all `screenshots/` PNGs in order, then read the current component before touching code
-- Always screenshot with Playwright after changes: `node -e "const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();const p=await b.newPage();await p.setViewportSize({width:1400,height:900});await p.goto('http://localhost:3000/#SECTION',{waitUntil:'networkidle'});await p.waitForTimeout(2500);await p.evaluate(()=>{document.getElementById('SECTION')?.scrollIntoView()});await p.waitForTimeout(800);await p.screenshot({path:'/tmp/check.png'});await b.close();})()"`
-- Dev server runs on `http://localhost:3000` — user keeps it running
-- Commit and push after each logical unit of work (user always asks "commit and push")
+### Workflow
+- **Design zips** land in `/Users/aditya/Downloads/Trading Dashboard-handoff (N).zip`. Extract to `/tmp/trading-handoff-N/`, then read the numbered `screenshots/*.png` in order (highest number = final pick — the design iterates within one zip). The exact CSS is in `project/Trading Dashboard (purple).dc.html` — grep it for pixel-accurate values rather than eyeballing screenshots.
+- Read the current component before editing. After changes, screenshot with Playwright (installed in repo) and read the PNG back:
+  ```
+  node -e "const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();const p=await b.newPage();await p.setViewportSize({width:1400,height:900});await p.goto('http://localhost:3000/#SECTION',{waitUntil:'networkidle'});await p.waitForTimeout(2500);await p.evaluate(()=>{const el=document.getElementById('SECTION');if(el)window.scrollTo({top:el.offsetTop-80})});await p.waitForTimeout(700);await p.screenshot({path:'/tmp/check.png'});await b.close();})()"
+  ```
+  To inspect one element, locate it via `getBoundingClientRect()` and pass a `clip`. For hover states, `page.mouse.move()` onto it first.
+- Dev server is kept running at `http://localhost:3000` by the user.
+- Commit + push after each logical unit (the user routinely asks "commit and push"). Co-author trailer reflects the active model.

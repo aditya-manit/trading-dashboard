@@ -23,12 +23,12 @@ A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays li
 - **Details drawer** per position: uPnL hero + ROE% since entry, direction, leverage, size in BTC, notional value, margin used, entry/mark/liquidation price, hold duration
 
 ### Reports
-- Win rate donut chart with wins/losses breakdown
-- Best & worst trade callout cards
-- Risk profile: Sortino ratio, annualised volatility, recovery factor, expectancy per trade, avg hold time
+- Win rate donut with wins/losses/total breakdown and a win/loss split bar
+- Best & worst trade cards (side / leverage / return / P&L) — click to open the trade detail drawer
+- Risk & efficiency: Max Drawdown area chart, Sortino/Sharpe/Calmar gauges, risk of ruin, annualised volatility
 
 ### History
-- Closed trade cards (4-column grid, paginated): color-coded profit/loss, leverage badge, return on margin %, close date
+- Two views: **calendar** (default) — per-day P&L cells with a live month summary bar (net P&L, trade count, win/loss split) — and **gallery** — color-coded closed-trade cards with leverage badge and return on margin %
 - **Details drawer** per trade: realized PnL hero, return on margin, direction, leverage, position size, notional, entry/exit price, trading fees, hold duration
 
 ## API Routes
