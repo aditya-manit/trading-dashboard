@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { usePositions } from '@/hooks/usePositions';
 import { useAccount } from '@/hooks/useAccount';
-import { useAccountBook } from '@/hooks/useAccountBook';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GateFuturesPosition } from '@/types/gate';
 
@@ -323,29 +322,11 @@ function PositionRow({ p, totalValue, onOpen }: { p: GateFuturesPosition; totalV
   );
 }
 
-// ─── Mini Sparkline ───────────────────────────────────────────────────────────
-
-function MiniSparkline({ points }: { points: number[] }) {
-  if (points.length < 2) return null;
-  const W = 68, H = 26, pad = 2;
-  const mn = Math.min(...points), mx = Math.max(...points);
-  const sp = mx - mn || 1;
-  const X = (i: number) => pad + (i / (points.length - 1)) * (W - pad * 2);
-  const Y = (v: number) => H - pad - ((v - mn) / sp) * (H - pad * 2);
-  const d = points.map((v, i) => `${i === 0 ? 'M' : 'L'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
-  return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', flexShrink: 0 }}>
-      <path d={d} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function PositionsTable() {
   const { data: rawPositions, isLoading } = usePositions();
   const { data: account } = useAccount();
-  const { data: bookEntries } = useAccountBook();
   const [selected, setSelected] = useState<GateFuturesPosition | null>(null);
 
   const positions = Array.isArray(rawPositions) ? rawPositions : [];
@@ -353,87 +334,73 @@ export function PositionsTable() {
   const totalUnrealPnl = positions.reduce((s, p) => s + parseFloat(p.unrealised_pnl), 0);
   const isUp = totalUnrealPnl >= 0;
 
-  const sparkPoints = useMemo(() => {
-    if (!Array.isArray(bookEntries) || bookEntries.length < 2) return [];
-    return bookEntries.slice(-28).map(e => parseFloat(e.balance));
-  }, [bookEntries]);
-
   if (isLoading) {
     return (
-      <div style={{ border: '1px solid #e3d8f8', borderRadius: 20, overflow: 'hidden' }}>
-        <div style={{ background: 'linear-gradient(105deg,#6a4fd8,#8b6ee8 55%,#a893f0)', padding: '18px 24px' }}>
-          <Skeleton className="h-6 w-40" style={{ background: 'rgba(255,255,255,0.2)' }} />
-        </div>
-        <div style={{ padding: '0 8px 14px', background: '#fff' }}>
-          {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full mb-2 rounded-lg mt-2" />)}
-        </div>
+      <div style={{ background: 'linear-gradient(180deg,#f3eeff,#ffffff 44%)', border: '1px solid #e0d5f5', borderRadius: 20, padding: '22px 24px 14px' }}>
+        <Skeleton className="h-6 w-40 mb-4" />
+        {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full mb-2 rounded-lg" />)}
       </div>
     );
   }
 
   return (
     <>
-      <style>{`
-        @keyframes livePulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(74,222,128,0.55); }
-          50%      { box-shadow: 0 0 0 5px rgba(74,222,128,0); }
-        }
-      `}</style>
-      <div style={{ border: '1px solid #d6caf5', borderRadius: 20, overflow: 'hidden', fontFamily: FONT }}>
+      <div style={{ background: 'linear-gradient(180deg,#f3eeff,#ffffff 44%)', border: '1px solid #e0d5f5', borderRadius: 20, padding: '22px 24px 14px', fontFamily: FONT }}>
 
-        {/* ── Purple gradient header ── */}
-        <div style={{ background: 'linear-gradient(105deg,#6a4fd8 0%,#8b6ee8 55%,#a893f0 100%)', padding: '17px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-          {/* Left */}
+        {/* ── Header row ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: 12, marginBottom: 8 }}>
+
+          {/* Left: dot + title + LIVE badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', flexShrink: 0, animation: 'livePulse 2s ease-in-out infinite', display: 'block' }} />
-            <span style={{ fontWeight: 800, fontSize: 18, color: '#ffffff', letterSpacing: '-0.01em' }}>Open positions</span>
-            <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.92)', background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.28)', padding: '3px 9px', borderRadius: 20 }}>LIVE</span>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c5cff', flexShrink: 0, display: 'block' }} />
+            <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em', color: '#1a1813' }}>Open positions</span>
+            <span style={{ fontWeight: 700, fontSize: 10.5, letterSpacing: '0.07em', color: '#ffffff', background: '#7c5cff', padding: '4px 10px', borderRadius: 20 }}>
+              LIVE
+            </span>
           </div>
-          {/* Right */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <span style={{ fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.65)' }}>{positions.length} open</span>
-            <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 14 }}>|</span>
-            <span style={{ fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.65)' }}>uPnL</span>
-            <span style={{ fontWeight: 700, fontSize: 13, color: '#ffffff', background: isUp ? 'rgba(47,170,99,0.85)' : 'rgba(223,83,56,0.85)', padding: '4px 11px', borderRadius: 20, letterSpacing: '-0.01em' }}>
+
+          {/* Right: count | uPnL value */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: 13, color: '#9b988d' }}>{positions.length} open</span>
+            <span style={{ color: '#d4d1c9', fontSize: 13, fontWeight: 400 }}>|</span>
+            <span style={{ fontWeight: 600, fontSize: 13, color: '#9b988d' }}>uPnL</span>
+            <span style={{ fontWeight: 700, fontSize: 13.5, color: isUp ? '#1f9d55' : '#df5338' }}>
               {isUp ? '+$' : '-$'}{fmt(Math.abs(totalUnrealPnl), 0)}
             </span>
-            <MiniSparkline points={sparkPoints} />
           </div>
         </div>
 
-        {/* ── Table body ── */}
-        <div style={{ background: '#ffffff', padding: '0 14px 10px' }}>
-          {positions.length === 0 ? (
-            <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 14, background: '#f3eefe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-                  <polyline points="2 17 12 22 22 17"/>
-                  <polyline points="2 12 12 17 22 12"/>
-                </svg>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', textAlign: 'center' as const }}>
-                <span style={{ fontWeight: 700, fontSize: 15, color: '#1a1813' }}>No open positions</span>
-                <span style={{ fontWeight: 500, fontSize: 13.5, color: '#9b988d' }}>Your open futures contracts will appear here</span>
-              </div>
+        {/* ── Table ── */}
+        {positions.length === 0 ? (
+          <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#f3eefe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                <polyline points="2 17 12 22 22 17"/>
+                <polyline points="2 12 12 17 22 12"/>
+              </svg>
             </div>
-          ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr .8fr .9fr .9fr .9fr 1.5fr 1fr 30px', gap: 12, padding: '13px 4px', fontWeight: 600, fontSize: 11, letterSpacing: '0.05em', color: '#b0aea3', textTransform: 'uppercase' as const, borderBottom: '1px solid #f2f1ee' }}>
-                <span>Instrument</span><span>Side</span>
-                <span style={{ textAlign: 'right' as const }}>Size</span>
-                <span style={{ textAlign: 'right' as const }}>Entry</span>
-                <span style={{ textAlign: 'right' as const }}>Mark</span>
-                <span>Allocation</span>
-                <span style={{ textAlign: 'right' as const }}>uPnL</span>
-                <span />
-              </div>
-              {positions.map((p, idx) => (
-                <PositionRow key={`${p.contract}-${idx}`} p={p} totalValue={totalValue} onOpen={() => setSelected(p)} />
-              ))}
-            </>
-          )}
-        </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', textAlign: 'center' as const }}>
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#1a1813' }}>No open positions</span>
+              <span style={{ fontWeight: 500, fontSize: 13.5, color: '#9b988d' }}>Your open futures contracts will appear here</span>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr .8fr .9fr .9fr .9fr 1.5fr 1fr 30px', gap: 12, padding: '13px 4px', fontWeight: 600, fontSize: 11, letterSpacing: '0.05em', color: '#b0aea3', textTransform: 'uppercase' as const, borderBottom: '1px solid #f2f1ee' }}>
+              <span>Instrument</span><span>Side</span>
+              <span style={{ textAlign: 'right' as const }}>Size</span>
+              <span style={{ textAlign: 'right' as const }}>Entry</span>
+              <span style={{ textAlign: 'right' as const }}>Mark</span>
+              <span>Allocation</span>
+              <span style={{ textAlign: 'right' as const }}>uPnL</span>
+              <span />
+            </div>
+            {positions.map((p, idx) => (
+              <PositionRow key={`${p.contract}-${idx}`} p={p} totalValue={totalValue} onOpen={() => setSelected(p)} />
+            ))}
+          </>
+        )}
       </div>
 
       {selected && <PositionDetailDrawer p={selected} onClose={() => setSelected(null)} />}
