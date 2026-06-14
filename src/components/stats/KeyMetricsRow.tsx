@@ -167,18 +167,20 @@ function DrawdownChart({ entries }: { entries: GateAccountBookEntry[] }) {
         <defs>
           <linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%"   stopColor="#df5338" stopOpacity={0}    />
-            <stop offset="5%"   stopColor="#df5338" stopOpacity={0.04} />
-            <stop offset="30%"  stopColor="#df5338" stopOpacity={0.08} />
-            <stop offset="55%"  stopColor="#df5338" stopOpacity={0.18} />
-            <stop offset="70%"  stopColor="#df5338" stopOpacity={0.40} />
-            <stop offset="85%"  stopColor="#df5338" stopOpacity={0.70} />
+            <stop offset="2%"   stopColor="#df5338" stopOpacity={0.02} />
+            <stop offset="5%"   stopColor="#df5338" stopOpacity={0.05} />
+            <stop offset="8%"   stopColor="#df5338" stopOpacity={0.12} />
+            <stop offset="30%"  stopColor="#df5338" stopOpacity={0.16} />
+            <stop offset="55%"  stopColor="#df5338" stopOpacity={0.25} />
+            <stop offset="70%"  stopColor="#df5338" stopOpacity={0.45} />
+            <stop offset="85%"  stopColor="#df5338" stopOpacity={0.72} />
             <stop offset="93%"  stopColor="#df5338" stopOpacity={0.88} />
             <stop offset="100%" stopColor="#df5338" stopOpacity={1}    />
           </linearGradient>
           <linearGradient id="ddGrad-mx" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%"   stopColor="#fff" stopOpacity={0} />
             <stop offset="4%"   stopColor="#fff" stopOpacity={1} />
-            <stop offset="99%"  stopColor="#fff" stopOpacity={1} />
+            <stop offset="98%"  stopColor="#fff" stopOpacity={1} />
             <stop offset="100%" stopColor="#fff" stopOpacity={0} />
           </linearGradient>
           <mask id="ddGrad-mask">
