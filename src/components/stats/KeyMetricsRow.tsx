@@ -354,6 +354,8 @@ export function KeyMetricsRow() {
   const stats = useMemo(() => computeTradeStats(positions, entries), [positions, entries]);
 
   const [drawerTrade, setDrawerTrade] = useState<GateFuturesPositionClose | null>(null);
+  const [bestHover, setBestHover] = useState(false);
+  const [worstHover, setWorstHover] = useState(false);
 
   const { bestPos, worstPos } = useMemo(() => {
     if (!positions.length) return { bestPos: null, worstPos: null };
@@ -504,9 +506,19 @@ export function KeyMetricsRow() {
           {/* Best trade card */}
           <div
             onClick={() => bestPos && setDrawerTrade(bestPos)}
-            style={{ borderRadius: 14, background: '#f1faf4', border: '1px solid #d3ecdd', overflow: 'hidden', cursor: bestPos ? 'pointer' : 'default', transition: 'opacity .15s' }}
-            onMouseEnter={e => { if (bestPos) (e.currentTarget as HTMLDivElement).style.opacity = '0.82'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
+            onMouseEnter={() => bestPos && setBestHover(true)}
+            onMouseLeave={() => setBestHover(false)}
+            style={{
+              borderRadius: 14,
+              background: bestHover
+                ? 'linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0) 52%),linear-gradient(180deg,#f1faf4,#d7eee0)'
+                : '#f1faf4',
+              border: `1px solid ${bestHover ? '#b5d9c6' : '#d3ecdd'}`,
+              boxShadow: bestHover ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'none',
+              overflow: 'hidden',
+              cursor: bestPos ? 'pointer' : 'default',
+              transition: 'background .18s, border-color .18s, box-shadow .18s',
+            }}
           >
             {/* Header row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px' }}>
@@ -547,9 +559,19 @@ export function KeyMetricsRow() {
           {/* Worst trade card */}
           <div
             onClick={() => worstPos && setDrawerTrade(worstPos)}
-            style={{ borderRadius: 14, background: '#fcf0ed', border: '1px solid #f3d6cd', overflow: 'hidden', cursor: worstPos ? 'pointer' : 'default', transition: 'opacity .15s' }}
-            onMouseEnter={e => { if (worstPos) (e.currentTarget as HTMLDivElement).style.opacity = '0.82'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
+            onMouseEnter={() => worstPos && setWorstHover(true)}
+            onMouseLeave={() => setWorstHover(false)}
+            style={{
+              borderRadius: 14,
+              background: worstHover
+                ? 'linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0) 52%),linear-gradient(180deg,#fcf0ed,#f6ddd4)'
+                : '#fcf0ed',
+              border: `1px solid ${worstHover ? '#e4c0b0' : '#f3d6cd'}`,
+              boxShadow: worstHover ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'none',
+              overflow: 'hidden',
+              cursor: worstPos ? 'pointer' : 'default',
+              transition: 'background .18s, border-color .18s, box-shadow .18s',
+            }}
           >
             {/* Header row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px' }}>
