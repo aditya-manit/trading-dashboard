@@ -336,19 +336,24 @@ export function PositionsTable() {
 
   if (isLoading) {
     return (
-      <div style={{ background: 'linear-gradient(180deg,#f3eeff,#ffffff 44%)', border: '1px solid #e0d5f5', borderRadius: 20, padding: '22px 24px 14px' }}>
-        <Skeleton className="h-6 w-40 mb-4" />
-        {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full mb-2 rounded-lg" />)}
+      <div style={{ border: '1px solid #e0d5f5', borderRadius: 20, overflow: 'hidden', fontFamily: FONT }}>
+        <div style={{ background: '#ece8ff', padding: '22px 24px 18px' }}>
+          <Skeleton className="h-6 w-40" style={{ background: 'rgba(124,92,255,0.15)' }} />
+        </div>
+        <div style={{ background: '#fff', padding: '0 16px 14px' }}>
+          {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full mb-2 rounded-lg mt-2" />)}
+        </div>
       </div>
     );
   }
 
   return (
     <>
-      <div style={{ background: 'linear-gradient(180deg,#f3eeff,#ffffff 44%)', border: '1px solid #e0d5f5', borderRadius: 20, padding: '22px 24px 14px', fontFamily: FONT }}>
+      <div style={{ border: '1px solid #e0d5f5', borderRadius: 20, overflow: 'hidden', fontFamily: FONT }}>
 
-        {/* ── Header row ── */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: 12, marginBottom: 8 }}>
+        {/* ── Solid lavender header ── */}
+        <div style={{ background: '#ece8ff', padding: '18px 22px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: 12 }}>
 
           {/* Left: dot + title + LIVE badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -369,8 +374,10 @@ export function PositionsTable() {
             </span>
           </div>
         </div>
+        </div>{/* end header */}
 
-        {/* ── Table ── */}
+        {/* ── White table body ── */}
+        <div style={{ background: '#ffffff', padding: '0 14px 10px' }}>
         {positions.length === 0 ? (
           <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 48, height: 48, borderRadius: 14, background: '#f3eefe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -401,6 +408,7 @@ export function PositionsTable() {
             ))}
           </>
         )}
+        </div>{/* end table body */}
       </div>
 
       {selected && <PositionDetailDrawer p={selected} onClose={() => setSelected(null)} />}
