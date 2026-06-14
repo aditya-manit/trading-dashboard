@@ -509,19 +509,20 @@ export function KeyMetricsRow() {
             onMouseEnter={() => bestPos && setBestHover(true)}
             onMouseLeave={() => setBestHover(false)}
             style={{
+              position: 'relative',
               borderRadius: 14,
-              background: bestHover
-                ? 'linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0) 52%),linear-gradient(180deg,#f1faf4,#d7eee0)'
-                : '#f1faf4',
+              background: '#f1faf4',
               border: `1px solid ${bestHover ? '#b5d9c6' : '#d3ecdd'}`,
-              boxShadow: bestHover ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'none',
+              boxShadow: bestHover ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'inset 0 1px 0 rgba(255,255,255,0)',
               overflow: 'hidden',
               cursor: bestPos ? 'pointer' : 'default',
-              transition: 'background .18s, border-color .18s, box-shadow .18s',
+              transition: 'border-color .2s ease, box-shadow .2s ease',
             }}
           >
+            {/* Hover gradient overlay — opacity fades smoothly (gradients can't transition directly) */}
+            <span aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0) 52%),linear-gradient(180deg,#f1faf4,#d7eee0)', opacity: bestHover ? 1 : 0, transition: 'opacity .2s ease' }} />
             {/* Header row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px' }}>
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px' }}>
               <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 11, background: '#ffffff', border: '1px solid #cfe9da', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1f9d55' }}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" />
@@ -536,7 +537,7 @@ export function KeyMetricsRow() {
               </span>
             </div>
             {/* Stats strip */}
-            <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid #d3ecdd' }}>
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'stretch', borderTop: '1px solid #d3ecdd' }}>
               {[
                 { label: 'Side', value: bestPos?.side === 'long' ? 'Long' : 'Short', color: '#1f9d55' },
                 { label: 'Lev', value: bestPos ? bwFmtLev(bestPos.leverage) : '—', color: '#1a1813' },
@@ -562,19 +563,20 @@ export function KeyMetricsRow() {
             onMouseEnter={() => worstPos && setWorstHover(true)}
             onMouseLeave={() => setWorstHover(false)}
             style={{
+              position: 'relative',
               borderRadius: 14,
-              background: worstHover
-                ? 'linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0) 52%),linear-gradient(180deg,#fcf0ed,#f6ddd4)'
-                : '#fcf0ed',
+              background: '#fcf0ed',
               border: `1px solid ${worstHover ? '#e4c0b0' : '#f3d6cd'}`,
-              boxShadow: worstHover ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'none',
+              boxShadow: worstHover ? 'inset 0 1px 0 rgba(255,255,255,0.9)' : 'inset 0 1px 0 rgba(255,255,255,0)',
               overflow: 'hidden',
               cursor: worstPos ? 'pointer' : 'default',
-              transition: 'background .18s, border-color .18s, box-shadow .18s',
+              transition: 'border-color .2s ease, box-shadow .2s ease',
             }}
           >
+            {/* Hover gradient overlay — opacity fades smoothly */}
+            <span aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0) 52%),linear-gradient(180deg,#fcf0ed,#f6ddd4)', opacity: worstHover ? 1 : 0, transition: 'opacity .2s ease' }} />
             {/* Header row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px' }}>
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 11, padding: '13px 15px' }}>
               <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 11, background: '#ffffff', border: '1px solid #f3d6cd', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#df5338' }}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 7 9 13 13 9 21 17" /><polyline points="15 17 21 17 21 11" />
@@ -589,7 +591,7 @@ export function KeyMetricsRow() {
               </span>
             </div>
             {/* Stats strip */}
-            <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid #f3d6cd' }}>
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'stretch', borderTop: '1px solid #f3d6cd' }}>
               {[
                 { label: 'Side', value: worstPos?.side === 'long' ? 'Long' : 'Short', color: worstPos?.side === 'long' ? '#1f9d55' : '#df5338' },
                 { label: 'Lev', value: worstPos ? bwFmtLev(worstPos.leverage) : '—', color: '#1a1813' },
