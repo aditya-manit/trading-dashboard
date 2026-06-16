@@ -62,7 +62,7 @@ function GrayChip({ icon }: { icon: React.ReactNode }) {
 
 // ─── Position Detail Drawer ───────────────────────────────────────────────────
 
-function PositionDetailDrawer({ p, onClose }: { p: GateFuturesPosition; onClose: () => void }) {
+function PositionDetailDrawer({ p, totalValue, onClose }: { p: GateFuturesPosition; totalValue: number; onClose: () => void }) {
   const isLong = p.size > 0;
   const pnl = parseFloat(p.unrealised_pnl);
   const isUp = pnl >= 0;
@@ -73,8 +73,9 @@ function PositionDetailDrawer({ p, onClose }: { p: GateFuturesPosition; onClose:
   const entry = parseFloat(p.entry_price) || 0;
   const mark  = parseFloat(p.mark_price)  || 0;
   const liq   = parseFloat(p.liq_price)   || 0;
-  const leverage = parseFloat(p.leverage) || 1;
-  const marginPct = notional > 0 ? Math.min(100, (margin / (notional / leverage)) * 100) : 0;
+  // Share of total account equity allocated to this position — matches the
+  // allocation bar in the table row (margin ÷ account total).
+  const marginPct = totalValue > 0 ? Math.min(100, (margin / totalValue) * 100) : 0;
 
   // Price track positions
   const clamp = (x: number) => Math.max(4, Math.min(96, x));
@@ -131,7 +132,7 @@ function PositionDetailDrawer({ p, onClose }: { p: GateFuturesPosition; onClose:
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>Unrealized P&L</span>
               <span style={{ fontWeight: 800, fontSize: 34, letterSpacing: '-0.02em', color: isUp ? '#1f9d55' : '#df5338' }}>
-                {isUp ? '+$' : '-$'}{fmt(Math.abs(pnl), 2)}
+                {isUp ? '+$' : '-$'}{fmt(Math.abs(pnl), 0)}
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                 <span style={{ fontWeight: 700, fontSize: 13, color: isUp ? '#1f9d55' : '#df5338', background: isUp ? '#e9f6ee' : '#fbeae6', padding: '4px 10px', borderRadius: 8 }}>
@@ -144,7 +145,7 @@ function PositionDetailDrawer({ p, onClose }: { p: GateFuturesPosition; onClose:
             <div style={{ width: 1, background: '#f0efec', flexShrink: 0 }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
               <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>Entry price</span>
-              <span style={{ fontWeight: 800, fontSize: 34, letterSpacing: '-0.02em', color: '#7c5cff' }}>{fmtPrice(p.entry_price)}</span>
+              <span style={{ fontWeight: 800, fontSize: 34, letterSpacing: '-0.02em', color: '#7c5cff' }}>{entry > 0 ? `$${fmt(entry, 0)}` : '—'}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 {isLong
                   ? <span style={{ fontWeight: 700, fontSize: 13, color: '#1f9d55', background: '#e9f6ee', padding: '4px 10px', borderRadius: 8 }}>Long</span>
@@ -414,7 +415,7 @@ export function PositionsTable() {
         </div>{/* end table body */}
       </div>
 
-      {selected && <PositionDetailDrawer p={selected} onClose={() => setSelected(null)} />}
+      {selected && <PositionDetailDrawer p={selected} totalValue={totalValue} onClose={() => setSelected(null)} />}
     </>
   );
 }
