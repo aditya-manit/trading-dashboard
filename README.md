@@ -1,6 +1,6 @@
 # Trading Dashboard
 
-A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays live account balance, open positions, closed trade history, and performance analytics — all fetched read-only from the Gate.io Futures API.
+A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays live account balance, open positions, closed trade history, and performance analytics — all fetched read-only from the Gate.io Futures API. A top-level **Dashboard / Plan** toggle switches between the analytics dashboard and a pre-trade workbook.
 
 ## Stack
 
@@ -30,6 +30,11 @@ A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays li
 ### History
 - Two views: **calendar** (default) — per-day P&L cells with a live month summary bar (net P&L, trade count, win/loss split) — and **gallery** — color-coded closed-trade cards with leverage badge and return on margin %
 - **Details drawer** per trade: realized PnL hero, return on margin, direction, leverage, position size, notional, entry/exit price, trading fees, hold duration
+
+### Plan (pre-trade workbook)
+- A 5-step routine to vet a setup before entry: levels → trend → confirmation → stop → liquidity, each with an animated diagram, a one-line rule, and pre-flight checks
+- Each step gates the next — you can only advance once its checks are cleared; progress and checks persist in localStorage
+- Sample market-news strip (high-impact economic events) with a slide-out calendar drawer
 
 ## API Routes
 

@@ -1,0 +1,324 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
+import { NEWS_STRIP_HTML, NEWS_DRAWER_HTML } from './planNews';
+
+const FONT = "'Plus Jakarta Sans', sans-serif";
+
+// ─── Step metadata (verbatim from handoff 15 planMeta) ────────────────────────
+type PlanStep = {
+  n: number; title: string; color: string; soft: string; border: string; shadow: string;
+  rail: string; short: string; lead: string; caption: string; ask: string[]; rule: string;
+};
+
+const PLAN_META: PlanStep[] = [
+  { n: 1, title: 'Where is the nearest support & resistance?', color: '#7c5cff', soft: '#f3eefe', border: '#e7ddfb', shadow: 'rgba(124,92,255,0.32)', rail: 'Levels', short: 'Levels',
+    lead: 'Price is always traveling between support and resistance. Mark both before you enter.',
+    caption: 'Price is pinned to support — a long has the whole range to run, a short has nowhere to go.',
+    ask: ['I am NOT buying into resistance', 'I am NOT shorting into support', 'There is room for price to move my way'],
+    rule: 'Never buy into resistance or short into support.' },
+  { n: 2, title: 'What is the higher timeframe doing?', color: '#1f9d55', soft: '#edf7f0', border: '#cfe9da', shadow: 'rgba(31,157,85,0.3)', rail: 'Trend', short: 'Trend',
+    lead: 'Trade with the trend, not against it. The higher timeframe decides which way you are allowed to lean.',
+    caption: 'Price pulled back inside an uptrend — a long goes with the trend, a short fights it.',
+    ask: ['Is the higher-timeframe trend up, down, or sideways?', 'Does my trade go WITH that trend?', 'If it is counter-trend, is my proof strong enough?'],
+    rule: 'Trade with the trend. Against it, you need much stronger proof.' },
+  { n: 3, title: 'Has price actually confirmed my idea?', color: '#2f6fc8', soft: '#eef3fb', border: '#d6e3f5', shadow: 'rgba(47,111,200,0.32)', rail: 'Confirmation', short: 'Confirm',
+    lead: 'Do not predict the move — let price prove it. Wait for the break, and then for the hold.',
+    caption: 'Price broke the level and retested it — the break held, so the move is confirmed. A reclaim would have been a fakeout.',
+    ask: ['Has the level actually broken, or am I guessing?', 'Did it hold the break, or instantly reclaim?', 'Am I reacting to price, or to hope?'],
+    rule: 'Trade confirmations, not predictions.' },
+  { n: 4, title: 'If I enter now, where is my stop?', color: '#7c5cff', soft: '#f3eefe', border: '#e4d8fb', shadow: 'rgba(124,92,255,0.32)', rail: 'Stop', short: 'Stop',
+    lead: 'Decide where you are wrong before you decide where you are right. The stop comes first — always.',
+    caption: 'The stop sits just below the major level — on structure, where losing it truly means the idea failed. Not inside the noise.',
+    ask: ['Where exactly is my idea invalidated?', 'Is the stop on structure, or on emotion?', 'Is the risk small enough to survive being wrong?'],
+    rule: 'Entry comes after stop placement, never before.' },
+  { n: 5, title: 'Why would the other side be trapped?', color: '#e07b2f', soft: '#fdf2e8', border: '#f6dcc1', shadow: 'rgba(224,123,47,0.3)', rail: 'Liquidity', short: 'Traps',
+    lead: 'Every move needs a loser. Find who is offside and where their stops sit — that is the fuel for your move.',
+    caption: 'Price swept the stops above resistance, trapped the late longs, then reversed — their forced exits are the fuel.',
+    ask: ['Who is wrong if price pushes up?', 'Who is wrong if price pushes down?', 'Where are their stops stacked?'],
+    rule: 'Trade where trapped traders are forced to exit.' },
+];
+
+// ─── Stepper mini-icons (verbatim from handoff 15 planStepper) ────────────────
+const G = '#c4c1b9', G2 = '#d8d5cd';
+const ICON_SVG_PROPS = { width: 46, height: 30, viewBox: '0 0 130 48', fill: 'none', preserveAspectRatio: 'none' as const, style: { flex: '0 0 auto' as const } };
+const STEPPER_ICONS = [
+  <svg key={0} {...ICON_SVG_PROPS}>
+    <line x1={4} y1={9} x2={126} y2={9} stroke={G2} strokeWidth={2.6} strokeDasharray="6 4" strokeLinecap="round" />
+    <line x1={4} y1={40} x2={126} y2={40} stroke={G} strokeWidth={2.6} strokeLinecap="round" />
+    <polyline points="6,20 34,27 58,23 84,34 110,39 122,39" stroke={G} strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx={122} cy={39} r={4.5} fill={G} />
+  </svg>,
+  <svg key={1} {...ICON_SVG_PROPS}>
+    <polyline points="4,40 28,31 52,34 80,18 106,11 126,5" stroke={G} strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+  </svg>,
+  <svg key={2} {...ICON_SVG_PROPS}>
+    <line x1={4} y1={30} x2={126} y2={30} stroke={G2} strokeWidth={2.4} strokeDasharray="5 4" strokeLinecap="round" />
+    <line x1={65} y1={44} x2={65} y2={11} stroke={G} strokeWidth={3} strokeLinecap="round" />
+    <polyline points="54,21 65,9 76,21" stroke={G} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+  </svg>,
+  <svg key={3} {...ICON_SVG_PROPS}>
+    <polyline points="6,12 32,22 60,37 88,25 122,13" stroke={G} strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+    <line x1={44} y1={45} x2={78} y2={45} stroke={G2} strokeWidth={3} strokeLinecap="round" />
+  </svg>,
+  <svg key={4} {...ICON_SVG_PROPS}>
+    <line x1={4} y1={30} x2={126} y2={30} stroke={G2} strokeWidth={2.4} strokeDasharray="5 4" strokeLinecap="round" />
+    <circle cx={58} cy={22} r={1.8} fill={G} />
+    <circle cx={68} cy={22} r={1.8} fill={G} />
+    <circle cx={78} cy={22} r={1.8} fill={G} />
+    <polyline points="14,40 46,32 68,12 82,32 116,42" stroke={G} strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+  </svg>,
+];
+
+const pad2 = (n: number) => ('0' + n).slice(-2);
+
+export function PlanPage() {
+  const [step, setStep] = useState(0);
+  const [checks, setChecks] = useState<Record<string, boolean>>({});
+  const [finished, setFinished] = useState(false);
+  const [newsOpen, setNewsOpen] = useState(false);
+
+  // Restore persisted progress
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem('tdplan_step');
+      const f = localStorage.getItem('tdplan_fin');
+      const c = localStorage.getItem('tdplan_checks_v2');
+      if (s !== null) setStep(Math.max(0, Math.min(4, +s)));
+      if (f !== null) setFinished(f === '1');
+      if (c !== null) setChecks(JSON.parse(c) || {});
+    } catch { /* ignore */ }
+  }, []);
+
+  const persistPlan = (s: number, f: boolean) => {
+    try { localStorage.setItem('tdplan_step', String(s)); localStorage.setItem('tdplan_fin', f ? '1' : '0'); } catch { /* ignore */ }
+  };
+  const persistChecks = (c: Record<string, boolean>) => {
+    try { localStorage.setItem('tdplan_checks_v2', JSON.stringify(c)); } catch { /* ignore */ }
+  };
+
+  const goStep = (s: number) => { const ns = Math.max(0, Math.min(4, s)); persistPlan(ns, finished); setStep(ns); };
+  const toggleCheck = (k: string) => {
+    setChecks((prev) => { const nc = { ...prev, [k]: !prev[k] }; persistChecks(nc); return nc; });
+  };
+  const reset = () => { persistPlan(0, false); persistChecks({}); setStep(0); setFinished(false); setChecks({}); };
+
+  const meta = PLAN_META[step];
+  const doneCount = meta.ask.filter((_, i) => checks[`${step}-${i}`]).length;
+  const allClear = doneCount === meta.ask.length && meta.ask.length > 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', fontFamily: FONT }}>
+      <style>{`
+        @keyframes pkDraw{to{stroke-dashoffset:0;}}
+        @keyframes pkPop{from{opacity:0;transform:scale(.3);}to{opacity:1;transform:scale(1);}}
+        @keyframes pkUp{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:translateY(0);}}
+        @keyframes pkZone{from{opacity:0;}to{opacity:1;}}
+        @keyframes pkPulse{0%{transform:scale(.5);opacity:.45;}70%{opacity:0;}100%{transform:scale(1.9);opacity:0;}}
+        @keyframes pkGrowX{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+        @keyframes pkFade{from{opacity:0;}to{opacity:1;}}
+        @keyframes pkSlideIn{from{transform:translateX(100%);}to{transform:translateX(0);}}
+      `}</style>
+
+      {/* header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 24, flexWrap: 'wrap', padding: '6px 2px 0' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#7c5cff' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c5cff' }} />Pre-trade workbook
+          </span>
+          <span style={{ fontWeight: 800, fontSize: 30, letterSpacing: '-0.025em', color: '#1a1813', lineHeight: 1.08 }}>Plan the trade before you take it.</span>
+          <span style={{ fontWeight: 500, fontSize: 14.5, color: '#897f70', lineHeight: 1.5, maxWidth: 580 }}>A short routine that keeps you out of bad setups. Work it top to bottom — each step has to pass before the next one matters.</span>
+        </div>
+      </div>
+
+      {/* market news */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, flexWrap: 'wrap' }}>
+          <span style={{ width: 32, height: 32, borderRadius: 9, background: '#fbe7cb', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9821f" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Market news · sample feed</span>
+            <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.01em' }}>Next: FOMC · tomorrow 2:00pm</span>
+          </div>
+          <button onClick={() => setNewsOpen(true)} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontFamily: 'inherit', background: '#fff', border: '1px solid #e8e6e0', borderRadius: 10, padding: '8px 14px', fontWeight: 700, fontSize: 12, color: '#56544b' }}>
+            View all <span style={{ fontWeight: 800, color: '#c9821f' }}>5</span> →
+          </button>
+        </div>
+        <div dangerouslySetInnerHTML={{ __html: NEWS_STRIP_HTML }} />
+      </div>
+
+      {/* news drawer */}
+      {newsOpen && (
+        <>
+          <div onClick={() => setNewsOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(20,20,12,0.35)', zIndex: 60, animation: 'pkFade .2s both' }} />
+          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 440, maxWidth: '92vw', background: '#fbfaf8', zIndex: 61, boxShadow: '-12px 0 40px rgba(20,20,12,0.16)', display: 'flex', flexDirection: 'column', animation: 'pkSlideIn .28s cubic-bezier(.2,.8,.3,1) both', fontFamily: FONT }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px', borderBottom: '1px solid #efedea', background: '#fff', flex: '0 0 auto' }}>
+              <span style={{ width: 32, height: 32, borderRadius: 9, background: '#fbe7cb', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9821f" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Economic calendar · sample</span>
+                <span style={{ fontWeight: 800, fontSize: 16, color: '#1a1813', letterSpacing: '-0.015em' }}>This week’s high-impact</span>
+              </div>
+              <button onClick={() => setNewsOpen(false)} style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: 9, border: '1px solid #e8e6e0', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#8c8a81', fontSize: 17, lineHeight: 1, fontFamily: 'inherit' }}>×</button>
+            </div>
+            <div dangerouslySetInnerHTML={{ __html: NEWS_DRAWER_HTML }} />
+          </div>
+        </>
+      )}
+
+      {/* top stepper */}
+      <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 16, padding: '8px 12px', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
+        <div style={{ display: 'flex', alignItems: 'stretch' }}>
+          {PLAN_META.map((m, i) => (
+            <span key={m.n} style={{ display: 'contents' }}>
+              <button onClick={() => goStep(i)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, cursor: 'pointer', fontFamily: FONT, border: 'none', background: i === step ? '#f4f3f0' : 'transparent', borderRadius: 11, padding: '9px 14px', textAlign: 'left' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                  <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.09em', textTransform: 'uppercase', color: i === step ? '#a8a69b' : '#c4c2b8' }}>Step {m.n}</span>
+                  <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em', color: i === step ? '#1a1813' : '#a8a69b', lineHeight: 1 }}>{m.short}</span>
+                </div>
+                {STEPPER_ICONS[i]}
+              </button>
+              {i < 4 && <span style={{ flex: '0 0 auto', alignSelf: 'center', color: '#d4d2c9', fontSize: 17, padding: '0 10px' }}>›</span>}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* step card */}
+      <div style={{ background: '#ffffff', border: '1px solid #efedf3', borderRadius: 22, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden' }}>
+        {/* header block */}
+        <div style={{ borderBottom: '1px solid #f4f3f0' }}>
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <div style={{ flex: '0 0 auto', width: 86, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 0' }}>
+              <span style={{ fontWeight: 800, fontSize: 44, letterSpacing: '-0.03em', color: '#7c5cff', lineHeight: 1 }}>{meta.n}</span>
+            </div>
+            <div style={{ flex: '0 0 auto', width: 1, background: '#eceae5' }} />
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, padding: '18px 30px', minWidth: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#a8a69b' }}>Step {meta.n} · {meta.rail}</span>
+                <span style={{ fontWeight: 800, fontSize: 23, letterSpacing: '-0.015em', color: '#1a1813', lineHeight: 1.05 }}>{meta.title}</span>
+              </div>
+              <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 9 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                    <span style={{ fontWeight: 800, fontSize: 15, color: '#1a1813', letterSpacing: '-0.01em' }}>{pad2(meta.n)}</span>
+                    <span style={{ fontWeight: 700, fontSize: 11, color: '#c4c2b8' }}>/ 05</span>
+                  </div>
+                  <div style={{ width: 84, height: 5, borderRadius: 99, background: '#eceae5', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${(meta.n / 5) * 100}%`, background: '#7c5cff', borderRadius: 99, transition: 'width .3s ease' }} />
+                  </div>
+                </div>
+                <button onClick={reset} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', border: 'none', padding: '0 1px', fontWeight: 700, fontSize: 11.5, color: '#b0aea3' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>Reset
+                </button>
+              </div>
+            </div>
+          </div>
+          <div style={{ height: 1, background: '#f4f3f0' }} />
+          <div style={{ display: 'flex', alignItems: 'stretch', background: '#faf8ff' }}>
+            <div style={{ flex: '0 0 auto', width: 86, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 0' }}>
+              <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#7c5cff' }}>The rule</span>
+            </div>
+            <div style={{ flex: '0 0 auto', width: 1, background: '#eceae5' }} />
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9, padding: '12px 30px', minWidth: 0 }}>
+              <span style={{ flex: '0 0 auto', width: 5, height: 5, borderRadius: '50%', background: '#7c5cff' }} />
+              <span style={{ fontWeight: 700, fontSize: 14, color: '#2a2342', letterSpacing: '-0.005em' }}>{meta.rule}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* body: diagram | checks */}
+        <div style={{ display: 'flex', alignItems: 'stretch' }}>
+          <div style={{ flex: 1, minWidth: 0, padding: '22px 28px', display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center' }}>
+            <div key={step} dangerouslySetInnerHTML={{ __html: PLAN_STEP_DIAGRAMS[step] }} />
+            <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70', lineHeight: 1.5, padding: '0 2px' }}>{meta.caption}</span>
+          </div>
+          <div style={{ flex: '0 0 auto', width: 1, background: '#f4f3f0' }} />
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 22, padding: '24px 28px' }}>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 15.5, lineHeight: 1.55, color: '#56544b' }}>{meta.lead}</p>
+            <div style={{ height: 1, background: '#f4f3f0', margin: '0 -28px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+                  <span style={{ width: 24, height: 24, borderRadius: 7, background: '#f3eefe', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  </span>
+                  <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#8c8a81' }}>Pre-flight checks</span>
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: 78 }}>
+                    {meta.ask.map((_, i) => (
+                      <span key={i} style={{ flex: 1, height: 5, borderRadius: 99, background: checks[`${step}-${i}`] ? '#1f9d55' : '#e7e5de', transition: 'background .3s ease' }} />
+                    ))}
+                  </div>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: '#1f9d55', minWidth: 34 }}>{doneCount} / {meta.ask.length}</span>
+                </div>
+              </div>
+              <div style={{ borderTop: '1px solid #f2f1ee' }}>
+                {meta.ask.map((text, i) => {
+                  const k = `${step}-${i}`; const done = !!checks[k];
+                  return (
+                    <button key={k} onClick={() => toggleCheck(k)} style={{ display: 'flex', alignItems: 'stretch', width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', border: 'none', borderBottom: '1px solid #f2f1ee' }}>
+                      <span style={{ flex: '0 0 auto', width: 46, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em', color: done ? '#1f9d55' : '#cbc9c0', borderRight: '1px solid #f2f1ee', transition: 'color .2s' }}>{pad2(i + 1)}</span>
+                      <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '13px 6px 13px 16px', fontWeight: 600, fontSize: 13.5, color: done ? '#1a1813' : '#56544b', transition: 'color .2s' }}>
+                        {text}
+                        <span style={{ flex: '0 0 auto', width: 20, height: 20, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, color: '#fff', background: done ? '#1f9d55' : 'transparent', border: done ? 'none' : '1.5px solid #dcdad2', transition: 'all .2s' }}>{done ? '✓' : ''}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* footer nav */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 30px', borderTop: '1px solid #f4f3f0', background: '#fcfcfb', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, minHeight: 46 }}>
+            {step > 0 && (
+              <span onClick={() => goStep(step - 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 14, cursor: 'pointer', background: '#faf9f7', border: '1px solid #efedea', borderRadius: 12, padding: '8px 18px 8px 9px' }}>
+                <span style={{ width: 30, height: 30, borderRadius: 9, background: '#fff', border: '1px solid #e8e6e0', display: 'grid', placeItems: 'center', color: '#8c8a81', fontSize: 15 }}>←</span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1 }}>
+                  <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#b0aea3' }}>Back</span>
+                  <span style={{ fontWeight: 800, fontSize: 13, color: '#1a1813' }}>{PLAN_META[step - 1].rail}</span>
+                </span>
+              </span>
+            )}
+          </div>
+          {step < 4 ? (
+            allClear ? (
+              <span onClick={() => goStep(step + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 14, cursor: 'pointer', background: '#f3f0ff', border: '1px solid #e6ddfb', borderRadius: 12, padding: '8px 9px 8px 18px' }}>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1 }}>
+                  <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#a99cd0' }}>Next step</span>
+                  <span style={{ fontWeight: 800, fontSize: 13, color: '#1a1813', letterSpacing: '-0.01em' }}>{PLAN_META[step + 1].rail}</span>
+                </span>
+                <span style={{ width: 30, height: 30, borderRadius: 9, background: '#fff', border: '1px solid #e6ddfb', display: 'grid', placeItems: 'center', color: '#7c5cff', fontSize: 15 }}>→</span>
+              </span>
+            ) : (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 11, cursor: 'not-allowed', background: '#f7f6f3', border: '1px solid #efedea', borderRadius: 12, padding: '6px 6px 6px 16px' }}>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1 }}>
+                  <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#c4c2b8' }}>Next step</span>
+                  <span style={{ fontWeight: 800, fontSize: 13, color: '#b0aea3', letterSpacing: '-0.01em' }}>{PLAN_META[step + 1].rail}</span>
+                </span>
+                <span style={{ width: 30, height: 30, borderRadius: 9, background: '#eceae5', display: 'grid', placeItems: 'center', color: '#c4c2b8', fontSize: 15 }}>→</span>
+              </span>
+            )
+          ) : allClear ? (
+            <span onClick={() => { persistPlan(step, true); setFinished(true); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 11, cursor: 'pointer', background: '#eef8f1', border: '1px solid #bfe3cd', borderRadius: 12, padding: '8px 16px' }}>
+              <span style={{ fontWeight: 800, fontSize: 13, color: '#1f9d55', letterSpacing: '0.02em' }}>{finished ? 'Plan complete' : 'Mark plan complete'}</span>
+              <span style={{ width: 24, height: 24, borderRadius: 7, background: '#1f9d55', display: 'grid', placeItems: 'center', color: '#fff', fontSize: 13, fontWeight: 800 }}>✓</span>
+            </span>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 11, cursor: 'not-allowed', background: '#f7f6f3', border: '1px solid #efedea', borderRadius: 12, padding: '6px 6px 6px 16px' }}>
+              <span style={{ fontWeight: 800, fontSize: 13, color: '#b0aea3' }}>Clear all checks</span>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: '#eceae5', display: 'grid', placeItems: 'center', color: '#c4c2b8', fontSize: 15 }}>✓</span>
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

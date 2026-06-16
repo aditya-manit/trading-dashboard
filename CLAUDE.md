@@ -46,6 +46,10 @@ src/
     positions/PositionsTable.tsx      # Row hover, Details → PositionDetailDrawer
     positions-history/
       PositionHistoryTable.tsx        # Trade cards, leverage badge, Details → TradeDetailDrawer
+    plan/
+      PlanPage.tsx                    # Pre-trade workbook (Plan page)
+      planDiagrams.ts                 # 5 step SVGs, verbatim from handoff 15
+      planNews.ts                     # Sample market-news strip + drawer HTML
   hooks/
     useAccount.ts · usePositions.ts · usePositionHistory.ts
     useAccountBook.ts · useTrades.ts
@@ -97,6 +101,17 @@ src/
 This is the source of truth for component-level styling decisions that aren't
 obvious from the code. Keep it current; delete entries once they're plainly
 encoded in the component and no longer surprising.
+
+### Top-level pages: Dashboard ↔ Plan (`app/page.tsx`, `layout/Topbar.tsx`)
+- `page.tsx` holds `page: 'dashboard' | 'plan'` state and renders either the dashboard sections or `<PlanPage/>`. The Topbar's **Dashboard/Plan segmented toggle** (left, after the Gate.io pill) drives it — active = white text on `#23211b` (Dashboard) / `#7c5cff` (Plan).
+- On the Plan page the center nav tabs become **Workbook / Plans / Journal** (only Workbook is live; Plans/Journal are inert placeholders at `#c3c1b8`). Scroll-spy section nav is disabled while on Plan.
+
+### Plan page — Pre-trade workbook (`plan/PlanPage.tsx`) — matches handoff-15 "fresh redesign"
+- 5-step trading checklist: header → sample market-news strip (4 cards) + "View all" → news drawer → top stepper → step card → footer nav. Self-contained; **no API data** (educational content).
+- **Step diagrams** (`planDiagrams.ts`) and the **news strip/drawer HTML** (`planNews.ts`) are extracted **verbatim** from `Trading Dashboard (purple).dc.html` and rendered via `dangerouslySetInnerHTML` for pixel fidelity. The diagrams animate via the `pk*` keyframes injected by `PlanPage`. Diagram replays on step change because its container is keyed by `step`.
+- **Ignore the leftover `pkChart`/`pkWalk`/`pkCard`/`planRail`/`planFinalCheck` functions in the dc.html** — they're from an earlier iteration. The shipped template uses the bespoke per-step SVGs + `planStepper` only.
+- Progress (`tdplan_step`, `tdplan_fin`) and per-step checks (`tdplan_checks_v2`) persist to **localStorage**. Check keys are `${step}-${idx}`. `toggleCheck` uses a functional updater — required, since clicking two boxes before re-render would otherwise clobber via stale closure.
+- Next is gated on all checks of the current step being cleared; on step 5 the CTA becomes a green "Mark plan complete ✓". `PLAN_META` (5 objects: title/color/rail/short/lead/caption/ask[3]/rule) is the content source.
 
 ### Open positions (`positions/PositionsTable.tsx`) — matches handoff-14 spec
 - Card: white bg, `1px solid #e3d8f8`, `borderRadius:20`, soft box-shadow, `overflow:hidden`

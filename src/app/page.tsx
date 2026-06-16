@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Topbar } from '@/components/layout/Topbar';
 import { Hero } from '@/components/hero/Hero';
 import { EquityChart } from '@/components/charts/EquityChart';
@@ -9,23 +10,32 @@ import { KpiStrip } from '@/components/stats/KpiStrip';
 import { PositionsTable } from '@/components/positions/PositionsTable';
 import { KeyMetricsRow } from '@/components/stats/KeyMetricsRow';
 import { PositionHistoryTable } from '@/components/positions-history/PositionHistoryTable';
+import { PlanPage } from '@/components/plan/PlanPage';
 
 export default function DashboardPage() {
+  const [page, setPage] = useState<'dashboard' | 'plan'>('dashboard');
+
   return (
     <div style={{ minHeight: '100vh', background: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", fontVariantNumeric: 'tabular-nums', color: '#181712' }}>
       <div style={{ background: '#ffffff', minHeight: '100vh' }}>
-        <Topbar />
+        <Topbar page={page} onPageChange={setPage} />
         <div style={{ padding: 30, display: 'flex', flexDirection: 'column', gap: 22 }}>
-          <section id="overview" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-            <Hero />
-            <EquityChart />
-            <HighlightCards />
-            <RealizedPerformance />
-            <KpiStrip />
-          </section>
-          <section id="positions"><PositionsTable /></section>
-          <section id="reports"><KeyMetricsRow /></section>
-          <section id="history"><PositionHistoryTable /></section>
+          {page === 'plan' ? (
+            <PlanPage />
+          ) : (
+            <>
+              <section id="overview" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                <Hero />
+                <EquityChart />
+                <HighlightCards />
+                <RealizedPerformance />
+                <KpiStrip />
+              </section>
+              <section id="positions"><PositionsTable /></section>
+              <section id="reports"><KeyMetricsRow /></section>
+              <section id="history"><PositionHistoryTable /></section>
+            </>
+          )}
         </div>
       </div>
     </div>

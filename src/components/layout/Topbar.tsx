@@ -10,14 +10,20 @@ const TABS = [
   { id: 'history',    label: 'History' },
 ];
 
-export function Topbar() {
+const PLAN_TABS = ['Workbook', 'Plans', 'Journal'];
+
+type Page = 'dashboard' | 'plan';
+
+export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: Page) => void }) {
   const { mutate } = useSWRConfig();
   const [synced, setSynced] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const onPlan = page === 'plan';
 
   useEffect(() => { setSynced('just now'); }, []);
 
   useEffect(() => {
+    if (onPlan) return;
     const handleScroll = () => {
       const topbarH = 70;
       const scrollY = window.scrollY + topbarH + 40;
@@ -33,7 +39,7 @@ export function Topbar() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [onPlan]);
 
   const handleTabClick = useCallback((id: string) => {
     const el = document.getElementById(id);
@@ -66,34 +72,81 @@ export function Topbar() {
           <span style={{ fontWeight: 700, fontSize: 14, color: '#23211b' }}>Gate.io Futures</span>
           <span style={{ color: '#b3b2aa', fontSize: 12 }}>▾</span>
         </div>
+
+        {/* Dashboard / Plan toggle */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#f6f5f2', border: '1px solid #eeede9', borderRadius: 11, padding: 3 }}>
+          {([['Dashboard', false], ['Plan', true]] as const).map(([label, planMode]) => {
+            const active = planMode === onPlan;
+            return (
+              <button
+                key={label}
+                onClick={() => onPageChange(planMode ? 'plan' : 'dashboard')}
+                style={{
+                  fontFamily: 'inherit', cursor: 'pointer', border: 'none', borderRadius: 8,
+                  padding: '6px 14px', fontWeight: active ? 800 : 700, fontSize: 12,
+                  letterSpacing: '0.04em', textTransform: 'uppercase',
+                  color: active ? '#fff' : '#8c8a81',
+                  background: active ? (planMode ? '#7c5cff' : '#23211b') : 'transparent',
+                  transition: 'all .15s',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Nav tabs */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f6f5f2', border: '1px solid #eeede9', borderRadius: 12, padding: 4 }}>
-        {TABS.map(tab => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
-              style={{
-                fontWeight: isActive ? 700 : 600,
-                fontSize: 13.5,
-                color: isActive ? '#6a45d8' : '#8c8a81',
-                background: isActive ? 'linear-gradient(135deg,#f1ecff,#e1d6ff)' : 'transparent',
-                padding: '8px 16px',
-                borderRadius: 9,
-                boxShadow: isActive ? '0 1px 2px rgba(110,70,210,0.10)' : 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                transition: 'all .15s ease',
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+        {onPlan
+          ? PLAN_TABS.map(label => {
+              const isActive = label === 'Workbook';
+              return (
+                <button
+                  key={label}
+                  style={{
+                    fontWeight: isActive ? 700 : 600,
+                    fontSize: 13.5,
+                    color: isActive ? '#6a45d8' : '#c3c1b8',
+                    background: isActive ? 'linear-gradient(135deg,#f1ecff,#e1d6ff)' : 'transparent',
+                    padding: '8px 16px',
+                    borderRadius: 9,
+                    boxShadow: isActive ? '0 1px 2px rgba(110,70,210,0.10)' : 'none',
+                    border: 'none',
+                    cursor: isActive ? 'pointer' : 'default',
+                    fontFamily: 'inherit',
+                    transition: 'all .15s ease',
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })
+          : TABS.map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabClick(tab.id)}
+                  style={{
+                    fontWeight: isActive ? 700 : 600,
+                    fontSize: 13.5,
+                    color: isActive ? '#6a45d8' : '#8c8a81',
+                    background: isActive ? 'linear-gradient(135deg,#f1ecff,#e1d6ff)' : 'transparent',
+                    padding: '8px 16px',
+                    borderRadius: 9,
+                    boxShadow: isActive ? '0 1px 2px rgba(110,70,210,0.10)' : 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    transition: 'all .15s ease',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
