@@ -15,15 +15,18 @@ const SYSTEM = `You annotate ONE macro economic-calendar event for a trader of B
 
 Describe how markets typically react to the outcome that is BULLISH for the event's own currency (hawkish central bank, hot inflation, strong beat, more hawkish dots, etc.).
 
-USE WEB SEARCH to find the 2 MOST RECENT past occurrence dates of this EXACT recurring release, on or before the "asOf" date — do NOT rely on memory, the dates must be real and recent.
+For "prints", USE WEB SEARCH to find the 2 MOST RECENT past occurrence dates of this EXACT recurring release (same country/currency AND same release), on or before the "asOf" date. ACCURACY OVER COMPLETENESS:
+- Only include a date you have CONFIRMED from an authoritative source: the issuing central bank / official statistics agency, or a major economic calendar (ForexFactory, Investing.com, Trading Economics).
+- Cross-check across sources. If sources disagree, or the date you find belongs to a DIFFERENT release, or you cannot confirm it — DO NOT include it.
+- It is far better to return "prints": [] than to guess. When in any doubt, return [].
 
 Your FINAL message must be ONLY a JSON object (no prose, no code fences):
-{"condition":"<=2 words bullish-for-the-currency scenario, e.g. Hawkish, Hot CPI, Beat, Fewer claims","assets":[{"sym":"<short symbol e.g. BTC, USD, stocks, gold>","dir":"up|down|flat"}],"prints":["YYYY-MM-DD","YYYY-MM-DD"]}
+{"condition":"<=2 words bullish-for-the-currency scenario, e.g. Hawkish, Hot CPI, Beat, Fewer claims","assets":[{"sym":"<short symbol e.g. BTC, USD, stocks, gold>","dir":"up|down|flat"}],"prints":[{"date":"YYYY-MM-DD","source":"<authoritative source name/URL confirming this exact date>"}]}
 
 Rules:
 - 2 to 3 assets; ALWAYS include BTC and its likely direction under that scenario.
 - Symbols <=6 chars; use the event currency code where relevant.
-- "prints": the actual UTC dates of the last 2 occurrences, most recent first; [] if it is a one-off.`;
+- "prints": most recent first; ONLY verified dates each with a real confirming source; [] if uncertain, unverifiable, or a one-off.`;
 
 // Bounded-concurrency map so we don't fire 19 web-search calls at once.
 async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -102,7 +105,17 @@ async function callClaude(
 
   const dirs: AssetDir[] = ['up', 'down', 'flat'];
   const assets = Array.isArray(obj.assets) ? obj.assets : [];
-  const printDates = Array.isArray(obj.prints) ? obj.prints : [];
+  const printsRaw = Array.isArray(obj.prints) ? obj.prints : [];
+  // Keep only prints the model confirmed with a source and a valid ISO date.
+  // No source / malformed date → dropped (we'd rather show nothing than guess).
+  const prints = printsRaw
+    .map((p) => {
+      const o = p as { date?: unknown; source?: unknown };
+      return { date: String(o?.date ?? ''), source: String(o?.source ?? '').trim() };
+    })
+    .filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.date) && p.source.length > 0)
+    .slice(0, 2)
+    .map((p) => ({ date: p.date, pct: 0 })); // pct filled later from Gate candles
   return {
     condition: String(obj.condition ?? ''),
     assets: assets.slice(0, 3).map((a) => {
@@ -110,8 +123,7 @@ async function callClaude(
       const dir = asset.dir as AssetDir;
       return { sym: String(asset.sym ?? ''), dir: dirs.includes(dir) ? dir : 'flat' };
     }),
-    // pct is filled later from real Gate candle data; keep date only here.
-    prints: printDates.slice(0, 2).map((d) => ({ date: String(d), pct: 0 })),
+    prints,
   };
 }
 
