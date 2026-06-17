@@ -14,3 +14,9 @@ export function isBtcRelevant(e: CalendarEvent): boolean {
   if (e.country === 'USD') return true;
   return CB_DECISION.test(e.title);
 }
+
+// Why this event passed the filter — shown as a small chip on each card.
+export function relevanceTag(e: CalendarEvent): { label: string; bg: string; color: string } {
+  if (e.country === 'USD') return { label: 'US MACRO', bg: '#fdf3e6', color: '#c9821f' };
+  return { label: 'CENTRAL BANK', bg: '#f3eefe', color: '#7c5cff' };
+}

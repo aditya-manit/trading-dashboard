@@ -3,7 +3,7 @@
 import { memo, useEffect, useState, type CSSProperties } from 'react';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, type CalendarEvent } from '@/hooks/useCalendar';
-import { isBtcRelevant } from '@/lib/calendar-filter';
+import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 
@@ -66,6 +66,12 @@ function valueParts(e: CalendarEvent): { main: string; note: string; muted?: boo
   return { main: 'No number', note: '', muted: true };
 }
 
+// Small chip showing why the event passed the filter (US MACRO / CENTRAL BANK).
+function Tag({ e }: { e: CalendarEvent }) {
+  const t = relevanceTag(e);
+  return <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.04em', color: t.color, background: t.bg, padding: '2px 6px', borderRadius: 5 }}>{t.label}</span>;
+}
+
 // One "print" row: date · magnitude bar · signed % (real BTC move from Gate).
 function PrintBar({ p }: { p: { date: string; pct: number } }) {
   const up = p.pct >= 0;
@@ -122,6 +128,7 @@ function StripCard({ e }: { e: CalendarEvent }) {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
             <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
             <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
+            <Tag e={e} />
           </div>
           <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
         </div>
@@ -171,6 +178,7 @@ function NewsCard({ e }: { e: CalendarEvent }) {
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
             <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
             <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
+            <Tag e={e} />
           </div>
           <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
         </div>
