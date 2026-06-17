@@ -16,7 +16,10 @@ export function isBtcRelevant(e: CalendarEvent): boolean {
 }
 
 // Why this event passed the filter — shown as a small chip on each card.
+// Both tags are equally vivid: CENTRAL BANK on the brand purple, US MACRO on a
+// saturated blue (echoes the Gate.io logo). Avoids green/red (= profit/loss).
 export function relevanceTag(e: CalendarEvent): { label: string; color: string } {
-  const color = '#7c5cff';
-  return { label: e.country === 'USD' ? 'US MACRO' : 'CENTRAL BANK', color };
+  return e.country === 'USD'
+    ? { label: 'US MACRO', color: '#3b6ce7' }
+    : { label: 'CENTRAL BANK', color: '#7c5cff' };
 }
