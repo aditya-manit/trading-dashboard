@@ -20,7 +20,7 @@
         "dir": "down"
       }
     ],
-    "note": "Dot plot raised from 3.4% to 3.8%; 9 of 18 members now project rate hikes in 2026. Warsh removed easing bias, signaling higher-for-longer."
+    "note": "Median 2026 dot raised to 3.8% from 3.4%; 9 of 18 now project hikes — hawkish surprise drove equities down 1%+ and crypto lower."
   },
   "USD|FOMC Press Conference|2026-06-17": {
     "actual": "3.50%-3.75%",
@@ -30,24 +30,24 @@
     "ifReaction": [
       {
         "sym": "crypto",
-        "dir": "flat"
+        "dir": "down"
       }
     ],
     "reaction": [
       {
         "sym": "BTC",
-        "dir": "flat"
+        "dir": "down"
       },
       {
         "sym": "stocks",
         "dir": "down"
       }
     ],
-    "note": "Hold as expected, but dot plot shifted to signal 2026 hike vs prior cuts. Warsh removed easing bias; stocks sold off ~1% post-presser."
+    "note": "Rate held as expected; hawkish surprise was Warsh's press conference tone, dot plot revision to 3.8% (from 3.4%), and removal of forward guidance—signaling hikes ahead."
   },
   "USD|FOMC Statement|2026-06-17": {
-    "actual": "3.50%-3.75%",
-    "surprise": "In line",
+    "actual": "3.625%",
+    "surprise": "Hot",
     "bearishForBtc": true,
     "condition": "hawkish",
     "ifReaction": [
@@ -66,7 +66,7 @@
         "dir": "down"
       }
     ],
-    "note": "Warsh's hawkish tone and dot plot showing 9 of 18 officials projecting rate hikes in 2026 (vs 3.4% year-end in March) drove selloff. BTC fell 1.6% to $64.6k; S&P 500 down 0.5%, Nasdaq down 1%."
+    "note": "Held at 3.5%-3.75% as expected; dot plot revised sharply hawkish to 3.8% year-end (from 3.4%), 9 of 18 officials now project hikes — the real surprise."
   },
   "USD|Federal Funds Rate|2026-06-17": {
     "actual": "3.75%",
@@ -89,6 +89,6 @@
         "dir": "down"
       }
     ],
-    "note": "Dot plot shifted hawkish: median 3.8% vs 3.4% in March, signaling potential 2026 hike. Warsh emphasized price stability."
+    "note": "Held at 3.75% as expected; dot plot revised sharply higher to 3.8% year-end (from 3.4%), with 9 of 18 officials now projecting hikes — the hawkish surprise that drove liquidations."
   }
 }

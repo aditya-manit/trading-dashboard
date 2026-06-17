@@ -251,10 +251,24 @@ Your FINAL message must be ONLY a JSON object (no prose, no code fences):
 {"actual":"<the figure ONLY, in the SAME format/units as the forecast>","surprise":"Hot|Soft|In line","bearishForBtc":true|false,"condition":"ONE word bullish-for-currency scenario, e.g. hawkish, hot, beat, fewer (no qualifiers)","ifReaction":[{"sym":"crypto","dir":"up|down|flat"}],"reaction":[{"sym":"BTC","dir":"up|down|flat"},{"sym":"stocks","dir":"up|down|flat"}],"note":"<optional, <=140 chars: a useful detail — vs forecast/previous, a notable move, or what stood out. Empty string if nothing noteworthy.>"}
 
 Rules:
-- "actual": JUST the number/figure, matching the forecast's format and units so they compare directly. e.g. forecast "3.75%" → actual "3.75%"; forecast "0.3%" → actual "0.4%". No prose, no words. For a central-bank rate decision, give the SINGLE resulting policy rate in the forecast's format (e.g. "3.75%"), NEVER a range like "3.50%-3.75%".
-- "surprise": compare the ACTUAL figure to the given FORECAST. Hot = actual higher/stronger than forecast; Soft = actual lower/weaker; In line = the actual EQUALS the forecast, or there is no numeric forecast to compare. Base this ONLY on the figures — if the rate was held exactly at the forecast it is "In line" even if the guidance was hawkish (the hawkish nuance goes in "note", not here).
-- "reaction": SEPARATELY, what BTC and stocks ACTUALLY did after the print (2 assets, BTC first). This may AGREE with or DIVERGE from the typical reaction — report what truly happened, do not force it to match the surprise.
-- "bearishForBtc": whether the outcome would TYPICALLY be read as bearish for BTC (not necessarily what happened).`;
+- "actual": JUST the figure, in the SAME format/units as the forecast so they compare directly (forecast "0.3%" → actual "0.4%"). No prose, no words. For a central-bank rate decision give the SINGLE resulting policy rate in the forecast's format (e.g. "3.75%"), NEVER a range like "3.50%-3.75%".
+- "surprise": how the release compared to what was EXPECTED — this drives the Actual's colour, so be precise.
+  • Forecast given → Hot = actual above forecast, Soft = below, In line = equals it.
+  • No forecast figure (statement, dot plot, press conf) → judge vs the PRIOR reading / consensus you find: Hot if clearly more hawkish/stronger than expected (e.g. dot plot revised UP), Soft if more dovish/weaker, In line if it matched.
+  • A rate HELD exactly at the forecast is "In line" even if the meeting was hawkish — the hawkish surprise belongs to the projections/statement event, NOT the rate decision. Give the right event the credit.
+- "reaction": SEPARATELY, what BTC and stocks ACTUALLY did after the print (2 assets, BTC first). Report the TRUTH from web search even if it DIVERGED from the typical reaction — do NOT force it to match "surprise" or "bearishForBtc".
+- "bearishForBtc": whether the outcome would TYPICALLY be read as bearish for BTC (not necessarily what actually happened).
+- "note": one precise, factual line — the specific number vs forecast/prior, what stood out, or why the figure was in-line but the meeting still moved markets.
+
+EXAMPLES (input → output):
+{"currency":"USD","event":"Federal Funds Rate","forecast":"3.75%"} (Fed held at 3.75%) →
+{"actual":"3.75%","surprise":"In line","bearishForBtc":false,"condition":"hawkish","ifReaction":[{"sym":"crypto","dir":"down"}],"reaction":[{"sym":"BTC","dir":"down"},{"sym":"stocks","dir":"down"}],"note":"Held at 3.75% as expected — the hawkish surprise was the dot plot, not the rate."}
+
+{"currency":"USD","event":"FOMC Economic Projections","forecast":""} (dot plot revised up) →
+{"actual":"3.8%","surprise":"Hot","bearishForBtc":true,"condition":"hawkish","ifReaction":[{"sym":"crypto","dir":"down"}],"reaction":[{"sym":"BTC","dir":"down"},{"sym":"stocks","dir":"down"}],"note":"Median 2026 dot raised to 3.8% from 3.4%; 9 of 18 now project hikes — the real hawkish surprise."}
+
+{"currency":"USD","event":"Core CPI m/m","forecast":"0.3%"} (hot print but BTC rallied) →
+{"actual":"0.4%","surprise":"Hot","bearishForBtc":true,"condition":"hot","ifReaction":[{"sym":"BTC","dir":"down"}],"reaction":[{"sym":"BTC","dir":"up"},{"sym":"stocks","dir":"up"}],"note":"Hot 0.4% vs 0.3%, yet BTC rallied on positioning — reaction diverged from the usual drop."}`;
 
 export async function enrichReleased(
   events: { country: string; title: string; date: string; forecast?: string }[],
