@@ -251,7 +251,7 @@ Your FINAL message must be ONLY a JSON object (no prose, no code fences):
 {"actual":"<the figure ONLY, in the SAME format/units as the forecast>","surprise":"Hot|Soft|In line","bearishForBtc":true|false,"condition":"ONE word bullish-for-currency scenario, e.g. hawkish, hot, beat, fewer (no qualifiers)","ifReaction":[{"sym":"crypto","dir":"up|down|flat"}],"reaction":[{"sym":"BTC","dir":"up|down|flat"},{"sym":"stocks","dir":"up|down|flat"}],"note":"<optional, <=140 chars: a useful detail — vs forecast/previous, a notable move, or what stood out. Empty string if nothing noteworthy.>"}
 
 Rules:
-- "actual": JUST the figure, in the SAME format/units as the forecast so they compare directly (forecast "0.3%" → actual "0.4%"). No prose, no words. For a central-bank rate decision give the SINGLE resulting policy rate in the forecast's format (e.g. "3.75%"), NEVER a range like "3.50%-3.75%".
+- "actual": if the release HAS a numeric reading, give JUST that figure in the forecast's format (data: "0.4%"; rate decision: the SINGLE policy rate e.g. "3.75%", never a range). If the release has NO number — a policy STATEMENT, PRESS CONFERENCE, speech, or minutes — give a SHORT 1-2 word qualitative outcome instead (e.g. "Hawkish", "Dovish", "Hawkish hold"). NEVER invent a number or repeat a rate range (e.g. "3.625%" or "3.50%-3.75%") for a non-numeric event.
 - "surprise": how the release compared to what was EXPECTED — this drives the Actual's colour, so be precise.
   • Forecast given → Hot = actual above forecast, Soft = below, In line = equals it.
   • No forecast figure (statement, dot plot, press conf) → judge vs the PRIOR reading / consensus you find: Hot if clearly more hawkish/stronger than expected (e.g. dot plot revised UP), Soft if more dovish/weaker, In line if it matched.
@@ -268,7 +268,10 @@ EXAMPLES (input → output):
 {"actual":"3.8%","surprise":"Hot","bearishForBtc":true,"condition":"hawkish","ifReaction":[{"sym":"crypto","dir":"down"}],"reaction":[{"sym":"BTC","dir":"down"},{"sym":"stocks","dir":"down"}],"note":"Median 2026 dot raised to 3.8% from 3.4%; 9 of 18 now project hikes — the real hawkish surprise."}
 
 {"currency":"USD","event":"Core CPI m/m","forecast":"0.3%"} (hot print but BTC rallied) →
-{"actual":"0.4%","surprise":"Hot","bearishForBtc":true,"condition":"hot","ifReaction":[{"sym":"BTC","dir":"down"}],"reaction":[{"sym":"BTC","dir":"up"},{"sym":"stocks","dir":"up"}],"note":"Hot 0.4% vs 0.3%, yet BTC rallied on positioning — reaction diverged from the usual drop."}`;
+{"actual":"0.4%","surprise":"Hot","bearishForBtc":true,"condition":"hot","ifReaction":[{"sym":"BTC","dir":"down"}],"reaction":[{"sym":"BTC","dir":"up"},{"sym":"stocks","dir":"up"}],"note":"Hot 0.4% vs 0.3%, yet BTC rallied on positioning — reaction diverged from the usual drop."}
+
+{"currency":"USD","event":"FOMC Statement","forecast":""} (no number — hawkish text) →
+{"actual":"Hawkish","surprise":"Hot","bearishForBtc":true,"condition":"hawkish","ifReaction":[{"sym":"crypto","dir":"down"}],"reaction":[{"sym":"BTC","dir":"down"},{"sym":"stocks","dir":"down"}],"note":"Dropped the easing bias and flagged upside inflation risks — no figure, tone hawkish."}`;
 
 export async function enrichReleased(
   events: { country: string; title: string; date: string; forecast?: string }[],
