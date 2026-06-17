@@ -115,9 +115,9 @@ function HoverTip({ tip, width = 240, children }: { tip: React.ReactNode; width?
     >
       {children}
       {rect && typeof document !== 'undefined' && createPortal(
-        // Open above the anchor, but flip below when there isn't room (e.g. the
-        // drawer header sits near the viewport top).
-        <span style={{ position: 'fixed', left: Math.round(rect.left), zIndex: 300, width, maxWidth: '72vw', background: '#1a1813', color: '#f1efe9', fontSize: 11, fontWeight: 500, lineHeight: 1.5, padding: '9px 12px', borderRadius: 10, boxShadow: '0 10px 30px rgba(20,18,12,0.3)', pointerEvents: 'none', fontFamily: FONT,
+        // Open above the anchor, flip below when there isn't room (drawer header
+        // near the top); clamp left so it never spills off the right/left edge.
+        <span style={{ position: 'fixed', left: Math.round(Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))), zIndex: 300, width, maxWidth: '92vw', background: '#1a1813', color: '#f1efe9', fontSize: 11, fontWeight: 500, lineHeight: 1.5, padding: '9px 12px', borderRadius: 10, boxShadow: '0 10px 30px rgba(20,18,12,0.3)', pointerEvents: 'none', fontFamily: FONT,
           ...(rect.top > 130
             ? { top: Math.round(rect.top - 8), transform: 'translateY(-100%)' }
             : { top: Math.round(rect.bottom + 8) }) }}>
