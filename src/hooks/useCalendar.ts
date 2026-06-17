@@ -12,6 +12,16 @@ export interface EventInsight {
   prints?: { date: string; pct: number }[];
 }
 
+// What actually printed for an already-released event (Claude + web search).
+export interface ReleasedInfo {
+  actual: string;
+  surprise: 'Hot' | 'Soft' | 'In line' | string;
+  bearishForBtc: boolean; // true → red chip (bad for BTC), false → green
+  condition: string; // bullish-for-currency scenario label, e.g. "hot", "beat"
+  ifReaction: { sym: string; dir: AssetDir }[]; // what that scenario implies
+  reaction: { sym: string; dir: AssetDir }[]; // what ACTUALLY played out
+}
+
 // One event from the ForexFactory / FairEconomy economic-calendar feed.
 // `country` actually holds the currency code (USD, EUR, JPY…); `date` is
 // ISO-8601 with a US-Eastern offset baked in. There is no `actual` field.
@@ -53,6 +63,15 @@ export function useCalendarInsights() {
 export function useCalendarDefinitions() {
   return useSWR<Record<string, string>>('/api/calendar/definitions', fetcher, {
     refreshInterval: 3_600_000,
+    revalidateOnFocus: false,
+  });
+}
+
+// Released (already-fired) events: actual figure + surprise + realized reaction,
+// keyed by `currency|title`. Shown in the drawer's "Released" tab.
+export function useCalendarReleased() {
+  return useSWR<Record<string, ReleasedInfo>>('/api/calendar/released', fetcher, {
+    refreshInterval: 1_800_000,
     revalidateOnFocus: false,
   });
 }

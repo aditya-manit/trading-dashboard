@@ -3,7 +3,7 @@
 import { memo, useEffect, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
-import { useCalendar, useCalendarInsights, useCalendarDefinitions, eventKey, type CalendarEvent } from '@/hooks/useCalendar';
+import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
 import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
@@ -148,11 +148,11 @@ function Skel({ w, h = 9 }: { w: number | string; h?: number }) {
   return <span style={{ display: 'block', width: w, height: h, borderRadius: 4, background: '#edece8', animation: 'plPulse 1.2s ease-in-out infinite' }} />;
 }
 
-function ReactionLine({ e }: { e: CalendarEvent }) {
-  if (!e.insight) return null;
+// Inline colored asset arrows: "BTC ↓ · USD ↑ · stocks ↓".
+function AssetArrows({ assets }: { assets: { sym: string; dir: AssetDir }[] }) {
   return (
-    <span style={{ fontWeight: 600, fontSize: 11.5, color: '#56544b' }}>
-      {e.insight.assets.map((a, i) => (
+    <>
+      {assets.map((a, i) => (
         <span key={i}>
           {i > 0 && ' · '}
           <b style={{ color: a.dir === 'up' ? '#1f9d55' : a.dir === 'down' ? '#df5338' : '#9b988d' }}>
@@ -160,7 +160,55 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
           </b>
         </span>
       ))}
-    </span>
+    </>
+  );
+}
+
+function ReactionLine({ e }: { e: CalendarEvent }) {
+  if (!e.insight) return null;
+  return <span style={{ fontWeight: 600, fontSize: 11.5, color: '#56544b' }}><AssetArrows assets={e.insight.assets} /></span>;
+}
+
+// Released (already-fired) card: recessed tint, 4-col spec table — Forecast +
+// Actual (with Hot/Soft surprise chip), and If-<condition> + realized Reaction.
+function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
+  const forecast = (e.forecast || '').trim() || '—';
+  const chipColor = info?.bearishForBtc ? '#df5338' : '#1f9d55';
+  const chipArrow = info?.surprise === 'Hot' ? '▲' : info?.surprise === 'Soft' ? '▼' : '';
+  const lab: CSSProperties = { fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bba074' };
+  const labCell: CSSProperties = { padding: '8px 11px', borderRight: '1px solid #ece7de', display: 'flex', alignItems: 'center' };
+  const valCell: CSSProperties = { padding: '8px 11px', display: 'flex', alignItems: 'center' };
+  const tb: CSSProperties = { borderTop: '1px solid #ece7de' };
+  const when = `${new Date(e.date).toLocaleDateString('en-US', { weekday: 'short' })} ${fmtTime(e.date)}`;
+  return (
+    <div style={{ background: '#f8f6f2', border: '1px solid #ece7de', borderRadius: 12, overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(20,20,12,0.03)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderBottom: '1px solid #ece7de' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#d98a78', flex: '0 0 auto' }} />
+            <span style={{ fontWeight: 800, fontSize: 12.5, color: '#6b6457' }}>{e.country}</span>
+            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color: '#c47a68' }}>{(e.impact || '').toUpperCase()}</span>
+          </div>
+          <span style={{ fontWeight: 700, fontSize: 13, color: '#9a9082', letterSpacing: '-0.01em' }}>{e.title}</span>
+        </div>
+        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 11, color: '#a8a69b', flex: '0 0 auto' }}>{when}</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '66px 1fr 66px 1fr' }}>
+        <div style={labCell}><span style={lab}>Forecast</span></div>
+        <div style={{ ...valCell, borderRight: '1px solid #ece7de' }}><span style={{ fontWeight: 800, fontSize: 12, color: '#1a1813' }}>{forecast}</span></div>
+        <div style={labCell}><span style={lab}>Actual</span></div>
+        <div style={{ ...valCell, gap: 6 }}>
+          <span style={{ fontWeight: 800, fontSize: 12, color: '#1a1813' }}>{info?.actual ?? '—'}</span>
+          {info && chipArrow && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.04em', color: chipColor, background: `${chipColor}1f`, padding: '2px 7px', borderRadius: 6 }}>{chipArrow} {info.surprise}</span>
+          )}
+        </div>
+        <div style={{ ...labCell, ...tb }}><span style={lab}>{info?.condition ? `If ${info.condition.toLowerCase()}` : 'If'}</span></div>
+        <div style={{ ...valCell, ...tb, borderRight: '1px solid #ece7de' }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.ifReaction ?? []} /></span></div>
+        <div style={{ ...labCell, ...tb }}><span style={lab}>Reaction</span></div>
+        <div style={{ ...valCell, ...tb }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.reaction ?? []} /></span></div>
+      </div>
+    </div>
   );
 }
 
@@ -273,12 +321,13 @@ function NewsCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def
 function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
   next: CalendarEvent;
   progressPct: number;
-  counts: { high: number; med: number; low: number };
+  counts: { usMacro: number; centralBank: number };
   total: number;
   onViewAll: () => void;
 }) {
   const c = IMPACT_COLOR[next.impact] || '#df5338';
-  const legend: [string, number, string][] = [['#df5338', counts.high, 'High'], ['#e8922e', counts.med, 'Med'], ['#e0c34a', counts.low, 'Low']];
+  // Legend uses our own tiers (US Macro / Central Bank), matching the card tags.
+  const legend: [string, number, string][] = [['#0ea5e9', counts.usMacro, 'US Macro'], ['#7c5cff', counts.centralBank, 'Central bank']];
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', background: '#fff', border: '1px solid #efedea', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)', flexWrap: 'wrap' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 17px', flex: '0 0 auto' }}>
@@ -288,7 +337,7 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
         </span>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#1a1813', whiteSpace: 'nowrap' }}>Market news</span>
-          <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#bba074', whiteSpace: 'nowrap' }}>Sample feed</span>
+          <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#bba074', whiteSpace: 'nowrap' }}>Live feed</span>
         </div>
       </div>
       <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
@@ -404,6 +453,7 @@ export function PlanPage() {
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [finished, setFinished] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
+  const [newsTab, setNewsTab] = useState<'upcoming' | 'released'>('upcoming');
 
   // Restore persisted progress
   useEffect(() => {
@@ -440,6 +490,8 @@ export function PlanPage() {
   const { data: calRaw } = useCalendar();
   const { data: insightMap } = useCalendarInsights();
   const { data: defMap } = useCalendarDefinitions();
+  const { data: releasedMap } = useCalendarReleased();
+  const releasedLoading = releasedMap === undefined;
   const insightsLoading = insightMap === undefined;
   const now = new Date();
   const calLoading = calRaw === undefined;
@@ -450,12 +502,11 @@ export function PlanPage() {
   const stripEvents = upcomingHigh.slice(0, 4);
   const nextEvent = upcomingHigh[0];
 
-  // Header extras: this-week impact legend + time-until progress bar.
-  const upcomingAll = (Array.isArray(calRaw) ? calRaw : []).filter((e) => new Date(e.date).getTime() >= now.getTime());
-  const impactCounts = {
-    high: upcomingAll.filter((e) => e.impact === 'High').length,
-    med: upcomingAll.filter((e) => e.impact === 'Medium').length,
-    low: upcomingAll.filter((e) => e.impact === 'Low').length,
+  // Header legend uses our own tiers (US Macro / Central Bank) over the upcoming
+  // relevant events — we don't surface generic High/Med/Low.
+  const tierCounts = {
+    usMacro: upcomingHigh.filter((e) => e.country === 'USD').length,
+    centralBank: upcomingHigh.filter((e) => e.country !== 'USD').length,
   };
   const prevRelevant = (Array.isArray(calRaw) ? calRaw : [])
     .filter((e) => isBtcRelevant(e) && new Date(e.date).getTime() < now.getTime())
@@ -466,6 +517,12 @@ export function PlanPage() {
     const prevMs = prevRelevant ? new Date(prevRelevant.date).getTime() : nextMs - 48 * 3600_000;
     newsProgress = Math.max(4, Math.min(100, ((now.getTime() - prevMs) / (nextMs - prevMs)) * 100));
   }
+
+  // Released (already-fired) relevant events this week, most-recent first.
+  const releasedEvents = (Array.isArray(calRaw) ? calRaw : [])
+    .filter((e) => isBtcRelevant(e) && new Date(e.date).getTime() < now.getTime())
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 4);
   const newsGroups: { key: number; label: string; events: CalendarEvent[] }[] = [];
   for (const e of upcomingHigh) {
     const k = dayDiff(e.date, now);
@@ -502,7 +559,7 @@ export function PlanPage() {
       {/* market news */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {nextEvent ? (
-          <NewsHeader next={nextEvent} progressPct={newsProgress} counts={impactCounts} total={upcomingHigh.length} onViewAll={() => setNewsOpen(true)} />
+          <NewsHeader next={nextEvent} progressPct={newsProgress} counts={tierCounts} total={upcomingHigh.length} onViewAll={() => setNewsOpen(true)} />
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #efedea', borderRadius: 14, padding: '16px 18px', fontWeight: 700, fontSize: 13, color: '#897f70', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
             {calLoading ? 'Loading economic calendar…' : 'No high-impact events ahead this week'}
@@ -534,8 +591,34 @@ export function PlanPage() {
               </div>
               <button onClick={() => setNewsOpen(false)} style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: 9, border: '1px solid #e8e6e0', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#8c8a81', fontSize: 17, lineHeight: 1, fontFamily: 'inherit' }}>×</button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 22 }}>
-              {newsGroups.length === 0 ? (
+            {/* Upcoming / Released toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', padding: '14px 22px 2px', flex: '0 0 auto' }}>
+              <div style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', background: '#efece6', border: '1px solid #e7e3da', borderRadius: 11, padding: 3, gap: 3 }}>
+                {(['upcoming', 'released'] as const).map((t) => {
+                  const active = newsTab === t;
+                  return (
+                    <button key={t} onClick={() => setNewsTab(t)} style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 13px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', background: active ? '#fff' : 'transparent', color: active ? '#1a1813' : '#8c8a81', boxShadow: active ? '0 1px 2px rgba(20,20,12,0.08)' : 'none', transition: 'all .18s' }}>
+                      {t === 'upcoming' ? 'Upcoming' : 'Released'}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 18px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+              {newsTab === 'released' ? (
+                releasedEvents.length === 0 ? (
+                  <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>No high-impact events released yet this week.</span>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a8a69b' }}>Earlier this week</span>
+                      <span style={{ flex: 1, height: 1, background: '#efedea' }} />
+                      {releasedLoading && <span style={{ fontWeight: 600, fontSize: 9.5, color: '#bba074' }}>confirming actuals…</span>}
+                    </div>
+                    {releasedEvents.map((e, i) => <ReleasedCard key={i} e={e} info={releasedMap?.[eventKey(e)]} />)}
+                  </div>
+                )
+              ) : newsGroups.length === 0 ? (
                 <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>No high-impact events remaining this week.</span>
               ) : newsGroups.map((g) => (
                 <div key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

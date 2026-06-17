@@ -1,4 +1,4 @@
-import type { AssetDir } from '@/hooks/useCalendar';
+import type { AssetDir, ReleasedInfo } from '@/hooks/useCalendar';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 
@@ -19,6 +19,12 @@ const authHeaders = (apiKey: string) => ({ 'x-api-key': apiKey, 'anthropic-versi
 type Reaction = { condition: string; assets: { sym: string; dir: AssetDir }[] };
 const reactionCache = new Map<string, Reaction>();
 const printsCache = new Map<string, { date: string }[]>();
+const releasedCache = new Map<string, ReleasedInfo>();
+const asset = (a: unknown): { sym: string; dir: AssetDir } => {
+  const o = a as { sym?: unknown; dir?: unknown };
+  const dir = o?.dir as AssetDir;
+  return { sym: String(o?.sym ?? ''), dir: dirs.includes(dir) ? dir : 'flat' };
+};
 
 export const insightKey = (country: string, title: string) => `${country}|${title}`;
 
@@ -33,9 +39,11 @@ function loadCache() {
     const raw = JSON.parse(readFileSync(CACHE_FILE, 'utf8')) as {
       reactions?: Record<string, Reaction>;
       prints?: Record<string, { date: string }[]>;
+      released?: Record<string, ReleasedInfo>;
     };
     for (const [k, v] of Object.entries(raw.reactions ?? {})) reactionCache.set(k, v);
     for (const [k, v] of Object.entries(raw.prints ?? {})) printsCache.set(k, v);
+    for (const [k, v] of Object.entries(raw.released ?? {})) releasedCache.set(k, v);
   } catch { /* no cache yet */ }
 }
 
@@ -45,6 +53,7 @@ function saveCache() {
     writeFileSync(CACHE_FILE, JSON.stringify({
       reactions: Object.fromEntries(reactionCache),
       prints: Object.fromEntries(printsCache),
+      released: Object.fromEntries(releasedCache),
     }));
   } catch { /* read-only FS (e.g. serverless) — stays in-memory only */ }
 }
@@ -203,6 +212,84 @@ async function fetchPrints(
     .filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.date) && p.source.length > 0)
     .slice(0, 2)
     .map((p) => ({ date: p.date }));
+}
+
+// Tier 3 — released events: actual figure + surprise + realized reaction
+// (per-event web search, verified, persisted). For the drawer's "Released" tab.
+const RELEASED_SYSTEM = `You report what happened for an economic release that has ALREADY occurred (the "date" is given), for a BTC/USDT perp trader.
+
+USE WEB SEARCH to find the ACTUAL released figure and how markets reacted in the hours after — do not rely on memory. If you cannot confirm the actual figure from a credible source, set "actual" to "".
+
+Your FINAL message must be ONLY a JSON object (no prose, no code fences):
+{"actual":"<the released figure, e.g. 0.4% or 'Held 3.75%'>","surprise":"Hot|Soft|In line","bearishForBtc":true|false,"condition":"<=2 words bullish-for-currency scenario, e.g. hot, beat, fewer","ifReaction":[{"sym":"crypto","dir":"up|down|flat"}],"reaction":[{"sym":"BTC","dir":"up|down|flat"},{"sym":"stocks","dir":"up|down|flat"}]}
+
+Rules:
+- "surprise": Hot = stronger/higher than forecast, Soft = weaker/lower, In line = as expected.
+- "bearishForBtc": did the actual outcome lean bearish for BTC/crypto?
+- "reaction": what BTC and stocks ACTUALLY did after the print (2 assets, BTC first).`;
+
+export async function enrichReleased(
+  events: { country: string; title: string; date: string }[],
+): Promise<Record<string, ReleasedInfo>> {
+  loadCache();
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const result: Record<string, ReleasedInfo> = {};
+  const uniq = new Map<string, { country: string; title: string; date: string }>();
+  for (const e of events) uniq.set(insightKey(e.country, e.title), e);
+  const missing = [...uniq.entries()].filter(([k]) => !releasedCache.has(k)).map(([, e]) => e);
+
+  if (apiKey && missing.length) {
+    await pool(missing, 5, async (e) => {
+      try {
+        const info = await fetchReleased(apiKey, e);
+        if (info) releasedCache.set(insightKey(e.country, e.title), info);
+      } catch (err) {
+        console.error(`[event-insight] released ${e.country} ${e.title}:`, err);
+      }
+    });
+    saveCache();
+  }
+
+  for (const k of uniq.keys()) { const v = releasedCache.get(k); if (v) result[k] = v; }
+  return result;
+}
+
+async function fetchReleased(
+  apiKey: string,
+  event: { country: string; title: string; date: string },
+): Promise<ReleasedInfo | null> {
+  const res = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 3000,
+      temperature: 0,
+      system: RELEASED_SYSTEM,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
+      messages: [{ role: 'user', content: JSON.stringify({ date: event.date.slice(0, 10), currency: event.country, event: event.title }) }],
+    }),
+  });
+  if (!res.ok) throw new Error(`anthropic ${res.status}: ${await res.text()}`);
+
+  const data = await res.json();
+  const texts: string[] = (data.content || []).filter((b: { type: string }) => b.type === 'text').map((b: { text: string }) => b.text);
+  let text = texts[texts.length - 1] ?? '';
+  if (!text.includes('{')) text = texts.join('');
+  const start = text.indexOf('{'), end = text.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('no JSON object in model reply');
+  const o = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+
+  const actual = String(o.actual ?? '').trim();
+  if (!actual) throw new Error('no actual figure confirmed'); // don't cache unconfirmed
+  return {
+    actual,
+    surprise: String(o.surprise ?? 'In line'),
+    bearishForBtc: o.bearishForBtc === true,
+    condition: String(o.condition ?? ''),
+    ifReaction: (Array.isArray(o.ifReaction) ? o.ifReaction : []).slice(0, 3).map(asset),
+    reaction: (Array.isArray(o.reaction) ? o.reaction : []).slice(0, 3).map(asset),
+  };
 }
 
 // ─── Real BTC daily moves (Gate.io) ───────────────────────────────────────────
