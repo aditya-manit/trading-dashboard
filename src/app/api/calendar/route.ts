@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { enrichInsights, insightKey, btcDailyMoves } from '@/lib/event-insight';
+import { isBtcRelevant } from '@/lib/calendar-filter';
 import type { CalendarEvent } from '@/hooks/useCalendar';
 
 // ForexFactory's economic calendar, published by FairEconomy as a static JSON
@@ -26,7 +27,7 @@ export async function GET() {
       // web-search + candle work to what's displayed.
       const nowMs = Date.now();
       const strip = data
-        .filter((e) => e.impact === 'High' && new Date(e.date).getTime() >= nowMs)
+        .filter((e) => isBtcRelevant(e) && new Date(e.date).getTime() >= nowMs)
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, 4);
 

@@ -3,6 +3,7 @@
 import { memo, useEffect, useState, type CSSProperties } from 'react';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, type CalendarEvent } from '@/hooks/useCalendar';
+import { isBtcRelevant } from '@/lib/calendar-filter';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 
@@ -299,7 +300,7 @@ export function PlanPage() {
   const now = new Date();
   const calLoading = calRaw === undefined;
   const upcomingHigh = (Array.isArray(calRaw) ? calRaw : [])
-    .filter((e) => e.impact === 'High' && new Date(e.date).getTime() >= now.getTime())
+    .filter((e) => isBtcRelevant(e) && new Date(e.date).getTime() >= now.getTime())
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const stripEvents = upcomingHigh.slice(0, 4);
   const nextEvent = upcomingHigh[0];
