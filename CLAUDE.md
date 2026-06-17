@@ -47,9 +47,8 @@ src/
     positions-history/
       PositionHistoryTable.tsx        # Trade cards, leverage badge, Details → TradeDetailDrawer
     plan/
-      PlanPage.tsx                    # Pre-trade workbook (Plan page)
+      PlanPage.tsx                    # Pre-trade workbook (Plan page) + economic-calendar news
       planDiagrams.ts                 # 5 step SVGs, verbatim from handoff 15
-      planNews.ts                     # Sample market-news strip + drawer HTML
   hooks/
     useAccount.ts · usePositions.ts · usePositionHistory.ts
     useAccountBook.ts · useTrades.ts
@@ -107,8 +106,9 @@ encoded in the component and no longer surprising.
 - On the Plan page the center nav tabs become **Workbook / Plans / Journal** (only Workbook is live; Plans/Journal are inert placeholders at `#c3c1b8`). Scroll-spy section nav is disabled while on Plan.
 
 ### Plan page — Pre-trade workbook (`plan/PlanPage.tsx`) — matches handoff-15 "fresh redesign"
-- 5-step trading checklist: header → sample market-news strip (4 cards) + "View all" → news drawer → top stepper → step card → footer nav. Self-contained; **no API data** (educational content).
-- **Step diagrams** (`planDiagrams.ts`) and the **news strip/drawer HTML** (`planNews.ts`) are extracted **verbatim** from `Trading Dashboard (purple).dc.html` and rendered via `dangerouslySetInnerHTML` for pixel fidelity. The diagrams animate via the `pk*` keyframes injected by `PlanPage`. Diagram replays on step change because its container is keyed by `step`.
+- 5-step trading checklist: header → market-news strip (4 cards) + "View all" → news drawer → top stepper → step card → footer nav. The workbook itself is educational content (no API); the news strip/drawer is **live data**.
+- **Market news = real economic calendar.** `useCalendar()` → `/api/calendar` proxies ForexFactory's free FairEconomy feed (`nfs.faireconomy.media/ff_calendar_thisweek.json`, no key, route caches 6h). Filtered to `impact: 'High'`, upcoming only, sorted; strip shows next 4, drawer groups by day. Times render in the **viewer's local timezone** (feed carries a US-Eastern offset). The feed has no `actual` field and no editorial interpretation — cards show forecast/previous only (the design's "→ BTC↓" arrow line was dropped as non-derivable).
+- **Step diagrams** (`planDiagrams.ts`) are extracted **verbatim** from `Trading Dashboard (purple).dc.html` and rendered via `dangerouslySetInnerHTML` for pixel fidelity. They animate via the `pk*` keyframes injected by `PlanPage`; the diagram replays on step change because its container is keyed by `step`.
 - **Ignore the leftover `pkChart`/`pkWalk`/`pkCard`/`planRail`/`planFinalCheck` functions in the dc.html** — they're from an earlier iteration. The shipped template uses the bespoke per-step SVGs + `planStepper` only.
 - Progress (`tdplan_step`, `tdplan_fin`) and per-step checks (`tdplan_checks_v2`) persist to **localStorage**. Check keys are `${step}-${idx}`. `toggleCheck` uses a functional updater — required, since clicking two boxes before re-render would otherwise clobber via stale closure.
 - Next is gated on all checks of the current step being cleared; on step 5 the CTA becomes a green "Mark plan complete ✓". `PLAN_META` (5 objects: title/color/rail/short/lead/caption/ask[3]/rule) is the content source.

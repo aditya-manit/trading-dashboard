@@ -2,9 +2,61 @@
 
 import { useEffect, useState } from 'react';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
-import { NEWS_STRIP_HTML, NEWS_DRAWER_HTML } from './planNews';
+import { useCalendar, type CalendarEvent } from '@/hooks/useCalendar';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
+
+// ─── Economic-calendar helpers (real ForexFactory feed) ───────────────────────
+const IMPACT_COLOR: Record<string, string> = { High: '#df5338', Medium: '#d98a1f', Low: '#1f9d55', Holiday: '#8c8a81' };
+
+// Times render in the viewer's local timezone (the feed carries a US-Eastern offset).
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+const localMidnight = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const dayDiff = (iso: string, now: Date) => Math.round((localMidnight(new Date(iso)).getTime() - localMidnight(now).getTime()) / 86_400_000);
+
+function dayHeader(iso: string, now: Date) {
+  const d = dayDiff(iso, now);
+  const rel = d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d === -1 ? 'Yesterday' : '';
+  const date = new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(/,/g, '');
+  return `${rel ? rel + ' · ' : ''}${date}`.toUpperCase();
+}
+
+function relShort(iso: string, now: Date) {
+  const d = dayDiff(iso, now);
+  if (d === 0) return 'today';
+  if (d === 1) return 'tomorrow';
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+function valueParts(e: CalendarEvent): { main: string; note: string; muted?: boolean } {
+  const f = (e.forecast || '').trim(), p = (e.previous || '').trim();
+  if (f && p) return { main: f, note: `exp · ${p} prev` };
+  if (f) return { main: f, note: 'exp' };
+  if (p) return { main: p, note: 'prev' };
+  return { main: 'No number', note: '', muted: true };
+}
+
+function NewsCard({ e, variant }: { e: CalendarEvent; variant: 'strip' | 'drawer' }) {
+  const color = IMPACT_COLOR[e.impact] || '#8c8a81';
+  const v = valueParts(e);
+  return (
+    <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: variant === 'strip' ? 13 : 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, boxShadow: variant === 'strip' ? '0 1px 2px rgba(20,20,12,0.03)' : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
+        <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
+        <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
+        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 11, color: '#a8a69b' }}>{fmtTime(e.date)}</span>
+      </div>
+      <span style={{ fontWeight: 600, fontSize: 11.5, color: '#897f70' }}>{e.title}</span>
+      <div style={{ height: 1, background: '#f4f3f0', margin: '1px 0' }} />
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+        <span style={{ fontWeight: 800, fontSize: 12, color: v.muted ? '#a8a69b' : '#1a1813' }}>{v.main}</span>
+        {v.note && <span style={{ fontWeight: 600, fontSize: 10.5, color: '#a8a69b' }}>{v.note}</span>}
+      </div>
+    </div>
+  );
+}
 
 // ─── Step metadata (verbatim from handoff 15 planMeta) ────────────────────────
 type PlanStep = {
@@ -108,6 +160,23 @@ export function PlanPage() {
   const doneCount = meta.ask.filter((_, i) => checks[`${step}-${i}`]).length;
   const allClear = doneCount === meta.ask.length && meta.ask.length > 0;
 
+  // ─── Economic calendar (real feed) ──────────────────────────────────────────
+  const { data: calRaw } = useCalendar();
+  const now = new Date();
+  const calLoading = calRaw === undefined;
+  const upcomingHigh = (Array.isArray(calRaw) ? calRaw : [])
+    .filter((e) => e.impact === 'High' && new Date(e.date).getTime() >= now.getTime())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const stripEvents = upcomingHigh.slice(0, 4);
+  const nextEvent = upcomingHigh[0];
+  const newsGroups: { key: number; label: string; events: CalendarEvent[] }[] = [];
+  for (const e of upcomingHigh) {
+    const k = dayDiff(e.date, now);
+    let g = newsGroups.find((x) => x.key === k);
+    if (!g) { g = { key: k, label: dayHeader(e.date, now), events: [] }; newsGroups.push(g); }
+    g.events.push(e);
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', fontFamily: FONT }}>
       <style>{`
@@ -139,14 +208,26 @@ export function PlanPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9821f" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           </span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Market news · sample feed</span>
-            <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.01em' }}>Next: FOMC · tomorrow 2:00pm</span>
+            <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Market news · high impact</span>
+            <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.01em' }}>
+              {nextEvent
+                ? `Next: ${nextEvent.country} ${nextEvent.title} · ${relShort(nextEvent.date, now)} ${fmtTime(nextEvent.date)}`
+                : calLoading ? 'Loading economic calendar…' : 'No high-impact events ahead this week'}
+            </span>
           </div>
-          <button onClick={() => setNewsOpen(true)} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontFamily: 'inherit', background: '#fff', border: '1px solid #e8e6e0', borderRadius: 10, padding: '8px 14px', fontWeight: 700, fontSize: 12, color: '#56544b' }}>
-            View all <span style={{ fontWeight: 800, color: '#c9821f' }}>5</span> →
-          </button>
+          {upcomingHigh.length > 0 && (
+            <button onClick={() => setNewsOpen(true)} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontFamily: 'inherit', background: '#fff', border: '1px solid #e8e6e0', borderRadius: 10, padding: '8px 14px', fontWeight: 700, fontSize: 12, color: '#56544b' }}>
+              View all <span style={{ fontWeight: 800, color: '#c9821f' }}>{upcomingHigh.length}</span> →
+            </button>
+          )}
         </div>
-        <div dangerouslySetInnerHTML={{ __html: NEWS_STRIP_HTML }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+          {calLoading
+            ? [0, 1, 2, 3].map((i) => <div key={i} style={{ height: 96, background: '#fff', border: '1px solid #f0efec', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }} />)
+            : stripEvents.length > 0
+              ? stripEvents.map((e, i) => <NewsCard key={i} e={e} variant="strip" />)
+              : <div style={{ gridColumn: '1 / -1', background: '#fff', border: '1px solid #f0efec', borderRadius: 13, padding: '16px 18px', fontWeight: 600, fontSize: 12.5, color: '#897f70' }}>No high-impact events remaining this week.</div>}
+        </div>
       </div>
 
       {/* news drawer */}
@@ -159,12 +240,24 @@ export function PlanPage() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9821f" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Economic calendar · sample</span>
+                <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Economic calendar · ForexFactory</span>
                 <span style={{ fontWeight: 800, fontSize: 16, color: '#1a1813', letterSpacing: '-0.015em' }}>This week’s high-impact</span>
               </div>
               <button onClick={() => setNewsOpen(false)} style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: 9, border: '1px solid #e8e6e0', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#8c8a81', fontSize: 17, lineHeight: 1, fontFamily: 'inherit' }}>×</button>
             </div>
-            <div dangerouslySetInnerHTML={{ __html: NEWS_DRAWER_HTML }} />
+            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+              {newsGroups.length === 0 ? (
+                <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>No high-impact events remaining this week.</span>
+              ) : newsGroups.map((g) => (
+                <div key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a8a69b' }}>{g.label}</span>
+                    <span style={{ flex: 1, height: 1, background: '#efedea' }} />
+                  </div>
+                  {g.events.map((e, i) => <NewsCard key={i} e={e} variant="drawer" />)}
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}

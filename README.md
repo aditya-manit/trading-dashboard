@@ -34,7 +34,7 @@ A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays li
 ### Plan (pre-trade workbook)
 - A 5-step routine to vet a setup before entry: levels → trend → confirmation → stop → liquidity, each with an animated diagram, a one-line rule, and pre-flight checks
 - Each step gates the next — you can only advance once its checks are cleared; progress and checks persist in localStorage
-- Sample market-news strip (high-impact economic events) with a slide-out calendar drawer
+- Live high-impact economic calendar (ForexFactory feed, proxied server-side) — a strip of the next events plus a slide-out drawer grouped by day, with times in your local timezone
 
 ## API Routes
 
@@ -47,6 +47,8 @@ All Gate.io calls are proxied through Next.js server-side routes — credentials
 | `/api/gate/position-history` | `GET /futures/usdt/position_close` (180-day window, paginated) |
 | `/api/gate/account-book` | `GET /futures/usdt/account_book?type=pnl` (6×30d windows) |
 | `/api/gate/trades` | `GET /futures/usdt/my_trades` |
+
+The Plan page additionally uses `/api/calendar`, which proxies ForexFactory's free FairEconomy economic-calendar feed (`nfs.faireconomy.media/ff_calendar_thisweek.json`, no key, cached 6h).
 
 ## Contract Maths
 
