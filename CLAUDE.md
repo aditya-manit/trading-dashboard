@@ -8,6 +8,7 @@ Next.js 15 App Router · TypeScript · Tailwind CSS v4 · shadcn/ui · SWR
 - `GATE_API_KEY` and `GATE_API_SECRET` live only in `.env.local` — never in source
 - All Gate.io API calls MUST go through `/api/gate/*` server-side routes
 - Never import or reference `process.env.GATE_API_KEY` / `GATE_API_SECRET` in any client component or hook
+- `ANTHROPIC_API_KEY` (used by `lib/event-insight.ts` for calendar reaction lines) is likewise server-only — never reference it in a client component or hook
 
 ## Gate.io API constraints
 - `position_close` and `account_book`: `from` cannot be more than 180 days before NOW (absolute, not relative to `to`)
@@ -107,7 +108,8 @@ encoded in the component and no longer surprising.
 
 ### Plan page — Pre-trade workbook (`plan/PlanPage.tsx`) — matches handoff-15 "fresh redesign"
 - 5-step trading checklist: header → market-news strip (4 cards) + "View all" → news drawer → top stepper → step card → footer nav. The workbook itself is educational content (no API); the news strip/drawer is **live data**.
-- **Market news = real economic calendar.** `useCalendar()` → `/api/calendar` proxies ForexFactory's free FairEconomy feed (`nfs.faireconomy.media/ff_calendar_thisweek.json`, no key, route caches 6h). Filtered to `impact: 'High'`, upcoming only, sorted; strip shows next 4, drawer groups by day. Times render in the **viewer's local timezone** (feed carries a US-Eastern offset). The feed has no `actual` field and no editorial interpretation — cards show forecast/previous only (the design's "→ BTC↓" arrow line was dropped as non-derivable).
+- **Market news = real economic calendar.** `useCalendar()` → `/api/calendar` proxies ForexFactory's free FairEconomy feed (`nfs.faireconomy.media/ff_calendar_thisweek.json`, no key, route caches 6h). Filtered to `impact: 'High'`, upcoming only, sorted; strip shows next 4, drawer groups by day. Times render in the **viewer's local timezone** (feed carries a US-Eastern offset). No `actual` field — cards show forecast/previous.
+- **The "→ BTC↓" reaction line is Claude-generated** (`lib/event-insight.ts`, model `claude-haiku-4-5-20251001`, via `fetch` to the Messages API — no SDK dep). The route enriches high-impact events with `{condition, assets:[{sym,dir}]}`; interpretations are cached in-process keyed by `currency|title` (stable across weeks, so the LLM is hit rarely). **Requires `ANTHROPIC_API_KEY`** (server-only, `.env.local`); without it enrichment is skipped and cards render forecast/previous only — fully graceful. The arrow line renders dir as green↑/red↓/grey-flat.
 - **Step diagrams** (`planDiagrams.ts`) are extracted **verbatim** from `Trading Dashboard (purple).dc.html` and rendered via `dangerouslySetInnerHTML` for pixel fidelity. They animate via the `pk*` keyframes injected by `PlanPage`; the diagram replays on step change because its container is keyed by `step`.
 - **Ignore the leftover `pkChart`/`pkWalk`/`pkCard`/`planRail`/`planFinalCheck` functions in the dc.html** — they're from an earlier iteration. The shipped template uses the bespoke per-step SVGs + `planStepper` only.
 - Progress (`tdplan_step`, `tdplan_fin`) and per-step checks (`tdplan_checks_v2`) persist to **localStorage**. Check keys are `${step}-${idx}`. `toggleCheck` uses a functional updater — required, since clicking two boxes before re-render would otherwise clobber via stale closure.

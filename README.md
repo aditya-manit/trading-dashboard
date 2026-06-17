@@ -84,6 +84,7 @@ Gate.io BTC_USDT perpetual: **1 contract = 0.0001 BTC**
 |---|---|
 | `GATE_API_KEY` | Gate.io API key (read-only permissions sufficient) |
 | `GATE_API_SECRET` | Gate.io API secret |
+| `ANTHROPIC_API_KEY` | *Optional.* Enables the Claude-generated "market reaction" line on the Plan page's economic calendar. Without it, calendar cards still show forecast/previous. |
 
 **Never commit `.env.local`.** It is gitignored by default.
 

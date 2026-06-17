@@ -1,8 +1,18 @@
 import useSWR from 'swr';
 
+export type AssetDir = 'up' | 'down' | 'flat';
+
+// Editorial "market reaction" annotation, generated server-side (Claude) for
+// high-impact events: the bullish-for-the-currency scenario and likely moves.
+export interface EventInsight {
+  condition: string;
+  assets: { sym: string; dir: AssetDir }[];
+}
+
 // One event from the ForexFactory / FairEconomy economic-calendar feed.
 // `country` actually holds the currency code (USD, EUR, JPY…); `date` is
 // ISO-8601 with a US-Eastern offset baked in. There is no `actual` field.
+// `insight` is attached by /api/calendar for high-impact events.
 export interface CalendarEvent {
   title: string;
   country: string;
@@ -10,6 +20,7 @@ export interface CalendarEvent {
   impact: 'Low' | 'Medium' | 'High' | 'Holiday' | string;
   forecast: string;
   previous: string;
+  insight?: EventInsight;
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());

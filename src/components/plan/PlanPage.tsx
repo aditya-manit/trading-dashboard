@@ -54,6 +54,19 @@ function NewsCard({ e, variant }: { e: CalendarEvent; variant: 'strip' | 'drawer
         <span style={{ fontWeight: 800, fontSize: 12, color: v.muted ? '#a8a69b' : '#1a1813' }}>{v.main}</span>
         {v.note && <span style={{ fontWeight: 600, fontSize: 10.5, color: '#a8a69b' }}>{v.note}</span>}
       </div>
+      {e.insight && e.insight.assets.length > 0 && (
+        <span style={{ fontWeight: 600, fontSize: 11.5, color: '#56544b' }}>
+          {e.insight.condition && `${e.insight.condition} → `}
+          {e.insight.assets.map((a, i) => (
+            <span key={i}>
+              {i > 0 && ' · '}
+              <b style={{ color: a.dir === 'up' ? '#1f9d55' : a.dir === 'down' ? '#df5338' : '#9b988d' }}>
+                {a.sym}{a.dir === 'up' ? '↑' : a.dir === 'down' ? '↓' : ' flat'}
+              </b>
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }
