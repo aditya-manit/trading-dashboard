@@ -13,7 +13,7 @@ import { PositionHistoryTable } from '@/components/positions-history/PositionHis
 import { PlanPage } from '@/components/plan/PlanPage';
 
 export default function DashboardPage() {
-  const [page, setPage] = useState<'dashboard' | 'plan'>('dashboard');
+  const [page, setPage] = useState<'dashboard' | 'plan'>('plan');
 
   return (
     <div style={{ minHeight: '100vh', background: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", fontVariantNumeric: 'tabular-nums', color: '#181712' }}>

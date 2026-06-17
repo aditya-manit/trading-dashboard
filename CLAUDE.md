@@ -26,15 +26,17 @@ Next.js 15 App Router · TypeScript · Tailwind CSS v4 · shadcn/ui · SWR
 ```
 src/
   app/
-    page.tsx                          # Section layout with IDs for scroll-nav
+    page.tsx                          # Holds page state (Dashboard|Plan); Plan is default
     api/gate/
       account/route.ts
       positions/route.ts
       position-history/route.ts       # 179-day window, offset pagination
       account-book/route.ts           # 6×30d windows
       trades/route.ts
+      btc-candles/route.ts            # Gate spot 1d candles (also used for "2 prints" %)
+    api/calendar/route.ts             # ForexFactory feed proxy + insight/prints enrichment
   components/
-    layout/Topbar.tsx                 # Sticky nav, scroll-based active tab, Gate.io logo
+    layout/Topbar.tsx                 # Sticky nav; Dashboard/Plan toggle; scroll-tab (dashboard only)
     hero/
       Hero.tsx                        # Balance, uPnL badge, milestone progress button
       MilestoneDrawer.tsx             # Slide-out $10M roadmap drawer
@@ -48,14 +50,15 @@ src/
     positions-history/
       PositionHistoryTable.tsx        # Trade cards, leverage badge, Details → TradeDetailDrawer
     plan/
-      PlanPage.tsx                    # Pre-trade workbook (Plan page) + economic-calendar news
+      PlanPage.tsx                    # Pre-trade workbook (Plan page) + economic-calendar news strip/drawer
       planDiagrams.ts                 # 5 step SVGs, verbatim from handoff 15
   hooks/
     useAccount.ts · usePositions.ts · usePositionHistory.ts
-    useAccountBook.ts · useTrades.ts
+    useAccountBook.ts · useTrades.ts · useCalendar.ts
   lib/
     gate-client.ts                    # HMAC signing + fetch wrapper
     trade-stats.ts                    # computeTradeStats, buildEquityData
+    event-insight.ts                  # Claude (web-search) event insights + Gate BTC "2 prints" %
     formatters.ts
   types/gate.ts
 ```
@@ -86,17 +89,22 @@ src/
 - Detail rows table: `border:1px solid #f0efec; border-radius:14px; overflow:hidden`
   Each row: `padding:13px 16px; border-bottom:1px solid #f5f4f1`
 
-## Tab sections (scroll-nav)
+## Pages & tab sections
+Top-level `page` state in `page.tsx` toggles between **Plan (default)** and **Dashboard**
+via the Topbar's Dashboard/Plan segmented control. Plan → `<PlanPage/>`; Dashboard →
+the scroll-nav sections below (scroll-spy active only on Dashboard).
 ```
-#overview   → Hero, EquityChart, HighlightCards, RealizedPerformance, KpiStrip
-#positions  → PositionsTable
-#reports    → KeyMetricsRow
-#history    → PositionHistoryTable
+Plan (default) → PlanPage  (Topbar tabs: Workbook* / Plans / Journal — only Workbook live)
+Dashboard:
+  #overview   → Hero, EquityChart, HighlightCards, RealizedPerformance, KpiStrip
+  #positions  → PositionsTable
+  #reports    → KeyMetricsRow
+  #history    → PositionHistoryTable
 ```
 
 ---
 
-## Session handover — current UI state (updated 2026-06-14)
+## Session handover — current UI state (updated 2026-06-17, through handoff 16)
 
 This is the source of truth for component-level styling decisions that aren't
 obvious from the code. Keep it current; delete entries once they're plainly
@@ -110,7 +118,7 @@ encoded in the component and no longer surprising.
 - 5-step trading checklist: header → market-news strip (4 cards) + "View all" → news drawer → top stepper → step card → footer nav. The workbook itself is educational content (no API); the news strip/drawer is **live data**.
 - **Market news = real economic calendar.** `useCalendar()` → `/api/calendar` proxies ForexFactory's free FairEconomy feed (`nfs.faireconomy.media/ff_calendar_thisweek.json`, no key, route caches 6h). Filtered to `impact: 'High'`, upcoming only, sorted; strip shows next 4 (each with a live `Countdown` ticking 1s, shown only on the strip variant), drawer groups by day. Times render in the **viewer's local timezone** (feed carries a US-Eastern offset). No `actual` field — cards show forecast/previous.
 - **Strip cards are rich** (`StripCard`, matches handoff-16): header (currency/HIGH + title + time + live `CountdownLabel`) over a Forecast / If-`<condition>` / **BTC 2 prints** table. The header banner shows a seconds-ticking `CountdownFull` ("Next: <event> · 7h 16m 42s"). Drawer cards stay compact (`NewsCard`: forecast + reaction line, no countdown/prints).
-- **Insight enrichment is Claude-generated and only for the 4 strip cards** (`lib/event-insight.ts`, model `claude-haiku-4-5-20251001`, `fetch` to Messages API — no SDK dep). The route enriches only the **next 4 upcoming high-impact** events (not the whole drawer), one **per-event call with the `web_search` server tool** (capped 5 concurrent) so the model looks up the *real recent* occurrence dates rather than guessing from memory. Returns `{condition, assets:[{sym,dir}], prints:[{date}]}`; cached in-process by `currency|title`.
+- **Insight enrichment is Claude-generated and only for the 4 strip cards** (`lib/event-insight.ts`, model `claude-haiku-4-5-20251001`, `fetch` to Messages API — no SDK dep). The route enriches only the **next 4 upcoming high-impact** events (not the whole drawer), one **per-event call with the `web_search` server tool** (capped 5 concurrent) so the model looks up the *real recent* occurrence dates rather than guessing from memory. Returns `{condition, assets:[{sym,dir}], prints:[{date}]}`, **cached in-process by `currency|title`** — so the prints (and reaction) ARE cached; web search only fires on a cold cache for a newly-seen event (warm `/api/calendar` ≈ 20ms, cold ≈ 10–35s). The Gate candle map (`btcDailyMoves`) is separately cached 1h and the `%` is recomputed from it each request, so it stays fresh without re-searching.
 - **"BTC 2 prints" % is measured, not model-guessed**: `btcDailyMoves()` pulls ~1000d of Gate daily candles and the route fills each print's `pct` with BTC's real `(close-open)/open` move on that date (dates with no candle are dropped). So dates come from Claude+web-search, percentages from Gate.
 - **Verification gate (accuracy over completeness):** the prompt makes Claude confirm each print date against an authoritative source and cross-check, returning `[]` when unsure; each print must come back as `{date, source}`. The parser **drops any print without a non-empty source or a valid ISO date**, and the route drops any with no Gate candle. Net: a date is shown only if web-search-confirmed AND price-measurable — otherwise the prints row is simply absent. Don't loosen this; the user explicitly wants empty over uncertain.
 - **Requires `ANTHROPIC_API_KEY`** (server-only, `.env.local`); without it enrichment is skipped and cards show forecast/previous only — fully graceful. Reaction arrows render green↑/red↓/grey-flat.

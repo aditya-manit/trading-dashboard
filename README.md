@@ -1,6 +1,6 @@
 # Trading Dashboard
 
-A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays live account balance, open positions, closed trade history, and performance analytics — all fetched read-only from the Gate.io Futures API. A top-level **Dashboard / Plan** toggle switches between the analytics dashboard and a pre-trade workbook.
+A personal trading dashboard for Gate.io BTC/USDT perpetual futures. Displays live account balance, open positions, closed trade history, and performance analytics — all fetched read-only from the Gate.io Futures API. A top-level **Plan / Dashboard** toggle switches between a pre-trade workbook (the default view) and the analytics dashboard.
 
 ## Stack
 
