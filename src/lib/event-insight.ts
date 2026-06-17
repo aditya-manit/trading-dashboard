@@ -252,9 +252,9 @@ Your FINAL message must be ONLY a JSON object (no prose, no code fences):
 
 Rules:
 - "actual": JUST the number/figure, matching the forecast's format and units so they compare directly. e.g. forecast "3.75%" → actual "3.75%"; forecast "0.3%" → actual "0.4%". No prose, no words. For a central-bank rate decision, give the SINGLE resulting policy rate in the forecast's format (e.g. "3.75%"), NEVER a range like "3.50%-3.75%".
-- "surprise": Hot = stronger/higher than forecast, Soft = weaker/lower, In line = as expected.
-- "bearishForBtc": did the actual outcome lean bearish for BTC/crypto?
-- "reaction": what BTC and stocks ACTUALLY did after the print (2 assets, BTC first).`;
+- "surprise": classify the RELEASE ITSELF vs expectations — Hot = higher / stronger / more HAWKISH than expected (a hawkish central-bank outcome is Hot even if the rate was held), Soft = lower / weaker / more dovish, In line = as expected. Judge ONLY from the figure/guidance — this is INDEPENDENT of how markets moved.
+- "reaction": SEPARATELY, what BTC and stocks ACTUALLY did after the print (2 assets, BTC first). This may AGREE with or DIVERGE from the typical reaction — report what truly happened, do not force it to match the surprise.
+- "bearishForBtc": whether the outcome would TYPICALLY be read as bearish for BTC (not necessarily what happened).`;
 
 export async function enrichReleased(
   events: { country: string; title: string; date: string; forecast?: string }[],
