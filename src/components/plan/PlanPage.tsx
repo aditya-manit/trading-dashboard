@@ -508,14 +508,14 @@ export function PlanPage() {
     usMacro: upcomingHigh.filter((e) => e.country === 'USD').length,
     centralBank: upcomingHigh.filter((e) => e.country !== 'USD').length,
   };
-  const prevRelevant = (Array.isArray(calRaw) ? calRaw : [])
-    .filter((e) => isBtcRelevant(e) && new Date(e.date).getTime() < now.getTime())
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-  let newsProgress = 64;
+  // Progress bar = imminence over a fixed 24h window (the countdown gives the
+  // exact time; the bar is the at-a-glance "how soon"). >24h away → ~5% (a
+  // sliver, never empty), 12h → ~50%, at release → 100%.
+  let newsProgress = 5;
   if (nextEvent) {
-    const nextMs = new Date(nextEvent.date).getTime();
-    const prevMs = prevRelevant ? new Date(prevRelevant.date).getTime() : nextMs - 48 * 3600_000;
-    newsProgress = Math.max(4, Math.min(100, ((now.getTime() - prevMs) / (nextMs - prevMs)) * 100));
+    const WINDOW = 24 * 3600_000;
+    const msUntil = new Date(nextEvent.date).getTime() - now.getTime();
+    newsProgress = Math.max(5, Math.min(100, ((WINDOW - msUntil) / WINDOW) * 100));
   }
 
   // Released (already-fired) relevant events this week, most-recent first.
