@@ -98,28 +98,42 @@ const labelCellBase: CSSProperties = { padding: '8px 12px', borderRight: '1px so
 const valueCellBase: CSSProperties = { padding: '8px 13px', display: 'flex', alignItems: 'center' };
 const topBorder: CSSProperties = { borderTop: '1px solid #f4f3f0' };
 
-// Event name with a definition tooltip on hover. The tooltip is portaled to
-// document.body so it escapes the card's overflow:hidden AND the drawer panel's
-// transform (a transformed ancestor would otherwise contain/clip a fixed child).
-function EventName({ title, def }: { title: string; def?: string }) {
+// Hover tooltip portaled to document.body so it escapes card overflow:hidden
+// AND the drawer panel's transform (which would otherwise contain/clip a fixed
+// child). Anchors to the wrapped content's rect, opening above it.
+function HoverTip({ tip, width = 240, children }: { tip: string; width?: number; children: React.ReactNode }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   return (
-    <span style={{ display: 'inline-block', minWidth: 0 }}>
-      <span
-        onMouseEnter={(ev) => { if (def) setRect(ev.currentTarget.getBoundingClientRect()); }}
-        onMouseLeave={() => setRect(null)}
-        style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em', cursor: def ? 'help' : 'default', borderBottom: def ? '1px dashed #d4d2c9' : undefined }}
-      >
-        {title}
-      </span>
-      {def && rect && typeof document !== 'undefined' && createPortal(
-        <span style={{ position: 'fixed', left: Math.round(rect.left), top: Math.round(rect.top - 8), transform: 'translateY(-100%)', zIndex: 300, width: 240, maxWidth: '72vw', background: '#1a1813', color: '#f1efe9', fontSize: 11, fontWeight: 500, lineHeight: 1.5, padding: '9px 12px', borderRadius: 10, boxShadow: '0 10px 30px rgba(20,18,12,0.3)', pointerEvents: 'none', fontFamily: FONT }}>
-          {def}
+    <span
+      style={{ display: 'inline-block', minWidth: 0, cursor: 'help' }}
+      onMouseEnter={(ev) => setRect(ev.currentTarget.getBoundingClientRect())}
+      onMouseLeave={() => setRect(null)}
+    >
+      {children}
+      {rect && typeof document !== 'undefined' && createPortal(
+        // Open above the anchor, but flip below when there isn't room (e.g. the
+        // drawer header sits near the viewport top).
+        <span style={{ position: 'fixed', left: Math.round(rect.left), zIndex: 300, width, maxWidth: '72vw', background: '#1a1813', color: '#f1efe9', fontSize: 11, fontWeight: 500, lineHeight: 1.5, padding: '9px 12px', borderRadius: 10, boxShadow: '0 10px 30px rgba(20,18,12,0.3)', pointerEvents: 'none', fontFamily: FONT,
+          ...(rect.top > 130
+            ? { top: Math.round(rect.top - 8), transform: 'translateY(-100%)' }
+            : { top: Math.round(rect.bottom + 8) }) }}>
+          {tip}
         </span>,
         document.body,
       )}
     </span>
   );
+}
+
+// Plain-English explanation of the calendar filter (isBtcRelevant).
+const FILTER_TIP = 'Filtered to the events that actually move BTC: every high-impact USD release (Fed, CPI, NFP, PCE…) plus non-USD central-bank rate decisions (BoJ, ECB, BoE, SNB). Lower-impact and minor-currency data (e.g. NZD GDP, UK Claimant Count) are hidden.';
+
+// Event name with its definition tooltip on hover (dashed underline when a
+// definition exists).
+function EventName({ title, def }: { title: string; def?: string }) {
+  const style: CSSProperties = { fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' };
+  if (!def) return <span style={style}>{title}</span>;
+  return <HoverTip tip={def}><span style={{ ...style, borderBottom: '1px dashed #d4d2c9' }}>{title}</span></HoverTip>;
 }
 
 // Shimmering placeholder bar for rows still loading (reaction / prints).
@@ -437,7 +451,9 @@ export function PlanPage() {
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Economic calendar · ForexFactory</span>
-                <span style={{ fontWeight: 800, fontSize: 16, color: '#1a1813', letterSpacing: '-0.015em' }}>This week’s high-impact</span>
+                <HoverTip tip={FILTER_TIP} width={260}>
+                  <span style={{ fontWeight: 800, fontSize: 16, color: '#1a1813', letterSpacing: '-0.015em', borderBottom: '1px dashed #cfccc4' }}>This week’s high-impact</span>
+                </HoverTip>
               </div>
               <button onClick={() => setNewsOpen(false)} style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: 9, border: '1px solid #e8e6e0', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#8c8a81', fontSize: 17, lineHeight: 1, fontFamily: 'inherit' }}>×</button>
             </div>
