@@ -16,10 +16,10 @@ export function isBtcRelevant(e: CalendarEvent): boolean {
 }
 
 // Why this event passed the filter — shown as a small chip on each card.
-// Two equally-vivid accents: US MACRO in magenta, CENTRAL BANK in brand purple
-// (warm-vs-cool, max distinction). Both avoid green/red (= profit/loss).
+// Two equally-vivid accents: US MACRO in electric sky-blue, CENTRAL BANK in
+// brand purple. Both avoid green/red (= profit/loss) and amber (= countdown).
 export function relevanceTag(e: CalendarEvent): { label: string; color: string } {
   return e.country === 'USD'
-    ? { label: 'US MACRO', color: '#d6336c' }
+    ? { label: 'US MACRO', color: '#0ea5e9' }
     : { label: 'CENTRAL BANK', color: '#7c5cff' };
 }
