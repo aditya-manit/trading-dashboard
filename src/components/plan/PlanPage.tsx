@@ -181,33 +181,34 @@ function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
   const hot = info?.surprise === 'Hot', soft = info?.surprise === 'Soft';
   const actualColor = hot ? '#df5338' : soft ? '#1f9d55' : '#1a1813';
   const caret = hot ? '▲ ' : soft ? '▼ ' : '';
+  const c = IMPACT_COLOR[e.impact] || '#df5338';
   const lab: CSSProperties = { fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bba074' };
-  const labCell: CSSProperties = { padding: '8px 11px', borderRight: '1px solid #ece7de', display: 'flex', alignItems: 'center' };
+  const labCell: CSSProperties = { padding: '8px 11px', borderRight: '1px solid #f0efec', display: 'flex', alignItems: 'center' };
   const valCell: CSSProperties = { padding: '8px 11px', display: 'flex', alignItems: 'center' };
-  const tb: CSSProperties = { borderTop: '1px solid #ece7de' };
+  const tb: CSSProperties = { borderTop: '1px solid #f4f3f0' };
   const when = `${new Date(e.date).toLocaleDateString('en-US', { weekday: 'short' })} ${fmtTime(e.date)}`;
   return (
-    <div style={{ background: '#f8f6f2', border: '1px solid #ece7de', borderRadius: 12, overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(20,20,12,0.03)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderBottom: '1px solid #ece7de' }}>
+    <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderBottom: '1px solid #f0efec' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#d98a78', flex: '0 0 auto' }} />
-            <span style={{ fontWeight: 800, fontSize: 12.5, color: '#6b6457' }}>{e.country}</span>
-            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color: '#c47a68' }}>{(e.impact || '').toUpperCase()}</span>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flex: '0 0 auto' }} />
+            <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
+            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color: c }}>{(e.impact || '').toUpperCase()}</span>
           </div>
-          <span style={{ fontWeight: 700, fontSize: 13, color: '#9a9082', letterSpacing: '-0.01em' }}>{e.title}</span>
+          <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
         </div>
         <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 11, color: '#a8a69b', flex: '0 0 auto' }}>{when}</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '66px 1fr 66px 1fr' }}>
         <div style={labCell}><span style={lab}>Forecast</span></div>
-        <div style={{ ...valCell, borderRight: '1px solid #ece7de' }}><span style={{ fontWeight: 800, fontSize: 12, color: '#1a1813' }}>{forecast}</span></div>
+        <div style={{ ...valCell, borderRight: '1px solid #f0efec' }}><span style={{ fontWeight: 800, fontSize: 12, color: '#1a1813' }}>{forecast}</span></div>
         <div style={labCell}><span style={lab}>Actual</span></div>
         <div style={valCell}>
           <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.01em', color: actualColor }}>{caret}{info?.actual ?? '—'}</span>
         </div>
         <div style={{ ...labCell, ...tb }}><span style={lab}>{info?.condition ? `If ${firstWord(info.condition)}` : 'If'}</span></div>
-        <div style={{ ...valCell, ...tb, borderRight: '1px solid #ece7de' }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.ifReaction ?? []} /></span></div>
+        <div style={{ ...valCell, ...tb, borderRight: '1px solid #f0efec' }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.ifReaction ?? []} /></span></div>
         <div style={{ ...labCell, ...tb }}><span style={lab}>Reaction</span></div>
         <div style={{ ...valCell, ...tb }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.reaction ?? []} /></span></div>
       </div>
