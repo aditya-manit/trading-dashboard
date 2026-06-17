@@ -177,10 +177,11 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
 // Actual (with Hot/Soft surprise chip), and If-<condition> + realized Reaction.
 function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
   const forecast = (e.forecast || '').trim() || '—';
-  // Actual: colored value with a leading caret (▲ red Hot / ▼ green Soft), no chip.
+  // Actual = colored value + leading caret (surprise-indicator variation 1):
+  // ▲ red Hot · ▼ green Soft · = grey In-line. Neutral only while unloaded.
   const hot = info?.surprise === 'Hot', soft = info?.surprise === 'Soft';
-  const actualColor = hot ? '#df5338' : soft ? '#1f9d55' : '#1a1813';
-  const caret = hot ? '▲ ' : soft ? '▼ ' : '';
+  const actualColor = !info ? '#1a1813' : hot ? '#df5338' : soft ? '#1f9d55' : '#8c897e';
+  const caret = !info ? '' : hot ? '▲ ' : soft ? '▼ ' : '= ';
   const c = IMPACT_COLOR[e.impact] || '#df5338';
   const lab: CSSProperties = { fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bba074' };
   const labCell: CSSProperties = { padding: '8px 11px', borderRight: '1px solid #f0efec', display: 'flex', alignItems: 'center' };

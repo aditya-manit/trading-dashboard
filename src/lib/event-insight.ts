@@ -224,7 +224,7 @@ Your FINAL message must be ONLY a JSON object (no prose, no code fences):
 {"actual":"<the figure ONLY, in the SAME format/units as the forecast>","surprise":"Hot|Soft|In line","bearishForBtc":true|false,"condition":"ONE word bullish-for-currency scenario, e.g. hawkish, hot, beat, fewer (no qualifiers)","ifReaction":[{"sym":"crypto","dir":"up|down|flat"}],"reaction":[{"sym":"BTC","dir":"up|down|flat"},{"sym":"stocks","dir":"up|down|flat"}]}
 
 Rules:
-- "actual": JUST the number/figure, matching the forecast's format and units so they compare directly. e.g. forecast "3.75%" → actual "3.75%" (NOT "Held 3.50%-3.75%"); forecast "0.3%" → actual "0.4%". No prose, no words.
+- "actual": JUST the number/figure, matching the forecast's format and units so they compare directly. e.g. forecast "3.75%" → actual "3.75%"; forecast "0.3%" → actual "0.4%". No prose, no words. For a central-bank rate decision, give the SINGLE resulting policy rate in the forecast's format (e.g. "3.75%"), NEVER a range like "3.50%-3.75%".
 - "surprise": Hot = stronger/higher than forecast, Soft = weaker/lower, In line = as expected.
 - "bearishForBtc": did the actual outcome lean bearish for BTC/crypto?
 - "reaction": what BTC and stocks ACTUALLY did after the print (2 assets, BTC first).`;
