@@ -29,6 +29,29 @@ function relShort(iso: string, now: Date) {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'short' });
 }
 
+function fmtCountdown(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (d >= 1) return `${d}d ${h}h`;
+  if (h >= 1) return `${h}h ${m}m`;
+  if (m >= 1) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+// Live "in 5h 23m" countdown to an event, ticking every second. Self-contained
+// so the rest of the Plan page doesn't re-render each tick.
+function Countdown({ date }: { date: string }) {
+  const [, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setTick((t) => t + 1), 1000); return () => clearInterval(id); }, []);
+  const ms = new Date(date).getTime() - Date.now();
+  const live = ms <= 0;
+  return (
+    <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: live ? '0.04em' : undefined, color: live ? '#df5338' : '#c9821f' }}>
+      {live ? 'LIVE NOW' : `in ${fmtCountdown(ms)}`}
+    </span>
+  );
+}
+
 function valueParts(e: CalendarEvent): { main: string; note: string; muted?: boolean } {
   const f = (e.forecast || '').trim(), p = (e.previous || '').trim();
   if (f && p) return { main: f, note: `exp · ${p} prev` };
@@ -46,7 +69,10 @@ function NewsCard({ e, variant }: { e: CalendarEvent; variant: 'strip' | 'drawer
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
         <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
         <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
-        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 11, color: '#a8a69b' }}>{fmtTime(e.date)}</span>
+        <span style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+          <span style={{ fontWeight: 700, fontSize: 11, color: '#a8a69b' }}>{fmtTime(e.date)}</span>
+          {variant === 'strip' && <Countdown date={e.date} />}
+        </span>
       </div>
       <span style={{ fontWeight: 600, fontSize: 11.5, color: '#897f70' }}>{e.title}</span>
       <div style={{ height: 1, background: '#f4f3f0', margin: '1px 0' }} />
