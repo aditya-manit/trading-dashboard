@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enrichInsights, insightKey } from '@/lib/event-insight';
+import { enrichInsights, insightKey, btcDailyMoves } from '@/lib/event-insight';
 import type { CalendarEvent } from '@/hooks/useCalendar';
 
 // ForexFactory's economic calendar, published by FairEconomy as a static JSON
@@ -21,11 +21,29 @@ export async function GET() {
     const data: CalendarEvent[] = await res.json();
 
     if (Array.isArray(data)) {
-      const high = data.filter((e) => e.impact === 'High');
-      const insights = await enrichInsights(high.map((e) => ({ country: e.country, title: e.title })));
-      for (const e of high) {
+      // Only enrich the 4 cards the strip actually shows (next upcoming
+      // high-impact, by time) — not every event in the drawer. Keeps the
+      // web-search + candle work to what's displayed.
+      const nowMs = Date.now();
+      const strip = data
+        .filter((e) => e.impact === 'High' && new Date(e.date).getTime() >= nowMs)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 4);
+
+      const [insights, moves] = await Promise.all([
+        enrichInsights(strip.map((e) => ({ country: e.country, title: e.title }))),
+        btcDailyMoves(),
+      ]);
+      for (const e of strip) {
         const ins = insights[insightKey(e.country, e.title)];
-        if (ins) e.insight = ins;
+        if (!ins) continue;
+        // Fill each print's % with BTC's real move on that date; drop dates we
+        // have no candle for (out of range / future / mis-estimated).
+        const prints = (ins.prints ?? [])
+          .map((p) => ({ date: p.date, pct: moves.get(p.date) }))
+          .filter((p): p is { date: string; pct: number } => typeof p.pct === 'number')
+          .slice(0, 2);
+        e.insight = { ...ins, prints };
       }
     }
 

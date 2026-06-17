@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, type CSSProperties } from 'react';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, type CalendarEvent } from '@/hooks/useCalendar';
 
@@ -22,40 +22,39 @@ function dayHeader(iso: string, now: Date) {
   return `${rel ? rel + ' · ' : ''}${date}`.toUpperCase();
 }
 
-function relShort(iso: string, now: Date) {
-  const d = dayDiff(iso, now);
-  if (d === 0) return 'today';
-  if (d === 1) return 'tomorrow';
-  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short' });
-}
-
 // Memoized so it only re-renders (and replays its entrance animation) when the
 // step changes — toggling pre-flight checks must NOT remount it.
 const StepDiagram = memo(function StepDiagram({ step }: { step: number }) {
   return <div dangerouslySetInnerHTML={{ __html: PLAN_STEP_DIAGRAMS[step] }} />;
 });
 
-function fmtCountdown(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  if (d >= 1) return `${d}d ${h}h`;
-  if (h >= 1) return `${h}h ${m}m`;
-  if (m >= 1) return `${m}m ${sec}s`;
-  return `${sec}s`;
+// Re-render every second (for live countdowns). Isolated to small components so
+// the rest of the Plan page never re-renders on a tick.
+function useTick() {
+  const [, set] = useState(0);
+  useEffect(() => { const id = setInterval(() => set((t) => t + 1), 1000); return () => clearInterval(id); }, []);
 }
 
-// Live "in 5h 23m" countdown to an event, ticking every second. Self-contained
-// so the rest of the Plan page doesn't re-render each tick.
-function Countdown({ date }: { date: string }) {
-  const [, setTick] = useState(0);
-  useEffect(() => { const id = setInterval(() => setTick((t) => t + 1), 1000); return () => clearInterval(id); }, []);
+// Header countdown: "7h 16m 42s" (hours optional), ticking each second.
+function CountdownFull({ date, style }: { date: string; style?: CSSProperties }) {
+  useTick();
   const ms = new Date(date).getTime() - Date.now();
-  const live = ms <= 0;
-  return (
-    <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: live ? '0.04em' : undefined, color: live ? '#df5338' : '#c9821f' }}>
-      {live ? 'LIVE NOW' : `in ${fmtCountdown(ms)}`}
-    </span>
-  );
+  const base = { color: '#c9821f', fontVariantNumeric: 'tabular-nums' as const, ...style };
+  if (ms <= 0) return <span style={base}>live now</span>;
+  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return <span style={base}>{(h > 0 ? `${h}h ` : '') + `${p(m)}m ${p(s)}s`}</span>;
+}
+
+// Per-card countdown: "in 2d 4h" / "in 5h 23m" / "in 5m 12s" (seconds under 1h).
+function CountdownLabel({ date }: { date: string }) {
+  useTick();
+  const ms = new Date(date).getTime() - Date.now();
+  const base = { fontWeight: 700, fontSize: 9.5, color: '#c9821f', fontVariantNumeric: 'tabular-nums' as const };
+  if (ms <= 0) return <span style={base}>live now</span>;
+  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
+  const label = h >= 24 ? `in ${Math.floor(h / 24)}d ${h % 24}h` : h >= 1 ? `in ${h}h ${m}m` : `in ${m}m ${s}s`;
+  return <span style={base}>{label}</span>;
 }
 
 function valueParts(e: CalendarEvent): { main: string; note: string; muted?: boolean } {
@@ -66,19 +65,107 @@ function valueParts(e: CalendarEvent): { main: string; note: string; muted?: boo
   return { main: 'No number', note: '', muted: true };
 }
 
-function NewsCard({ e, variant }: { e: CalendarEvent; variant: 'strip' | 'drawer' }) {
+// One "print" row: date · magnitude bar · signed % (real BTC move from Gate).
+function PrintBar({ p }: { p: { date: string; pct: number } }) {
+  const up = p.pct >= 0;
+  const color = up ? '#1f9d55' : '#df5338';
+  const width = Math.min(100, Math.max(8, Math.abs(p.pct) * 40));
+  const label = new Date(`${p.date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontWeight: 600, fontSize: 9, color: '#a8a69b', width: 36, flex: '0 0 auto' }}>{label}</span>
+      <div style={{ flex: 1, height: 5, borderRadius: 3, background: '#f4f3f0', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${width}%`, background: color, borderRadius: 3 }} />
+      </div>
+      <span style={{ fontWeight: 700, fontSize: 10, color, width: 38, textAlign: 'right', flex: '0 0 auto', fontVariantNumeric: 'tabular-nums' }}>
+        {up ? '+' : '−'}{Math.abs(p.pct).toFixed(1)}%
+      </span>
+    </div>
+  );
+}
+
+const cellLabel: CSSProperties = { fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bba074' };
+const labelCellBase: CSSProperties = { padding: '8px 12px', borderRight: '1px solid #f0efec', display: 'flex', alignItems: 'center' };
+const valueCellBase: CSSProperties = { padding: '8px 13px', display: 'flex', alignItems: 'center' };
+const topBorder: CSSProperties = { borderTop: '1px solid #f4f3f0' };
+
+function ReactionLine({ e }: { e: CalendarEvent }) {
+  if (!e.insight) return null;
+  return (
+    <span style={{ fontWeight: 600, fontSize: 11.5, color: '#56544b' }}>
+      {e.insight.assets.map((a, i) => (
+        <span key={i}>
+          {i > 0 && ' · '}
+          <b style={{ color: a.dir === 'up' ? '#1f9d55' : a.dir === 'down' ? '#df5338' : '#9b988d' }}>
+            {a.sym}{a.dir === 'up' ? ' ↑' : a.dir === 'down' ? ' ↓' : ' flat'}
+          </b>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// Rich strip card: header (currency/title + time + live countdown) over a
+// Forecast / If-<condition> / BTC-2-prints table.
+function StripCard({ e }: { e: CalendarEvent }) {
+  const color = IMPACT_COLOR[e.impact] || '#8c8a81';
+  const v = valueParts(e);
+  const ins = e.insight;
+  const hasReaction = !!ins && ins.assets.length > 0;
+  const prints = ins?.prints ?? [];
+  return (
+    <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 13, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderBottom: '1px solid #f0efec' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
+            <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
+            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
+          </div>
+          <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
+          <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b' }}>{fmtTime(e.date)}</span>
+          <CountdownLabel date={e.date} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr' }}>
+        <div style={labelCellBase}><span style={cellLabel}>Forecast</span></div>
+        <div style={{ ...valueCellBase, alignItems: 'baseline', gap: 5 }}>
+          <span style={{ fontWeight: 800, fontSize: 12, color: v.muted ? '#a8a69b' : '#1a1813' }}>{v.main}</span>
+          {v.note && <span style={{ fontWeight: 600, fontSize: 10.5, color: '#a8a69b' }}>{v.note}</span>}
+        </div>
+        {hasReaction && (
+          <>
+            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>{ins!.condition ? `If ${ins!.condition.toLowerCase()}` : 'Reaction'}</span></div>
+            <div style={{ ...valueCellBase, ...topBorder }}><ReactionLine e={e} /></div>
+          </>
+        )}
+        {prints.length > 0 && (
+          <>
+            <div style={{ ...labelCellBase, ...topBorder, alignItems: 'flex-start' }}><span style={{ ...cellLabel, lineHeight: 1.3 }}>BTC<br />{prints.length} prints</span></div>
+            <div style={{ ...valueCellBase, ...topBorder, flexDirection: 'column', alignItems: 'stretch', gap: 5 }}>
+              {prints.map((p, i) => <PrintBar key={i} p={p} />)}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Compact drawer card (no countdown / prints table): currency, time, forecast,
+// reaction line.
+function NewsCard({ e }: { e: CalendarEvent }) {
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
   const v = valueParts(e);
   return (
-    <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: variant === 'strip' ? 13 : 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, boxShadow: variant === 'strip' ? '0 1px 2px rgba(20,20,12,0.03)' : 'none' }}>
+    <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
         <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
         <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
-        <span style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-          <span style={{ fontWeight: 700, fontSize: 11, color: '#a8a69b' }}>{fmtTime(e.date)}</span>
-          {variant === 'strip' && <Countdown date={e.date} />}
-        </span>
+        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 11, color: '#a8a69b' }}>{fmtTime(e.date)}</span>
       </div>
       <span style={{ fontWeight: 600, fontSize: 11.5, color: '#897f70' }}>{e.title}</span>
       <div style={{ height: 1, background: '#f4f3f0', margin: '1px 0' }} />
@@ -89,14 +176,7 @@ function NewsCard({ e, variant }: { e: CalendarEvent; variant: 'strip' | 'drawer
       {e.insight && e.insight.assets.length > 0 && (
         <span style={{ fontWeight: 600, fontSize: 11.5, color: '#56544b' }}>
           {e.insight.condition && `${e.insight.condition} → `}
-          {e.insight.assets.map((a, i) => (
-            <span key={i}>
-              {i > 0 && ' · '}
-              <b style={{ color: a.dir === 'up' ? '#1f9d55' : a.dir === 'down' ? '#df5338' : '#9b988d' }}>
-                {a.sym}{a.dir === 'up' ? '↑' : a.dir === 'down' ? '↓' : ' flat'}
-              </b>
-            </span>
-          ))}
+          <ReactionLine e={e} />
         </span>
       )}
     </div>
@@ -255,9 +335,9 @@ export function PlanPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Market news · high impact</span>
             <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.01em' }}>
-              {nextEvent
-                ? `Next: ${nextEvent.country} ${nextEvent.title} · ${relShort(nextEvent.date, now)} ${fmtTime(nextEvent.date)}`
-                : calLoading ? 'Loading economic calendar…' : 'No high-impact events ahead this week'}
+              {nextEvent ? (
+                <>Next: {nextEvent.title} · <CountdownFull date={nextEvent.date} /></>
+              ) : calLoading ? 'Loading economic calendar…' : 'No high-impact events ahead this week'}
             </span>
           </div>
           {upcomingHigh.length > 0 && (
@@ -268,9 +348,9 @@ export function PlanPage() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
           {calLoading
-            ? [0, 1, 2, 3].map((i) => <div key={i} style={{ height: 96, background: '#fff', border: '1px solid #f0efec', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }} />)
+            ? [0, 1, 2, 3].map((i) => <div key={i} style={{ height: 150, background: '#fff', border: '1px solid #f0efec', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }} />)
             : stripEvents.length > 0
-              ? stripEvents.map((e, i) => <NewsCard key={i} e={e} variant="strip" />)
+              ? stripEvents.map((e, i) => <StripCard key={i} e={e} />)
               : <div style={{ gridColumn: '1 / -1', background: '#fff', border: '1px solid #f0efec', borderRadius: 13, padding: '16px 18px', fontWeight: 600, fontSize: 12.5, color: '#897f70' }}>No high-impact events remaining this week.</div>}
         </div>
       </div>
@@ -299,7 +379,7 @@ export function PlanPage() {
                     <span style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a8a69b' }}>{g.label}</span>
                     <span style={{ flex: 1, height: 1, background: '#efedea' }} />
                   </div>
-                  {g.events.map((e, i) => <NewsCard key={i} e={e} variant="drawer" />)}
+                  {g.events.map((e, i) => <NewsCard key={i} e={e} />)}
                 </div>
               ))}
             </div>

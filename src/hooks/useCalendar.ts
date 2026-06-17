@@ -7,6 +7,9 @@ export type AssetDir = 'up' | 'down' | 'flat';
 export interface EventInsight {
   condition: string;
   assets: { sym: string; dir: AssetDir }[];
+  // Last ≤2 occurrences of this event: the date (Claude's estimate of when the
+  // event last fired) + BTC's measured daily % move on that date (from Gate).
+  prints?: { date: string; pct: number }[];
 }
 
 // One event from the ForexFactory / FairEconomy economic-calendar feed.

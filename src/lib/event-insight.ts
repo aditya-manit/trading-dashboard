@@ -11,16 +11,29 @@ const cache = new Map<string, EventInsight>();
 
 export const insightKey = (country: string, title: string) => `${country}|${title}`;
 
-const SYSTEM = `You annotate macro economic-calendar events for a crypto trader who trades BTC/USDT perpetual futures. For each event, describe how markets typically react to the outcome that is BULLISH for that event's own currency (a hawkish central bank, a hot inflation print, a strong beat, more hawkish dots, etc.).
+const SYSTEM = `You annotate ONE macro economic-calendar event for a trader of BTC/USDT perpetual futures.
 
-Reply with ONLY a JSON array — no prose, no code fences. One object per input event, in the same order:
-{"condition":"<=2 words for the bullish-for-the-currency scenario, e.g. Hawkish, Hot CPI, Beat, Fewer claims, Higher dots","assets":[{"sym":"<short symbol e.g. BTC, USD, stocks, gold>","dir":"up|down|flat"}]}
+Describe how markets typically react to the outcome that is BULLISH for the event's own currency (hawkish central bank, hot inflation, strong beat, more hawkish dots, etc.).
+
+USE WEB SEARCH to find the 2 MOST RECENT past occurrence dates of this EXACT recurring release, on or before the "asOf" date — do NOT rely on memory, the dates must be real and recent.
+
+Your FINAL message must be ONLY a JSON object (no prose, no code fences):
+{"condition":"<=2 words bullish-for-the-currency scenario, e.g. Hawkish, Hot CPI, Beat, Fewer claims","assets":[{"sym":"<short symbol e.g. BTC, USD, stocks, gold>","dir":"up|down|flat"}],"prints":["YYYY-MM-DD","YYYY-MM-DD"]}
 
 Rules:
-- 2 to 3 assets per event.
-- ALWAYS include BTC and give its likely direction under that scenario.
-- Keep symbols <=6 chars; use the event currency code where relevant.
-- "dir" is the move under the stated condition.`;
+- 2 to 3 assets; ALWAYS include BTC and its likely direction under that scenario.
+- Symbols <=6 chars; use the event currency code where relevant.
+- "prints": the actual UTC dates of the last 2 occurrences, most recent first; [] if it is a one-off.`;
+
+// Bounded-concurrency map so we don't fire 19 web-search calls at once.
+async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx]); }
+  }));
+  return out;
+}
 
 export async function enrichInsights(
   events: { country: string; title: string }[],
@@ -34,12 +47,16 @@ export async function enrichInsights(
   const missing = [...uniq.entries()].filter(([k]) => !cache.has(k)).map(([, e]) => e);
 
   if (apiKey && missing.length) {
-    try {
-      const insights = await callClaude(apiKey, missing);
-      missing.forEach((e, i) => { if (insights[i]) cache.set(insightKey(e.country, e.title), insights[i]); });
-    } catch (err) {
-      console.error('[event-insight] enrichment failed:', err);
-    }
+    // One web-searched lookup per event (more accurate than a batched call),
+    // capped at 5 concurrent. Each result cached so this is one-time per type.
+    await pool(missing, 5, async (e) => {
+      try {
+        const ins = await callClaude(apiKey, e);
+        if (ins) cache.set(insightKey(e.country, e.title), ins);
+      } catch (err) {
+        console.error(`[event-insight] ${e.country} ${e.title}:`, err);
+      }
+    });
   }
 
   for (const k of uniq.keys()) { const v = cache.get(k); if (v) result[k] = v; }
@@ -48,8 +65,8 @@ export async function enrichInsights(
 
 async function callClaude(
   apiKey: string,
-  events: { country: string; title: string }[],
-): Promise<EventInsight[]> {
+  event: { country: string; title: string },
+): Promise<EventInsight | null> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -59,37 +76,70 @@ async function callClaude(
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 3000,
       system: SYSTEM,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
       messages: [{
         role: 'user',
-        content: JSON.stringify(events.map((e) => ({ currency: e.country, event: e.title }))),
+        content: JSON.stringify({ asOf: new Date().toISOString().slice(0, 10), currency: event.country, event: event.title }),
       }],
     }),
   });
   if (!res.ok) throw new Error(`anthropic ${res.status}: ${await res.text()}`);
 
   const data = await res.json();
-  const text: string = (data.content || [])
+  // With web search the reply has several blocks; the JSON object is the final
+  // text block. Prefer the last text block, fall back to all concatenated.
+  const texts: string[] = (data.content || [])
     .filter((b: { type: string }) => b.type === 'text')
-    .map((b: { text: string }) => b.text)
-    .join('');
+    .map((b: { text: string }) => b.text);
+  let text = texts[texts.length - 1] ?? '';
+  if (!text.includes('{')) text = texts.join('');
 
-  const start = text.indexOf('['), end = text.lastIndexOf(']');
-  if (start === -1 || end === -1) throw new Error('no JSON array in model reply');
-  const arr = JSON.parse(text.slice(start, end + 1)) as unknown[];
+  const start = text.indexOf('{'), end = text.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('no JSON object in model reply');
+  const obj = JSON.parse(text.slice(start, end + 1)) as { condition?: unknown; assets?: unknown; prints?: unknown };
 
   const dirs: AssetDir[] = ['up', 'down', 'flat'];
-  return arr.map((o) => {
-    const obj = o as { condition?: unknown; assets?: unknown };
-    const assets = Array.isArray(obj.assets) ? obj.assets : [];
-    return {
-      condition: String(obj.condition ?? ''),
-      assets: assets.slice(0, 3).map((a) => {
-        const asset = a as { sym?: unknown; dir?: unknown };
-        const dir = asset.dir as AssetDir;
-        return { sym: String(asset.sym ?? ''), dir: dirs.includes(dir) ? dir : 'flat' };
-      }),
-    };
-  });
+  const assets = Array.isArray(obj.assets) ? obj.assets : [];
+  const printDates = Array.isArray(obj.prints) ? obj.prints : [];
+  return {
+    condition: String(obj.condition ?? ''),
+    assets: assets.slice(0, 3).map((a) => {
+      const asset = a as { sym?: unknown; dir?: unknown };
+      const dir = asset.dir as AssetDir;
+      return { sym: String(asset.sym ?? ''), dir: dirs.includes(dir) ? dir : 'flat' };
+    }),
+    // pct is filled later from real Gate candle data; keep date only here.
+    prints: printDates.slice(0, 2).map((d) => ({ date: String(d), pct: 0 })),
+  };
+}
+
+// ─── Real BTC daily moves (Gate.io) ───────────────────────────────────────────
+// Maps a UTC 'YYYY-MM-DD' date → BTC's measured (close-open)/open % move that day.
+// Used to fill the "2 prints" reactions with real numbers, not model guesses.
+let candleCache: { at: number; map: Map<string, number> } | null = null;
+
+export async function btcDailyMoves(): Promise<Map<string, number>> {
+  if (candleCache && Date.now() - candleCache.at < 3_600_000) return candleCache.map;
+  const map = new Map<string, number>();
+  try {
+    // Wide window (~1000d) so older occurrence dates still resolve to a candle.
+    const from = Math.floor(Date.now() / 1000) - 1000 * 86400;
+    const res = await fetch(
+      `https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=BTC_USDT&interval=1d&from=${from}&limit=1000`,
+      { next: { revalidate: 3600 } },
+    );
+    if (res.ok) {
+      const raw: string[][] = await res.json();
+      for (const c of raw) {
+        const open = parseFloat(c[5]), close = parseFloat(c[2]);
+        if (!open) continue;
+        const day = new Date(parseInt(c[0], 10) * 1000).toISOString().slice(0, 10);
+        map.set(day, ((close - open) / open) * 100);
+      }
+    }
+  } catch { /* leave map empty — prints just won't render */ }
+  candleCache = { at: Date.now(), map };
+  return map;
 }
