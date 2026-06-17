@@ -20,6 +20,7 @@ export interface ReleasedInfo {
   condition: string; // bullish-for-currency scenario label, e.g. "hot", "beat"
   ifReaction: { sym: string; dir: AssetDir }[]; // what that scenario implies
   reaction: { sym: string; dir: AssetDir }[]; // what ACTUALLY played out
+  note?: string; // optional context (vs forecast/prev, notable move) — hover only
 }
 
 // One event from the ForexFactory / FairEconomy economic-calendar feed.

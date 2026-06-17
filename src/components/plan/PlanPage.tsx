@@ -195,7 +195,7 @@ function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flex: '0 0 auto' }} />
             <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
-            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color: c }}>{(e.impact || '').toUpperCase()}</span>
+            <Tag e={e} />
           </div>
           <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
         </div>
@@ -206,7 +206,13 @@ function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
         <div style={{ ...valCell, borderRight: '1px solid #f0efec' }}><span style={{ fontWeight: 800, fontSize: 12, color: '#1a1813' }}>{forecast}</span></div>
         <div style={labCell}><span style={lab}>Actual</span></div>
         <div style={valCell}>
-          <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.01em', color: actualColor }}>{caret}{info?.actual ?? '—'}</span>
+          {info?.note ? (
+            <HoverTip tip={info.note} width={230}>
+              <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.01em', color: actualColor, borderBottom: '1px dashed #cfccc4' }}>{caret}{info.actual}</span>
+            </HoverTip>
+          ) : (
+            <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.01em', color: actualColor }}>{caret}{info?.actual ?? '—'}</span>
+          )}
         </div>
         <div style={{ ...labCell, ...tb }}><span style={lab}>{info?.condition ? `If ${firstWord(info.condition)}` : 'If'}</span></div>
         <div style={{ ...valCell, ...tb, borderRight: '1px solid #f0efec' }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.ifReaction ?? []} /></span></div>
@@ -331,6 +337,7 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
   onViewAll: () => void;
 }) {
   const c = IMPACT_COLOR[next.impact] || '#df5338';
+  const tier = relevanceTag(next);
   // Legend uses our own tiers (US Macro / Central Bank), matching the card tags.
   const legend: [string, number, string][] = [['#0ea5e9', counts.usMacro, 'US Macro'], ['#7c5cff', counts.centralBank, 'Central bank']];
   return (
@@ -353,7 +360,7 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.015em', whiteSpace: 'nowrap' }}>{next.title}</span>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: c, flex: '0 0 auto' }} />
-              <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.06em', color: c, whiteSpace: 'nowrap' }}>{next.country} · {(next.impact || '').toUpperCase()}</span>
+              <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.06em', color: tier.color, whiteSpace: 'nowrap' }}>{next.country} · {tier.label}</span>
             </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
