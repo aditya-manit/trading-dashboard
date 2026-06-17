@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, type CalendarEvent } from '@/hooks/useCalendar';
 
@@ -28,6 +28,12 @@ function relShort(iso: string, now: Date) {
   if (d === 1) return 'tomorrow';
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'short' });
 }
+
+// Memoized so it only re-renders (and replays its entrance animation) when the
+// step changes — toggling pre-flight checks must NOT remount it.
+const StepDiagram = memo(function StepDiagram({ step }: { step: number }) {
+  return <div dangerouslySetInnerHTML={{ __html: PLAN_STEP_DIAGRAMS[step] }} />;
+});
 
 function fmtCountdown(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -365,7 +371,7 @@ export function PlanPage() {
         {/* body: diagram | checks */}
         <div style={{ display: 'flex', alignItems: 'stretch' }}>
           <div style={{ flex: 1, minWidth: 0, padding: '22px 28px', display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center' }}>
-            <div key={step} dangerouslySetInnerHTML={{ __html: PLAN_STEP_DIAGRAMS[step] }} />
+            <StepDiagram key={step} step={step} />
             <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70', lineHeight: 1.5, padding: '0 2px' }}>{meta.caption}</span>
           </div>
           <div style={{ flex: '0 0 auto', width: 1, background: '#f4f3f0' }} />
