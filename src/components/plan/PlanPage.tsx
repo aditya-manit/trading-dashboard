@@ -177,8 +177,10 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
 // Actual (with Hot/Soft surprise chip), and If-<condition> + realized Reaction.
 function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
   const forecast = (e.forecast || '').trim() || '—';
-  const chipColor = info?.bearishForBtc ? '#df5338' : '#1f9d55';
-  const chipArrow = info?.surprise === 'Hot' ? '▲' : info?.surprise === 'Soft' ? '▼' : '';
+  // Actual: colored value with a leading caret (▲ red Hot / ▼ green Soft), no chip.
+  const hot = info?.surprise === 'Hot', soft = info?.surprise === 'Soft';
+  const actualColor = hot ? '#df5338' : soft ? '#1f9d55' : '#1a1813';
+  const caret = hot ? '▲ ' : soft ? '▼ ' : '';
   const lab: CSSProperties = { fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bba074' };
   const labCell: CSSProperties = { padding: '8px 11px', borderRight: '1px solid #ece7de', display: 'flex', alignItems: 'center' };
   const valCell: CSSProperties = { padding: '8px 11px', display: 'flex', alignItems: 'center' };
@@ -201,11 +203,8 @@ function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
         <div style={labCell}><span style={lab}>Forecast</span></div>
         <div style={{ ...valCell, borderRight: '1px solid #ece7de' }}><span style={{ fontWeight: 800, fontSize: 12, color: '#1a1813' }}>{forecast}</span></div>
         <div style={labCell}><span style={lab}>Actual</span></div>
-        <div style={{ ...valCell, gap: 6 }}>
-          <span style={{ fontWeight: 800, fontSize: 12, color: '#1a1813' }}>{info?.actual ?? '—'}</span>
-          {info && chipArrow && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.04em', color: chipColor, background: `${chipColor}1f`, padding: '2px 7px', borderRadius: 6 }}>{chipArrow} {info.surprise}</span>
-          )}
+        <div style={valCell}>
+          <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.01em', color: actualColor }}>{caret}{info?.actual ?? '—'}</span>
         </div>
         <div style={{ ...labCell, ...tb }}><span style={lab}>{info?.condition ? `If ${firstWord(info.condition)}` : 'If'}</span></div>
         <div style={{ ...valCell, ...tb, borderRight: '1px solid #ece7de' }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.ifReaction ?? []} /></span></div>
