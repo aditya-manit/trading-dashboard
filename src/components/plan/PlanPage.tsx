@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState, type CSSProperties } from 'react';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
-import { useCalendar, useCalendarInsights, eventKey, type CalendarEvent } from '@/hooks/useCalendar';
+import { useCalendar, useCalendarInsights, useCalendarDefinitions, eventKey, type CalendarEvent } from '@/hooks/useCalendar';
 import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
@@ -97,6 +97,28 @@ const labelCellBase: CSSProperties = { padding: '8px 12px', borderRight: '1px so
 const valueCellBase: CSSProperties = { padding: '8px 13px', display: 'flex', alignItems: 'center' };
 const topBorder: CSSProperties = { borderTop: '1px solid #f4f3f0' };
 
+// Event name with a definition tooltip on hover. The tooltip is position:fixed
+// (anchored to the title's rect) so it escapes the card's overflow:hidden.
+function EventName({ title, def }: { title: string; def?: string }) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  return (
+    <span style={{ position: 'relative', display: 'inline-block', minWidth: 0 }}>
+      <span
+        onMouseEnter={(ev) => { if (def) setRect(ev.currentTarget.getBoundingClientRect()); }}
+        onMouseLeave={() => setRect(null)}
+        style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em', cursor: def ? 'help' : 'default', borderBottom: def ? '1px dashed #d4d2c9' : undefined }}
+      >
+        {title}
+      </span>
+      {def && rect && (
+        <span style={{ position: 'fixed', left: Math.round(rect.left), top: Math.round(rect.top - 8), transform: 'translateY(-100%)', zIndex: 200, width: 240, maxWidth: '72vw', background: '#1a1813', color: '#f1efe9', fontSize: 11, fontWeight: 500, lineHeight: 1.5, padding: '9px 12px', borderRadius: 10, boxShadow: '0 10px 30px rgba(20,18,12,0.3)', pointerEvents: 'none' }}>
+          {def}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // Shimmering placeholder bar for rows still loading (reaction / prints).
 function Skel({ w, h = 9 }: { w: number | string; h?: number }) {
   return <span style={{ display: 'block', width: w, height: h, borderRadius: 4, background: '#edece8', animation: 'plPulse 1.2s ease-in-out infinite' }} />;
@@ -120,7 +142,7 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
 
 // Rich strip card: header (currency/title + time + live countdown) over a
 // Forecast / If-<condition> / BTC-2-prints table.
-function StripCard({ e, loading }: { e: CalendarEvent; loading: boolean }) {
+function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def?: string }) {
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
   const v = valueParts(e);
   const ins = e.insight;
@@ -135,7 +157,7 @@ function StripCard({ e, loading }: { e: CalendarEvent; loading: boolean }) {
             <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
             <Tag e={e} />
           </div>
-          <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
+          <EventName title={e.title} def={def} />
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
           <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b' }}>{fmtTime(e.date)}</span>
@@ -182,7 +204,7 @@ function StripCard({ e, loading }: { e: CalendarEvent; loading: boolean }) {
 // Compact drawer card (no countdown / prints table): currency, time, forecast,
 // reaction row. Same table chrome as the strip, minus the countdown and the
 // BTC-prints row (handoff-16 drawer style).
-function NewsCard({ e, loading }: { e: CalendarEvent; loading: boolean }) {
+function NewsCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def?: string }) {
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
   const v = valueParts(e);
   const ins = e.insight;
@@ -196,7 +218,7 @@ function NewsCard({ e, loading }: { e: CalendarEvent; loading: boolean }) {
             <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
             <Tag e={e} />
           </div>
-          <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
+          <EventName title={e.title} def={def} />
         </div>
         <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 11, color: '#a8a69b', flex: '0 0 auto' }}>{fmtTime(e.date)}</span>
       </div>
@@ -329,6 +351,7 @@ export function PlanPage() {
   // separately and merge in — those rows show skeletons until they arrive.
   const { data: calRaw } = useCalendar();
   const { data: insightMap } = useCalendarInsights();
+  const { data: defMap } = useCalendarDefinitions();
   const insightsLoading = insightMap === undefined;
   const now = new Date();
   const calLoading = calRaw === undefined;
@@ -395,7 +418,7 @@ export function PlanPage() {
           {calLoading
             ? [0, 1, 2, 3].map((i) => <div key={i} style={{ height: 150, background: '#fff', border: '1px solid #f0efec', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }} />)
             : stripEvents.length > 0
-              ? stripEvents.map((e, i) => <StripCard key={i} e={e} loading={insightsLoading} />)
+              ? stripEvents.map((e, i) => <StripCard key={i} e={e} loading={insightsLoading} def={defMap?.[e.title]} />)
               : <div style={{ gridColumn: '1 / -1', background: '#fff', border: '1px solid #f0efec', borderRadius: 13, padding: '16px 18px', fontWeight: 600, fontSize: 12.5, color: '#897f70' }}>No high-impact events remaining this week.</div>}
         </div>
       </div>
@@ -424,7 +447,7 @@ export function PlanPage() {
                     <span style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a8a69b' }}>{g.label}</span>
                     <span style={{ flex: 1, height: 1, background: '#efedea' }} />
                   </div>
-                  {g.events.map((e, i) => <NewsCard key={i} e={e} loading={insightsLoading} />)}
+                  {g.events.map((e, i) => <NewsCard key={i} e={e} loading={insightsLoading} def={defMap?.[e.title]} />)}
                 </div>
               ))}
             </div>

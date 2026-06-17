@@ -47,3 +47,12 @@ export function useCalendarInsights() {
     revalidateOnFocus: false,
   });
 }
+
+// Event definitions keyed by title (curated seed + cached Claude fallback),
+// shown on hover over the event name.
+export function useCalendarDefinitions() {
+  return useSWR<Record<string, string>>('/api/calendar/definitions', fetcher, {
+    refreshInterval: 3_600_000,
+    revalidateOnFocus: false,
+  });
+}
