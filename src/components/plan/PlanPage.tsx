@@ -14,6 +14,10 @@ const IMPACT_COLOR: Record<string, string> = { High: '#df5338', Medium: '#d98a1f
 // Times render in the viewer's local timezone (the feed carries a US-Eastern offset).
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
+// "If <word>" label — keep the condition to a single word (Hawkish, Hot, Beat…)
+// even if the model returned a multi-word variation ("Hawkish hike signal").
+const firstWord = (s: string) => s.trim().split(/\s+/)[0].toLowerCase();
+
 const localMidnight = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const dayDiff = (iso: string, now: Date) => Math.round((localMidnight(new Date(iso)).getTime() - localMidnight(now).getTime()) / 86_400_000);
 
@@ -203,7 +207,7 @@ function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.04em', color: chipColor, background: `${chipColor}1f`, padding: '2px 7px', borderRadius: 6 }}>{chipArrow} {info.surprise}</span>
           )}
         </div>
-        <div style={{ ...labCell, ...tb }}><span style={lab}>{info?.condition ? `If ${info.condition.toLowerCase()}` : 'If'}</span></div>
+        <div style={{ ...labCell, ...tb }}><span style={lab}>{info?.condition ? `If ${firstWord(info.condition)}` : 'If'}</span></div>
         <div style={{ ...valCell, ...tb, borderRight: '1px solid #ece7de' }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.ifReaction ?? []} /></span></div>
         <div style={{ ...labCell, ...tb }}><span style={lab}>Reaction</span></div>
         <div style={{ ...valCell, ...tb }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.reaction ?? []} /></span></div>
@@ -244,7 +248,7 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
         </div>
         {hasReaction ? (
           <>
-            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>{ins!.condition ? `If ${ins!.condition.toLowerCase()}` : 'Reaction'}</span></div>
+            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>{ins!.condition ? `If ${firstWord(ins!.condition)}` : 'Reaction'}</span></div>
             <div style={{ ...valueCellBase, ...topBorder }}><ReactionLine e={e} /></div>
           </>
         ) : loading ? (
@@ -302,7 +306,7 @@ function NewsCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def
         </div>
         {hasReaction ? (
           <>
-            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>{ins!.condition ? `If ${ins!.condition.toLowerCase()}` : 'Reaction'}</span></div>
+            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>{ins!.condition ? `If ${firstWord(ins!.condition)}` : 'Reaction'}</span></div>
             <div style={{ ...valueCellBase, ...topBorder }}><ReactionLine e={e} /></div>
           </>
         ) : loading ? (

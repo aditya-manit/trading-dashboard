@@ -61,7 +61,7 @@ function saveCache() {
 const REACTION_SYSTEM = `You annotate macro economic-calendar events for a trader of BTC/USDT perpetual futures. For each event, give the typical market reaction to the outcome that is BULLISH for the event's own currency (hawkish central bank, hot inflation, strong beat, more hawkish dots, etc.).
 
 Reply with ONLY a JSON array — no prose, no code fences — one object per input event, IN THE SAME ORDER:
-{"condition":"<=2 words, e.g. Hawkish, Hot CPI, Beat, Fewer claims","assets":[{"sym":"<short symbol e.g. BTC, USD, stocks, gold>","dir":"up|down|flat"}]}
+{"condition":"ONE word only, e.g. Hawkish, Hot, Beat, Fewer (no qualifiers like 'hawkish hold')","assets":[{"sym":"<short symbol e.g. BTC, USD, stocks, gold>","dir":"up|down|flat"}]}
 
 Rules:
 - 2 to 3 assets; ALWAYS include BTC and its likely direction under that scenario.
@@ -221,7 +221,7 @@ const RELEASED_SYSTEM = `You report what happened for an economic release that h
 USE WEB SEARCH to find the ACTUAL released figure and how markets reacted in the hours after — do not rely on memory. If you cannot confirm the actual figure from a credible source, set "actual" to "".
 
 Your FINAL message must be ONLY a JSON object (no prose, no code fences):
-{"actual":"<the figure ONLY, in the SAME format/units as the forecast>","surprise":"Hot|Soft|In line","bearishForBtc":true|false,"condition":"<=2 words bullish-for-currency scenario, e.g. hot, beat, fewer","ifReaction":[{"sym":"crypto","dir":"up|down|flat"}],"reaction":[{"sym":"BTC","dir":"up|down|flat"},{"sym":"stocks","dir":"up|down|flat"}]}
+{"actual":"<the figure ONLY, in the SAME format/units as the forecast>","surprise":"Hot|Soft|In line","bearishForBtc":true|false,"condition":"ONE word bullish-for-currency scenario, e.g. hawkish, hot, beat, fewer (no qualifiers)","ifReaction":[{"sym":"crypto","dir":"up|down|flat"}],"reaction":[{"sym":"BTC","dir":"up|down|flat"},{"sym":"stocks","dir":"up|down|flat"}]}
 
 Rules:
 - "actual": JUST the number/figure, matching the forecast's format and units so they compare directly. e.g. forecast "3.75%" → actual "3.75%" (NOT "Held 3.50%-3.75%"); forecast "0.3%" → actual "0.4%". No prose, no words.
