@@ -101,7 +101,7 @@ const topBorder: CSSProperties = { borderTop: '1px solid #f4f3f0' };
 // Hover tooltip portaled to document.body so it escapes card overflow:hidden
 // AND the drawer panel's transform (which would otherwise contain/clip a fixed
 // child). Anchors to the wrapped content's rect, opening above it.
-function HoverTip({ tip, width = 240, children }: { tip: string; width?: number; children: React.ReactNode }) {
+function HoverTip({ tip, width = 240, children }: { tip: React.ReactNode; width?: number; children: React.ReactNode }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   return (
     <span
@@ -125,8 +125,15 @@ function HoverTip({ tip, width = 240, children }: { tip: string; width?: number;
   );
 }
 
-// Plain-English explanation of the calendar filter (isBtcRelevant).
-const FILTER_TIP = 'Filtered to the events that actually move BTC: every high-impact USD release (Fed, CPI, NFP, PCE…) plus non-USD central-bank rate decisions (BoJ, ECB, BoE, SNB). Lower-impact and minor-currency data (e.g. NZD GDP, UK Claimant Count) are hidden.';
+// Plain-English explanation of the calendar filter (isBtcRelevant), as 3 points.
+const FILTER_TIP = (
+  <span style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+    <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bdb8ad' }}>What moves BTC — what we show</span>
+    <span style={{ display: 'flex', gap: 7 }}><b style={{ color: '#5fcf95', flex: '0 0 auto' }}>+</b><span>High-impact USD releases — Fed, CPI, NFP, PCE</span></span>
+    <span style={{ display: 'flex', gap: 7 }}><b style={{ color: '#5fcf95', flex: '0 0 auto' }}>+</b><span>Non-USD central-bank decisions — BoJ, ECB, BoE, SNB</span></span>
+    <span style={{ display: 'flex', gap: 7 }}><b style={{ color: '#f0917a', flex: '0 0 auto' }}>−</b><span>Hidden: minor-currency data — NZD GDP, UK Claimant Count</span></span>
+  </span>
+);
 
 // Event name with its definition tooltip on hover (dashed underline when a
 // definition exists).
@@ -451,7 +458,7 @@ export function PlanPage() {
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Economic calendar · ForexFactory</span>
-                <HoverTip tip={FILTER_TIP} width={260}>
+                <HoverTip tip={FILTER_TIP} width={290}>
                   <span style={{ fontWeight: 800, fontSize: 16, color: '#1a1813', letterSpacing: '-0.015em', borderBottom: '1px dashed #cfccc4' }}>This week’s high-impact</span>
                 </HoverTip>
               </div>
