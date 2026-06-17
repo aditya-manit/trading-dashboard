@@ -177,10 +177,20 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
 // Actual (with Hot/Soft surprise chip), and If-<condition> + realized Reaction.
 function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
   const forecast = (e.forecast || '').trim() || '—';
-  // Actual reflects the EVENT'S OWN lean (independent of BTC): Hot/hawkish →
-  // red ▲, Soft/dovish → green ▼, In-line → grey =. The Reaction row shows what
-  // BTC actually did — kept SEPARATE so divergences (hawkish but BTC up) read.
-  const hot = info?.surprise === 'Hot', soft = info?.surprise === 'Soft';
+  // Actual reflects the figure vs FORECAST (independent of BTC): Hot (higher) →
+  // red ▲, Soft (lower) → green ▼, In-line (equal / no forecast) → grey =. The
+  // Reaction row shows what BTC actually did — kept SEPARATE so divergences read.
+  // Hard guard: if the actual equals the forecast it is In-line, whatever the
+  // model labelled it (a hold at the expected rate must not read Hot/red).
+  const norm = (x: string) => x.replace(/\s/g, '').toLowerCase();
+  // Only force In-line when the actual literally equals a real forecast (a hold
+  // at the expected rate must not read Hot). A missing forecast does NOT force
+  // In-line — e.g. the dot-plot revision is a genuine Hot surprise with no feed
+  // forecast, and deserves the credit. (User: give the right event the credit.)
+  const hasForecast = !!forecast && forecast !== '—' && /\d/.test(forecast);
+  const inlineByFigure = !!info && hasForecast && norm(info.actual) === norm(forecast);
+  const hot = !inlineByFigure && info?.surprise === 'Hot';
+  const soft = !inlineByFigure && info?.surprise === 'Soft';
   const actualColor = !info ? '#1a1813' : hot ? '#df5338' : soft ? '#1f9d55' : '#8c897e';
   const caret = !info ? '' : hot ? '▲ ' : soft ? '▼ ' : '= ';
   const c = IMPACT_COLOR[e.impact] || '#df5338';
