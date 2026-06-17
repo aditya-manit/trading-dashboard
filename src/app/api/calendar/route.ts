@@ -34,12 +34,15 @@ export async function GET() {
         btcDailyMoves(),
       ]);
 
+      const today = new Date().toISOString().slice(0, 10);
       for (const e of relevant) {
         const r = reactions[insightKey(e.country, e.title)];
         if (!r) continue;
-        // Prints only for the strip cards; fill each with BTC's real move on
-        // that date, dropping any we have no candle for.
+        // Prints only for the strip cards; only completed past occurrences
+        // (strictly before today), filled with BTC's real move on that date,
+        // dropping any we have no candle for.
         const prints = (printsMap[insightKey(e.country, e.title)] ?? [])
+          .filter((p) => p.date < today)
           .map((p) => ({ date: p.date, pct: moves.get(p.date) }))
           .filter((p): p is { date: string; pct: number } => typeof p.pct === 'number')
           .slice(0, 2);

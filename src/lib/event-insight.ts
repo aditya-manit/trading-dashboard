@@ -58,7 +58,9 @@ Rules:
 - 2 to 3 assets; ALWAYS include BTC and its likely direction under that scenario.
 - Symbols <=6 chars; use the event currency code where relevant.`;
 
-const PRINTS_SYSTEM = `You find the 2 MOST RECENT past occurrence dates of ONE recurring economic release (same country/currency AND same release), on or before the "asOf" date, for a BTC trader's calendar.
+const PRINTS_SYSTEM = `You find the 2 MOST RECENT *already-completed* occurrence dates of ONE recurring economic release (same country/currency AND same release), for a BTC trader's calendar.
+
+The dates must be STRICTLY BEFORE the "asOf" date — occurrences that have already happened. DO NOT include an occurrence dated on asOf itself or in the future (e.g. a meeting taking place today/this week). Return the two that occurred just before that.
 
 USE WEB SEARCH — do not rely on memory. ACCURACY OVER COMPLETENESS:
 - Only include a date CONFIRMED from an authoritative source: the issuing central bank / official statistics agency, or a major economic calendar (ForexFactory, Investing.com, Trading Economics). Cross-check across sources.
