@@ -58,6 +58,33 @@ function saveCache() {
   } catch { /* read-only FS (e.g. serverless) — stays in-memory only */ }
 }
 
+// ── Permanent released-outcomes archive (committed, per-occurrence) ──
+// Once an event has settled (a few hours after release) its final details are
+// written here and NEVER re-fetched. Unlike the .cache file this is committed
+// to the repo, keyed by `currency|title|YYYY-MM-DD` so each occurrence is kept
+// forever (a new FOMC doesn't overwrite the last one).
+const ARCHIVE_FILE = join(process.cwd(), 'data', 'released-archive.json');
+const archive = new Map<string, ReleasedInfo>();
+let archiveLoaded = false;
+const SETTLE_MS = 4 * 3_600_000; // wait ~4h after release before archiving (let the reaction settle)
+const relKey = (country: string, title: string, date: string) => `${country}|${title}|${date.slice(0, 10)}`;
+
+function loadArchive() {
+  if (archiveLoaded) return;
+  archiveLoaded = true;
+  try {
+    const raw = JSON.parse(readFileSync(ARCHIVE_FILE, 'utf8')) as Record<string, ReleasedInfo>;
+    for (const [k, v] of Object.entries(raw)) archive.set(k, v);
+  } catch { /* no archive yet */ }
+}
+
+function saveArchive() {
+  try {
+    mkdirSync(dirname(ARCHIVE_FILE), { recursive: true });
+    writeFileSync(ARCHIVE_FILE, JSON.stringify(Object.fromEntries([...archive.entries()].sort()), null, 2));
+  } catch { /* read-only FS */ }
+}
+
 const REACTION_SYSTEM = `You annotate macro economic-calendar events for a trader of BTC/USDT perpetual futures. For each event, give the typical market reaction to the outcome that is BULLISH for the event's own currency (hawkish central bank, hot inflation, strong beat, more hawkish dots, etc.).
 
 Reply with ONLY a JSON array — no prose, no code fences — one object per input event, IN THE SAME ORDER:
@@ -233,17 +260,22 @@ export async function enrichReleased(
   events: { country: string; title: string; date: string; forecast?: string }[],
 ): Promise<Record<string, ReleasedInfo>> {
   loadCache();
+  loadArchive();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const result: Record<string, ReleasedInfo> = {};
-  const uniq = new Map<string, { country: string; title: string; date: string; forecast?: string }>();
-  for (const e of events) uniq.set(insightKey(e.country, e.title), e);
-  const missing = [...uniq.entries()].filter(([k]) => !releasedCache.has(k)).map(([, e]) => e);
 
-  if (apiKey && missing.length) {
-    await pool(missing, 5, async (e) => {
+  // Dedupe by OCCURRENCE (currency|title|date) — each release is kept separately.
+  const uniq = new Map<string, { country: string; title: string; date: string; forecast?: string }>();
+  for (const e of events) uniq.set(relKey(e.country, e.title, e.date), e);
+
+  // Fetch only occurrences absent from BOTH the permanent archive and the
+  // transient cache. Archived events are final — never re-fetched.
+  const toFetch = [...uniq.entries()].filter(([occ]) => !archive.has(occ) && !releasedCache.has(occ)).map(([, e]) => e);
+  if (apiKey && toFetch.length) {
+    await pool(toFetch, 5, async (e) => {
       try {
         const info = await fetchReleased(apiKey, e);
-        if (info) releasedCache.set(insightKey(e.country, e.title), info);
+        if (info) releasedCache.set(relKey(e.country, e.title, e.date), info);
       } catch (err) {
         console.error(`[event-insight] released ${e.country} ${e.title}:`, err);
       }
@@ -251,7 +283,21 @@ export async function enrichReleased(
     saveCache();
   }
 
-  for (const k of uniq.keys()) { const v = releasedCache.get(k); if (v) result[k] = v; }
+  // Promote settled occurrences (≥4h after release) from the transient cache
+  // into the permanent committed archive — written once, kept forever.
+  let promoted = false;
+  for (const [occ, e] of uniq) {
+    if (archive.has(occ)) continue;
+    const info = releasedCache.get(occ);
+    if (info && Date.now() - new Date(e.date).getTime() > SETTLE_MS) { archive.set(occ, info); promoted = true; }
+  }
+  if (promoted) saveArchive();
+
+  // Result keyed by currency|title (what the client merges on); archive wins.
+  for (const [occ, e] of uniq) {
+    const info = archive.get(occ) ?? releasedCache.get(occ);
+    if (info) result[insightKey(e.country, e.title)] = info;
+  }
   return result;
 }
 
@@ -282,14 +328,18 @@ async function fetchReleased(
   const o = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
 
   const actual = String(o.actual ?? '').trim();
-  if (!actual) throw new Error('no actual figure confirmed'); // don't cache unconfirmed
+  const reaction = (Array.isArray(o.reaction) ? o.reaction : []).slice(0, 3).map(asset);
+  // The event is over — accept the result as final as long as we got SOMETHING
+  // (an actual or a reaction). Only a total blank retries (e.g. a press
+  // conference has no numeric actual but does have a reaction/note).
+  if (!actual && reaction.length === 0) throw new Error('nothing confirmed');
   return {
     actual,
     surprise: String(o.surprise ?? 'In line'),
     bearishForBtc: o.bearishForBtc === true,
     condition: String(o.condition ?? ''),
     ifReaction: (Array.isArray(o.ifReaction) ? o.ifReaction : []).slice(0, 3).map(asset),
-    reaction: (Array.isArray(o.reaction) ? o.reaction : []).slice(0, 3).map(asset),
+    reaction,
     note: String(o.note ?? '').trim() || undefined,
   };
 }

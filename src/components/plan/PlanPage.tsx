@@ -177,11 +177,14 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
 // Actual (with Hot/Soft surprise chip), and If-<condition> + realized Reaction.
 function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
   const forecast = (e.forecast || '').trim() || '—';
-  // Actual = colored value + leading caret (surprise-indicator variation 1):
-  // ▲ red Hot · ▼ green Soft · = grey In-line. Neutral only while unloaded.
-  const hot = info?.surprise === 'Hot', soft = info?.surprise === 'Soft';
-  const actualColor = !info ? '#1a1813' : hot ? '#df5338' : soft ? '#1f9d55' : '#8c897e';
-  const caret = !info ? '' : hot ? '▲ ' : soft ? '▼ ' : '= ';
+  // Actual colour/caret reflect what BTC ACTUALLY did (the reaction), not the
+  // noisy hot/soft label: BTC down → red ▼ (bearish), up → green ▲ (bullish),
+  // flat → grey =. Falls back to bearishForBtc when no reaction is present.
+  const btcDir = info?.reaction?.find((a) => a.sym.toUpperCase().includes('BTC'))?.dir
+    ?? (info ? (info.bearishForBtc ? 'down' : 'up') : undefined);
+  const down = btcDir === 'down', up = btcDir === 'up';
+  const actualColor = !info ? '#1a1813' : down ? '#df5338' : up ? '#1f9d55' : '#8c897e';
+  const caret = !info ? '' : down ? '▼ ' : up ? '▲ ' : '= ';
   const c = IMPACT_COLOR[e.impact] || '#df5338';
   const lab: CSSProperties = { fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bba074' };
   const labCell: CSSProperties = { padding: '8px 11px', borderRight: '1px solid #f0efec', display: 'flex', alignItems: 'center' };
