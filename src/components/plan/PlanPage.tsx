@@ -155,30 +155,39 @@ function StripCard({ e }: { e: CalendarEvent }) {
 }
 
 // Compact drawer card (no countdown / prints table): currency, time, forecast,
-// reaction line.
+// reaction row. Same table chrome as the strip, minus the countdown and the
+// BTC-prints row (handoff-16 drawer style).
 function NewsCard({ e }: { e: CalendarEvent }) {
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
   const v = valueParts(e);
+  const ins = e.insight;
+  const hasReaction = !!ins && ins.assets.length > 0;
   return (
-    <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
-        <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
-        <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
-        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 11, color: '#a8a69b' }}>{fmtTime(e.date)}</span>
+    <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderBottom: '1px solid #f0efec' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
+            <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
+            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
+          </div>
+          <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
+        </div>
+        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 11, color: '#a8a69b', flex: '0 0 auto' }}>{fmtTime(e.date)}</span>
       </div>
-      <span style={{ fontWeight: 600, fontSize: 11.5, color: '#897f70' }}>{e.title}</span>
-      <div style={{ height: 1, background: '#f4f3f0', margin: '1px 0' }} />
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-        <span style={{ fontWeight: 800, fontSize: 12, color: v.muted ? '#a8a69b' : '#1a1813' }}>{v.main}</span>
-        {v.note && <span style={{ fontWeight: 600, fontSize: 10.5, color: '#a8a69b' }}>{v.note}</span>}
+      <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr' }}>
+        <div style={labelCellBase}><span style={cellLabel}>Forecast</span></div>
+        <div style={{ ...valueCellBase, alignItems: 'baseline', gap: 5 }}>
+          <span style={{ fontWeight: 800, fontSize: 12, color: v.muted ? '#a8a69b' : '#1a1813' }}>{v.main}</span>
+          {v.note && <span style={{ fontWeight: 600, fontSize: 10.5, color: '#a8a69b' }}>{v.note}</span>}
+        </div>
+        {hasReaction && (
+          <>
+            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>{ins!.condition ? `If ${ins!.condition.toLowerCase()}` : 'Reaction'}</span></div>
+            <div style={{ ...valueCellBase, ...topBorder }}><ReactionLine e={e} /></div>
+          </>
+        )}
       </div>
-      {e.insight && e.insight.assets.length > 0 && (
-        <span style={{ fontWeight: 600, fontSize: 11.5, color: '#56544b' }}>
-          {e.insight.condition && `${e.insight.condition} → `}
-          <ReactionLine e={e} />
-        </span>
-      )}
     </div>
   );
 }
