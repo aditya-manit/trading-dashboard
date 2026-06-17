@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState, type CSSProperties } from 'react';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
-import { useCalendar, type CalendarEvent } from '@/hooks/useCalendar';
+import { useCalendar, useCalendarInsights, eventKey, type CalendarEvent } from '@/hooks/useCalendar';
 import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
@@ -97,6 +97,11 @@ const labelCellBase: CSSProperties = { padding: '8px 12px', borderRight: '1px so
 const valueCellBase: CSSProperties = { padding: '8px 13px', display: 'flex', alignItems: 'center' };
 const topBorder: CSSProperties = { borderTop: '1px solid #f4f3f0' };
 
+// Shimmering placeholder bar for rows still loading (reaction / prints).
+function Skel({ w, h = 9 }: { w: number | string; h?: number }) {
+  return <span style={{ display: 'block', width: w, height: h, borderRadius: 4, background: '#edece8', animation: 'plPulse 1.2s ease-in-out infinite' }} />;
+}
+
 function ReactionLine({ e }: { e: CalendarEvent }) {
   if (!e.insight) return null;
   return (
@@ -115,7 +120,7 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
 
 // Rich strip card: header (currency/title + time + live countdown) over a
 // Forecast / If-<condition> / BTC-2-prints table.
-function StripCard({ e }: { e: CalendarEvent }) {
+function StripCard({ e, loading }: { e: CalendarEvent; loading: boolean }) {
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
   const v = valueParts(e);
   const ins = e.insight;
@@ -143,20 +148,32 @@ function StripCard({ e }: { e: CalendarEvent }) {
           <span style={{ fontWeight: 800, fontSize: 12, color: v.muted ? '#a8a69b' : '#1a1813' }}>{v.main}</span>
           {v.note && <span style={{ fontWeight: 600, fontSize: 10.5, color: '#a8a69b' }}>{v.note}</span>}
         </div>
-        {hasReaction && (
+        {hasReaction ? (
           <>
             <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>{ins!.condition ? `If ${ins!.condition.toLowerCase()}` : 'Reaction'}</span></div>
             <div style={{ ...valueCellBase, ...topBorder }}><ReactionLine e={e} /></div>
           </>
-        )}
-        {prints.length > 0 && (
+        ) : loading ? (
+          <>
+            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>Reaction</span></div>
+            <div style={{ ...valueCellBase, ...topBorder }}><Skel w={150} /></div>
+          </>
+        ) : null}
+        {prints.length > 0 ? (
           <>
             <div style={{ ...labelCellBase, ...topBorder, alignItems: 'flex-start' }}><span style={{ ...cellLabel, lineHeight: 1.3 }}>BTC<br />{prints.length} prints</span></div>
             <div style={{ ...valueCellBase, ...topBorder, flexDirection: 'column', alignItems: 'stretch', gap: 5 }}>
               {prints.map((p, i) => <PrintBar key={i} p={p} />)}
             </div>
           </>
-        )}
+        ) : loading ? (
+          <>
+            <div style={{ ...labelCellBase, ...topBorder, alignItems: 'flex-start' }}><span style={{ ...cellLabel, lineHeight: 1.3 }}>BTC<br />prints</span></div>
+            <div style={{ ...valueCellBase, ...topBorder, flexDirection: 'column', alignItems: 'stretch', gap: 7 }}>
+              <Skel w="100%" /><Skel w="100%" />
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -165,7 +182,7 @@ function StripCard({ e }: { e: CalendarEvent }) {
 // Compact drawer card (no countdown / prints table): currency, time, forecast,
 // reaction row. Same table chrome as the strip, minus the countdown and the
 // BTC-prints row (handoff-16 drawer style).
-function NewsCard({ e }: { e: CalendarEvent }) {
+function NewsCard({ e, loading }: { e: CalendarEvent; loading: boolean }) {
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
   const v = valueParts(e);
   const ins = e.insight;
@@ -189,12 +206,17 @@ function NewsCard({ e }: { e: CalendarEvent }) {
           <span style={{ fontWeight: 800, fontSize: 12, color: v.muted ? '#a8a69b' : '#1a1813' }}>{v.main}</span>
           {v.note && <span style={{ fontWeight: 600, fontSize: 10.5, color: '#a8a69b' }}>{v.note}</span>}
         </div>
-        {hasReaction && (
+        {hasReaction ? (
           <>
             <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>{ins!.condition ? `If ${ins!.condition.toLowerCase()}` : 'Reaction'}</span></div>
             <div style={{ ...valueCellBase, ...topBorder }}><ReactionLine e={e} /></div>
           </>
-        )}
+        ) : loading ? (
+          <>
+            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>Reaction</span></div>
+            <div style={{ ...valueCellBase, ...topBorder }}><Skel w={150} /></div>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -302,13 +324,18 @@ export function PlanPage() {
   const doneCount = meta.ask.filter((_, i) => checks[`${step}-${i}`]).length;
   const allClear = doneCount === meta.ask.length && meta.ask.length > 0;
 
-  // ─── Economic calendar (real feed) ──────────────────────────────────────────
+  // ─── Economic calendar ──────────────────────────────────────────────────────
+  // Feed is fast (cards render immediately); insights (reaction + prints) load
+  // separately and merge in — those rows show skeletons until they arrive.
   const { data: calRaw } = useCalendar();
+  const { data: insightMap } = useCalendarInsights();
+  const insightsLoading = insightMap === undefined;
   const now = new Date();
   const calLoading = calRaw === undefined;
   const upcomingHigh = (Array.isArray(calRaw) ? calRaw : [])
     .filter((e) => isBtcRelevant(e) && new Date(e.date).getTime() >= now.getTime())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map((e) => ({ ...e, insight: insightMap?.[eventKey(e)] }));
   const stripEvents = upcomingHigh.slice(0, 4);
   const nextEvent = upcomingHigh[0];
   const newsGroups: { key: number; label: string; events: CalendarEvent[] }[] = [];
@@ -330,6 +357,7 @@ export function PlanPage() {
         @keyframes pkGrowX{from{transform:scaleX(0);}to{transform:scaleX(1);}}
         @keyframes pkFade{from{opacity:0;}to{opacity:1;}}
         @keyframes pkSlideIn{from{transform:translateX(100%);}to{transform:translateX(0);}}
+        @keyframes plPulse{0%,100%{opacity:1;}50%{opacity:.45;}}
       `}</style>
 
       {/* header */}
@@ -367,7 +395,7 @@ export function PlanPage() {
           {calLoading
             ? [0, 1, 2, 3].map((i) => <div key={i} style={{ height: 150, background: '#fff', border: '1px solid #f0efec', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }} />)
             : stripEvents.length > 0
-              ? stripEvents.map((e, i) => <StripCard key={i} e={e} />)
+              ? stripEvents.map((e, i) => <StripCard key={i} e={e} loading={insightsLoading} />)
               : <div style={{ gridColumn: '1 / -1', background: '#fff', border: '1px solid #f0efec', borderRadius: 13, padding: '16px 18px', fontWeight: 600, fontSize: 12.5, color: '#897f70' }}>No high-impact events remaining this week.</div>}
         </div>
       </div>
@@ -396,7 +424,7 @@ export function PlanPage() {
                     <span style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a8a69b' }}>{g.label}</span>
                     <span style={{ flex: 1, height: 1, background: '#efedea' }} />
                   </div>
-                  {g.events.map((e, i) => <NewsCard key={i} e={e} />)}
+                  {g.events.map((e, i) => <NewsCard key={i} e={e} loading={insightsLoading} />)}
                 </div>
               ))}
             </div>

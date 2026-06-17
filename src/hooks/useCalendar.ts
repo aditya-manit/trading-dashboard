@@ -28,9 +28,22 @@ export interface CalendarEvent {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+// Identity used to merge insights onto feed events.
+export const eventKey = (e: { country: string; title: string }) => `${e.country}|${e.title}`;
+
+// Fast: the raw economic-calendar feed (renders cards immediately).
 export function useCalendar() {
   return useSWR<CalendarEvent[]>('/api/calendar', fetcher, {
     refreshInterval: 1_800_000, // 30 min (route itself caches 6h upstream)
+    revalidateOnFocus: false,
+  });
+}
+
+// Slow: Claude/Gate enrichment (reaction + "2 prints"), keyed by `currency|title`.
+// Cards skeleton these rows until this resolves.
+export function useCalendarInsights() {
+  return useSWR<Record<string, EventInsight>>('/api/calendar/insights', fetcher, {
+    refreshInterval: 1_800_000,
     revalidateOnFocus: false,
   });
 }
