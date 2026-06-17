@@ -268,6 +268,70 @@ function NewsCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def
   );
 }
 
+// V5 "departure-board" news header: pulse + next release + big live countdown +
+// time-until progress bar + this-week impact legend + View all (handoff 17).
+function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
+  next: CalendarEvent;
+  progressPct: number;
+  counts: { high: number; med: number; low: number };
+  total: number;
+  onViewAll: () => void;
+}) {
+  const c = IMPACT_COLOR[next.impact] || '#df5338';
+  const legend: [string, number, string][] = [['#df5338', counts.high, 'High'], ['#e8922e', counts.med, 'Med'], ['#e0c34a', counts.low, 'Low']];
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', background: '#fff', border: '1px solid #efedea', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 17px', flex: '0 0 auto' }}>
+        <span style={{ position: 'relative', width: 8, height: 8, flex: '0 0 auto', display: 'inline-block' }}>
+          <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#1f9d55' }} />
+          <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#1f9d55', transformOrigin: 'center', animation: 'pkPulse 2s infinite' }} />
+        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#1a1813', whiteSpace: 'nowrap' }}>Market news</span>
+          <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#bba074', whiteSpace: 'nowrap' }}>Sample feed</span>
+        </div>
+      </div>
+      <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 9, padding: '11px 18px', minWidth: 280 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>Next release</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.015em', whiteSpace: 'nowrap' }}>{next.title}</span>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: c, flex: '0 0 auto' }} />
+              <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.06em', color: c, whiteSpace: 'nowrap' }}>{next.country} · {(next.impact || '').toUpperCase()}</span>
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
+            <CountdownFull date={next.date} style={{ fontSize: 23, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, whiteSpace: 'nowrap' }} />
+            <span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#d6b98a' }}>until release</span>
+          </div>
+        </div>
+        <div style={{ height: 5, borderRadius: 99, background: '#f3f1ec', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${progressPct}%`, background: '#c9821f', borderRadius: 99, transition: 'width .4s ease' }} />
+        </div>
+      </div>
+      <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5, padding: '11px 16px', flex: '0 0 auto' }}>
+        <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>This week</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+          {legend.map(([col, n, l]) => (
+            <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: col }} />
+              <span style={{ fontWeight: 800, fontSize: 11, color: '#1a1813', fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+              <span style={{ fontWeight: 600, fontSize: 9, color: '#a8a69b' }}>{l}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+      <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
+      <button onClick={onViewAll} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', border: 'none', padding: '0 18px', fontWeight: 700, fontSize: 12, color: '#56544b', flex: '0 0 auto' }}>
+        View all <span style={{ fontWeight: 800, color: '#c9821f' }}>{total}</span> →
+      </button>
+    </div>
+  );
+}
+
 // ─── Step metadata (verbatim from handoff 15 planMeta) ────────────────────────
 type PlanStep = {
   n: number; title: string; color: string; soft: string; border: string; shadow: string;
@@ -385,6 +449,23 @@ export function PlanPage() {
     .map((e) => ({ ...e, insight: insightMap?.[eventKey(e)] }));
   const stripEvents = upcomingHigh.slice(0, 4);
   const nextEvent = upcomingHigh[0];
+
+  // Header extras: this-week impact legend + time-until progress bar.
+  const upcomingAll = (Array.isArray(calRaw) ? calRaw : []).filter((e) => new Date(e.date).getTime() >= now.getTime());
+  const impactCounts = {
+    high: upcomingAll.filter((e) => e.impact === 'High').length,
+    med: upcomingAll.filter((e) => e.impact === 'Medium').length,
+    low: upcomingAll.filter((e) => e.impact === 'Low').length,
+  };
+  const prevRelevant = (Array.isArray(calRaw) ? calRaw : [])
+    .filter((e) => isBtcRelevant(e) && new Date(e.date).getTime() < now.getTime())
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+  let newsProgress = 64;
+  if (nextEvent) {
+    const nextMs = new Date(nextEvent.date).getTime();
+    const prevMs = prevRelevant ? new Date(prevRelevant.date).getTime() : nextMs - 48 * 3600_000;
+    newsProgress = Math.max(4, Math.min(100, ((now.getTime() - prevMs) / (nextMs - prevMs)) * 100));
+  }
   const newsGroups: { key: number; label: string; events: CalendarEvent[] }[] = [];
   for (const e of upcomingHigh) {
     const k = dayDiff(e.date, now);
@@ -420,24 +501,13 @@ export function PlanPage() {
 
       {/* market news */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 11, flexWrap: 'wrap' }}>
-          <span style={{ width: 32, height: 32, borderRadius: 9, background: '#fbe7cb', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9821f" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-          </span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#bba074' }}>Market news · high impact</span>
-            <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.01em' }}>
-              {nextEvent ? (
-                <>Next: {nextEvent.title} · <CountdownFull date={nextEvent.date} /></>
-              ) : calLoading ? 'Loading economic calendar…' : 'No high-impact events ahead this week'}
-            </span>
+        {nextEvent ? (
+          <NewsHeader next={nextEvent} progressPct={newsProgress} counts={impactCounts} total={upcomingHigh.length} onViewAll={() => setNewsOpen(true)} />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #efedea', borderRadius: 14, padding: '16px 18px', fontWeight: 700, fontSize: 13, color: '#897f70', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
+            {calLoading ? 'Loading economic calendar…' : 'No high-impact events ahead this week'}
           </div>
-          {upcomingHigh.length > 0 && (
-            <button onClick={() => setNewsOpen(true)} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontFamily: 'inherit', background: '#fff', border: '1px solid #e8e6e0', borderRadius: 10, padding: '8px 14px', fontWeight: 700, fontSize: 12, color: '#56544b' }}>
-              View all <span style={{ fontWeight: 800, color: '#c9821f' }}>{upcomingHigh.length}</span> →
-            </button>
-          )}
-        </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
           {calLoading
             ? [0, 1, 2, 3].map((i) => <div key={i} style={{ height: 150, background: '#fff', border: '1px solid #f0efec', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }} />)
