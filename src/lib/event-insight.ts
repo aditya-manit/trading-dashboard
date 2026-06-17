@@ -221,20 +221,21 @@ const RELEASED_SYSTEM = `You report what happened for an economic release that h
 USE WEB SEARCH to find the ACTUAL released figure and how markets reacted in the hours after — do not rely on memory. If you cannot confirm the actual figure from a credible source, set "actual" to "".
 
 Your FINAL message must be ONLY a JSON object (no prose, no code fences):
-{"actual":"<the released figure, e.g. 0.4% or 'Held 3.75%'>","surprise":"Hot|Soft|In line","bearishForBtc":true|false,"condition":"<=2 words bullish-for-currency scenario, e.g. hot, beat, fewer","ifReaction":[{"sym":"crypto","dir":"up|down|flat"}],"reaction":[{"sym":"BTC","dir":"up|down|flat"},{"sym":"stocks","dir":"up|down|flat"}]}
+{"actual":"<the figure ONLY, in the SAME format/units as the forecast>","surprise":"Hot|Soft|In line","bearishForBtc":true|false,"condition":"<=2 words bullish-for-currency scenario, e.g. hot, beat, fewer","ifReaction":[{"sym":"crypto","dir":"up|down|flat"}],"reaction":[{"sym":"BTC","dir":"up|down|flat"},{"sym":"stocks","dir":"up|down|flat"}]}
 
 Rules:
+- "actual": JUST the number/figure, matching the forecast's format and units so they compare directly. e.g. forecast "3.75%" → actual "3.75%" (NOT "Held 3.50%-3.75%"); forecast "0.3%" → actual "0.4%". No prose, no words.
 - "surprise": Hot = stronger/higher than forecast, Soft = weaker/lower, In line = as expected.
 - "bearishForBtc": did the actual outcome lean bearish for BTC/crypto?
 - "reaction": what BTC and stocks ACTUALLY did after the print (2 assets, BTC first).`;
 
 export async function enrichReleased(
-  events: { country: string; title: string; date: string }[],
+  events: { country: string; title: string; date: string; forecast?: string }[],
 ): Promise<Record<string, ReleasedInfo>> {
   loadCache();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const result: Record<string, ReleasedInfo> = {};
-  const uniq = new Map<string, { country: string; title: string; date: string }>();
+  const uniq = new Map<string, { country: string; title: string; date: string; forecast?: string }>();
   for (const e of events) uniq.set(insightKey(e.country, e.title), e);
   const missing = [...uniq.entries()].filter(([k]) => !releasedCache.has(k)).map(([, e]) => e);
 
@@ -256,7 +257,7 @@ export async function enrichReleased(
 
 async function fetchReleased(
   apiKey: string,
-  event: { country: string; title: string; date: string },
+  event: { country: string; title: string; date: string; forecast?: string },
 ): Promise<ReleasedInfo | null> {
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
@@ -267,7 +268,7 @@ async function fetchReleased(
       temperature: 0,
       system: RELEASED_SYSTEM,
       tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
-      messages: [{ role: 'user', content: JSON.stringify({ date: event.date.slice(0, 10), currency: event.country, event: event.title }) }],
+      messages: [{ role: 'user', content: JSON.stringify({ date: event.date.slice(0, 10), currency: event.country, event: event.title, forecast: event.forecast || '' }) }],
     }),
   });
   if (!res.ok) throw new Error(`anthropic ${res.status}: ${await res.text()}`);

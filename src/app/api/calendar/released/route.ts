@@ -24,7 +24,7 @@ export async function GET() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 4);
 
-    const map = await enrichReleased(released.map((e) => ({ country: e.country, title: e.title, date: e.date })));
+    const map = await enrichReleased(released.map((e) => ({ country: e.country, title: e.title, date: e.date, forecast: e.forecast })));
     const out: Record<string, ReleasedInfo> = {};
     for (const e of released) {
       const info = map[insightKey(e.country, e.title)];
