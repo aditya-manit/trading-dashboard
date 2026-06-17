@@ -1,12 +1,15 @@
 import type { AssetDir } from '@/hooks/useCalendar';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 
-// Server-only enrichment via the Claude Messages API. Two tiers, both cached
-// in-process by `currency|title` (stable across weeks). Requires
-// ANTHROPIC_API_KEY — without it, enrichment is skipped (cards stay plain).
+// Server-only enrichment via the Claude Messages API. Two tiers, cached by
+// `currency|title` and PERSISTED to disk so values don't change on restart /
+// reload. Requires ANTHROPIC_API_KEY — without it, enrichment is skipped.
 //   • reactions: condition + assets ("if hawkish → BTC↓") — cheap, batched, NO
 //     web search — produced for ALL relevant events (every card gets it).
 //   • prints: the 2 most recent occurrence dates — per-event web search,
 //     verified — produced only for the strip's 4 cards (the expensive bit).
+// Calls use temperature 0 so a re-enrichment returns the same answer.
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const dirs: AssetDir[] = ['up', 'down', 'flat'];
@@ -18,6 +21,33 @@ const reactionCache = new Map<string, Reaction>();
 const printsCache = new Map<string, { date: string }[]>();
 
 export const insightKey = (country: string, title: string) => `${country}|${title}`;
+
+// ── Disk persistence (survives dev restarts & redeploys with a writable FS) ──
+const CACHE_FILE = join(process.cwd(), '.cache', 'event-insight.json');
+let cacheLoaded = false;
+
+function loadCache() {
+  if (cacheLoaded) return;
+  cacheLoaded = true;
+  try {
+    const raw = JSON.parse(readFileSync(CACHE_FILE, 'utf8')) as {
+      reactions?: Record<string, Reaction>;
+      prints?: Record<string, { date: string }[]>;
+    };
+    for (const [k, v] of Object.entries(raw.reactions ?? {})) reactionCache.set(k, v);
+    for (const [k, v] of Object.entries(raw.prints ?? {})) printsCache.set(k, v);
+  } catch { /* no cache yet */ }
+}
+
+function saveCache() {
+  try {
+    mkdirSync(dirname(CACHE_FILE), { recursive: true });
+    writeFileSync(CACHE_FILE, JSON.stringify({
+      reactions: Object.fromEntries(reactionCache),
+      prints: Object.fromEntries(printsCache),
+    }));
+  } catch { /* read-only FS (e.g. serverless) — stays in-memory only */ }
+}
 
 const REACTION_SYSTEM = `You annotate macro economic-calendar events for a trader of BTC/USDT perpetual futures. For each event, give the typical market reaction to the outcome that is BULLISH for the event's own currency (hawkish central bank, hot inflation, strong beat, more hawkish dots, etc.).
 
@@ -52,6 +82,7 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>
 export async function enrichReactions(
   events: { country: string; title: string }[],
 ): Promise<Record<string, Reaction>> {
+  loadCache();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const result: Record<string, Reaction> = {};
   const uniq = new Map<string, { country: string; title: string }>();
@@ -66,6 +97,7 @@ export async function enrichReactions(
         body: JSON.stringify({
           model: MODEL,
           max_tokens: 1500,
+          temperature: 0,
           system: REACTION_SYSTEM,
           messages: [{ role: 'user', content: JSON.stringify(missing.map((e) => ({ currency: e.country, event: e.title }))) }],
         }),
@@ -92,6 +124,7 @@ export async function enrichReactions(
     } catch (err) {
       console.error('[event-insight] reactions failed:', err);
     }
+    saveCache();
   }
 
   for (const k of uniq.keys()) { const v = reactionCache.get(k); if (v) result[k] = v; }
@@ -102,6 +135,7 @@ export async function enrichReactions(
 export async function enrichPrints(
   events: { country: string; title: string }[],
 ): Promise<Record<string, { date: string }[]>> {
+  loadCache();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const result: Record<string, { date: string }[]> = {};
   const uniq = new Map<string, { country: string; title: string }>();
@@ -116,6 +150,7 @@ export async function enrichPrints(
         console.error(`[event-insight] prints ${e.country} ${e.title}:`, err);
       }
     });
+    saveCache();
   }
 
   for (const k of uniq.keys()) { const v = printsCache.get(k); if (v) result[k] = v; }
@@ -132,6 +167,7 @@ async function fetchPrints(
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 3000,
+      temperature: 0,
       system: PRINTS_SYSTEM,
       tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
       messages: [{

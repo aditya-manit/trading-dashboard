@@ -66,10 +66,11 @@ function valueParts(e: CalendarEvent): { main: string; note: string; muted?: boo
   return { main: 'No number', note: '', muted: true };
 }
 
-// Small chip showing why the event passed the filter (US MACRO / CENTRAL BANK).
+// Replaces the old "HIGH" badge (everything is high-impact now): shows the tier
+// the event passed the filter on — US MACRO / CENTRAL BANK — in the badge style.
 function Tag({ e }: { e: CalendarEvent }) {
   const t = relevanceTag(e);
-  return <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.04em', color: t.color, background: t.bg, padding: '2px 6px', borderRadius: 5 }}>{t.label}</span>;
+  return <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color: t.color }}>{t.label}</span>;
 }
 
 // One "print" row: date · magnitude bar · signed % (real BTC move from Gate).
@@ -127,7 +128,6 @@ function StripCard({ e }: { e: CalendarEvent }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
             <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
-            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
             <Tag e={e} />
           </div>
           <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
@@ -177,7 +177,6 @@ function NewsCard({ e }: { e: CalendarEvent }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flex: '0 0 auto' }} />
             <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
-            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color }}>{(e.impact || '').toUpperCase()}</span>
             <Tag e={e} />
           </div>
           <span style={{ fontWeight: 700, fontSize: 13, color: '#897f70', letterSpacing: '-0.01em' }}>{e.title}</span>
