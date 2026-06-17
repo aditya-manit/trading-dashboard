@@ -477,6 +477,7 @@ export function PlanPage() {
   const [finished, setFinished] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
   const [newsTab, setNewsTab] = useState<'upcoming' | 'released'>('upcoming');
+  const [newsQuery, setNewsQuery] = useState('');
 
   // Restore persisted progress
   useEffect(() => {
@@ -546,8 +547,13 @@ export function PlanPage() {
     .filter((e) => isBtcRelevant(e) && new Date(e.date).getTime() < now.getTime())
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 4);
+  // Drawer search: match on event title or currency.
+  const q = newsQuery.trim().toLowerCase();
+  const matchQ = (e: CalendarEvent) => !q || e.title.toLowerCase().includes(q) || e.country.toLowerCase().includes(q);
+  const releasedFiltered = releasedEvents.filter(matchQ);
   const newsGroups: { key: number; label: string; events: CalendarEvent[] }[] = [];
   for (const e of upcomingHigh) {
+    if (!matchQ(e)) continue;
     const k = dayDiff(e.date, now);
     let g = newsGroups.find((x) => x.key === k);
     if (!g) { g = { key: k, label: dayHeader(e.date, now), events: [] }; newsGroups.push(g); }
@@ -614,13 +620,25 @@ export function PlanPage() {
               </div>
               <button onClick={() => setNewsOpen(false)} style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: 9, border: '1px solid #e8e6e0', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#8c8a81', fontSize: 17, lineHeight: 1, fontFamily: 'inherit' }}>×</button>
             </div>
-            {/* Upcoming / Released toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', padding: '14px 22px 2px', flex: '0 0 auto' }}>
-              <div style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', background: '#efece6', border: '1px solid #e7e3da', borderRadius: 11, padding: 3, gap: 3 }}>
+            {/* Search + Upcoming/Released toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 22px 2px', flex: '0 0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, background: '#f4f3f0', border: '1px solid #ece9e3', borderRadius: 10, padding: '8px 11px' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a8a69b" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+                <input
+                  value={newsQuery}
+                  onChange={(ev) => setNewsQuery(ev.target.value)}
+                  placeholder="Search events…"
+                  style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#1a1813' }}
+                />
+                {newsQuery && (
+                  <button onClick={() => setNewsQuery('')} style={{ flex: '0 0 auto', width: 17, height: 17, borderRadius: '50%', border: 'none', background: '#e2dfd8', color: '#6b6457', cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 10, lineHeight: 1, padding: 0 }}>×</button>
+                )}
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', background: '#efece6', border: '1px solid #e7e3da', borderRadius: 10, padding: 3, gap: 3, flex: '0 0 auto' }}>
                 {(['upcoming', 'released'] as const).map((t) => {
                   const active = newsTab === t;
                   return (
-                    <button key={t} onClick={() => setNewsTab(t)} style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 13px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', background: active ? '#fff' : 'transparent', color: active ? '#1a1813' : '#8c8a81', boxShadow: active ? '0 1px 2px rgba(20,20,12,0.08)' : 'none', transition: 'all .18s' }}>
+                    <button key={t} onClick={() => setNewsTab(t)} style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', background: active ? '#fff' : 'transparent', color: active ? '#1a1813' : '#8c8a81', boxShadow: active ? '0 1px 2px rgba(20,20,12,0.08)' : 'none', transition: 'all .18s' }}>
                       {t === 'upcoming' ? 'Upcoming' : 'Released'}
                     </button>
                   );
@@ -629,8 +647,8 @@ export function PlanPage() {
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 18px', display: 'flex', flexDirection: 'column', gap: 22 }}>
               {newsTab === 'released' ? (
-                releasedEvents.length === 0 ? (
-                  <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>No high-impact events released yet this week.</span>
+                releasedFiltered.length === 0 ? (
+                  <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>{q ? `No released events match “${newsQuery.trim()}”.` : 'No high-impact events released yet this week.'}</span>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -638,11 +656,11 @@ export function PlanPage() {
                       <span style={{ flex: 1, height: 1, background: '#efedea' }} />
                       {releasedLoading && <span style={{ fontWeight: 600, fontSize: 9.5, color: '#bba074' }}>confirming actuals…</span>}
                     </div>
-                    {releasedEvents.map((e, i) => <ReleasedCard key={i} e={e} info={releasedMap?.[eventKey(e)]} />)}
+                    {releasedFiltered.map((e, i) => <ReleasedCard key={i} e={e} info={releasedMap?.[eventKey(e)]} />)}
                   </div>
                 )
               ) : newsGroups.length === 0 ? (
-                <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>No high-impact events remaining this week.</span>
+                <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>{q ? `No upcoming events match “${newsQuery.trim()}”.` : 'No high-impact events remaining this week.'}</span>
               ) : newsGroups.map((g) => (
                 <div key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
