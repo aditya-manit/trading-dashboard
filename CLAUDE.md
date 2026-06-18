@@ -121,7 +121,7 @@ encoded in the component and no longer surprising.
 - **News header = V5 "departure board"** (`NewsHeader`, handoff 17): pulsing green dot + MARKET NEWS / **LIVE FEED** (not "sample" — it's the real feed) · NEXT RELEASE (event + currency·impact) · big seconds-ticking `CountdownFull` + UNTIL RELEASE · **progress bar = imminence over a fixed 24h window** (`(24h − timeUntil)/24h`, min 5% so it's never empty; the countdown gives the exact time, the bar the gut-feel) · THIS WEEK legend showing **our tiers** (US Macro green / Central bank purple counts — not generic High/Med/Low, which we don't surface) · **View all** button (handoff 20): two-line "View all" (600, dark) over "N EVENTS" (in legible amber `#c9821f` 800 — deliberately punchier than the zip's faint `#bba074` so the count doesn't recede) + a circular arrow chip. Replaces the old bell banner.
 - **Drawer has a search box + Upcoming/Released toggle** (`newsQuery`, `newsTab`, handoff 19): the search (magnify icon + input + clear ×, left of the toggle) filters both tabs by event title or currency (`matchQ`); empty day-groups drop out and a no-match search shows the illustrated `NewsEmpty` state (calendar-with-X icon + "No events found / Nothing matches …"). Released ("Earlier this week") shows already-fired relevant events in `ReleasedCard`: same white card styling as upcoming, 4-col spec table — Forecast | value | Actual | value — then If-`<condition>` | reaction | Reaction | **the realized reaction**. The **Actual is coloured by the figure vs its FORECAST** (`surprise`, INDEPENDENT of BTC): Hot (higher/stronger) → red ▲, Soft (lower) → green ▼, In-line (equals forecast) → grey `=`. A hold at the expected rate is In-line (grey), NOT Hot — a client guard forces In-line when actual==forecast. But a real surprise with no feed forecast still earns Hot — e.g. the FOMC **dot-plot revision** (3.4%→3.8%) is the genuine hawkish event and reads red, while the rate hold reads grey (give the right event the credit). The **Reaction row shows what BTC actually did** (`reaction`), kept SEPARATE — a hawkish event where BTC is flat/up is visible, never forced to match. **Actual is numeric only for numeric events** (rate → single rate `3.75%`, data → `0.4%`); non-numeric events (statement, press conf, speech, minutes) get a short qualitative outcome (`Hawkish hold`) — the prompt forbids inventing a number/range (e.g. `3.625%`) for those, and carries worked examples (hold = in-line, dot plot = hot, a divergence case) for consistency. The `If <condition>` label is forced to a single word.
 - **Tags, not HIGH, everywhere.** The released cards, the strip/drawer cards, AND the header's "Next release" line all show our tier tag (`US Macro` green / `Central bank` purple via `relevanceTag`) — never a generic HIGH badge. (Don't reintroduce HIGH.)
-- **Released Actual carries an optional hover note** (`ReleasedInfo.note`, Claude-generated): a short context line (vs forecast/previous, the notable move, what stood out) shown via `HoverTip` only when present — the Actual gets a dashed underline when there's a note. Empty/absent otherwise. Data via `useCalendarReleased` → `/api/calendar/released` → `enrichReleased` (Claude **web search** for the real actual figure + how BTC/stocks actually moved; verified — unconfirmed actuals aren't cached; bounded to the 4 most-recent). **Persistence is two-tier:** a transient `.cache/` entry while the event is still settling, then — once it's ≥4h past release (reaction final) — its outcome is promoted to a **permanent committed archive `data/released-archive.json`**, keyed PER-OCCURRENCE (`currency|title|YYYY-MM-DD`) so a new FOMC never overwrites the old, and archived events are **never re-fetched**. Commit `data/released-archive.json` to keep history forever (serverless FS is read-only, so the committed file is the durable store).
+- **Released Actual carries an optional hover note** (`ReleasedInfo.note`, Claude-generated): a short context line (vs forecast/previous, the notable move, what stood out) shown via `HoverTip` only when present — the Actual gets a dashed underline when there's a note. Empty/absent otherwise. Data via `useCalendarReleased` → `/api/calendar/released` → `enrichReleased` (Claude **web search** for the real actual figure + how BTC/stocks actually moved; verified — unconfirmed actuals aren't cached; NO cap — the whole week's released relevant events are enriched (the week-scoped feed + strict BTC filter naturally bound this to ~10-12, web search is 5-concurrent, settled events are archived) so the drawer's Released tab is always complete and matches the header's week-wide count). **Persistence is two-tier:** a transient `.cache/` entry while the event is still settling, then — once it's ≥4h past release (reaction final) — its outcome is promoted to a **permanent committed archive `data/released-archive.json`**, keyed PER-OCCURRENCE (`currency|title|YYYY-MM-DD`) so a new FOMC never overwrites the old, and archived events are **never re-fetched**. Commit `data/released-archive.json` to keep history forever (serverless FS is read-only, so the committed file is the durable store).
 - **Strip cards are rich** (`StripCard`, matches handoff-16): header (currency/HIGH + title + time + live `CountdownLabel`) over a Forecast / If-`<condition>` / **BTC 2 prints** table. Drawer cards stay compact (`NewsCard`: forecast + reaction line, no countdown/prints).
 - **Insight enrichment is two-tier** (`lib/event-insight.ts`, model `claude-haiku-4-5-20251001`, `fetch` to Messages API — no SDK dep), both cached in-process by `currency|title`:
   - **`enrichReactions`** — condition + assets ("if hawkish → BTC↓ · USD↑ · SPX↓"). Cheap, **one batched call, NO web search**. Run for **ALL relevant events**, so every card (strip *and* drawer) gets the reaction row.
@@ -157,6 +157,17 @@ encoded in the component and no longer surprising.
 - Vertical gradient `ddGrad`: 0 opacity at y=0, very slow ease-in (≈0.015 at 3%, 0.04 at 8%, 0.08 at 15%) then exponential to 1.0 at the trough — faint even at shallow dips, dark at the trough
 - Horizontal mask `ddGrad-mx`: fades 4% on the left and 4% on the right (96→100%), opaque in between
 
+### Market-news header empty state (`plan/PlanPage.tsx` → `NewsHeader`)
+- When there are **no upcoming** relevant events, do NOT swap in a separate
+  banner (that was an old handoff-21 screenshot iteration, rejected). Instead
+  **keep the departure-board header** and render a quiet "No upcoming news"
+  (grey dot `#cfcdc4` + `#9b988d` text) where the countdown/progress bar was —
+  matching the dc.html `newsNoEvents` branch. `NewsHeader.next` is nullable.
+- The **strip cards are hidden** entirely when nothing is upcoming.
+- "This week" legend + "View all" total come from `weekHigh` (all relevant
+  events this week, upcoming + released) so they stay populated after every
+  release has fired and the drawer's Released tab still has content.
+
 ### Other current patterns
 - **Calendar month summary** (`positions-history/PositionHistoryTable.tsx`): nav header = Month/Year stacked · divider · trend circle + net P&L + trade count · divider · win/loss bar (92px, 5px) + W·L counts, all from `monthPositions` (visible y/m). Calendar is the default view (not gallery).
 - **Gallery `TradeCard` hover** (same file): the canonical card hover — gloss `0.68` + deepening gradient + darker border + `inset 0 1px 0 rgba(255,255,255,0.9)`, transitioned `.18s`.
@@ -171,3 +182,41 @@ encoded in the component and no longer surprising.
   To inspect one element, locate it via `getBoundingClientRect()` and pass a `clip`. For hover states, `page.mouse.move()` onto it first.
 - Dev server is kept running at `http://localhost:3000` by the user.
 - Commit + push after each logical unit (the user routinely asks "commit and push"). Co-author trailer reflects the active model.
+
+---
+
+## Planned (NOT yet built): Trade planner — entry / SL / TP / liquidation
+
+A new Plan-page section to plan a trade: input entry, SL, TP; compute exact
+liquidation, R:R, and fees. Discussed + inputs verified by the user 2026-06-16.
+**Build deferred until the Gate API key has WALLET read permission** (user is
+adding it). Do not build until the user confirms.
+
+### Data fetched + verified (2026-06-16)
+- **Contract `BTC_USDT`** (`GET /futures/usdt/contracts/BTC_USDT`, public):
+  contract size `cs = 0.0001` BTC (`quanto_multiplier`), base maintenance_rate
+  0.3%, leverage 1–200, default `taker_fee_rate 0.00075`, `maker_fee_rate -0.0001`.
+- **MMR is TIERED + PROGRESSIVE (tax-bracket style):** maintenance margin =
+  sum across tiers up to the position notional → an open position reports a
+  blended `average_maintenance_rate` (e.g. ~$5.8M position → 0.0058), NOT a
+  single tier's rate. Ladder from `GET /futures/usdt/risk_limit_tiers?contract=BTC_USDT`
+  (public): ≤500K→0.30% (200x), ≤1M→0.35%, ≤3M→0.50%, ≤5M→0.70%, ≤10M→0.85%,
+  ≤15M→1.00%, … up to 1.5B→0.50%/1.05x (19 tiers).
+- **Liquidation formula** (USDT perp, isolated; `Q`=contracts, `M`=margin):
+  - Long:  `P_liq = (Q·cs·P_entry − M) / (Q·cs·(1 − MMR))`
+  - Short: `P_liq = (Q·cs·P_entry + M) / (Q·cs·(1 + MMR))`
+  - For exactness, add the closing taker fee to the maintenance buffer.
+
+### Fees — BLOCKED on permission
+- `GET /wallet/fee?currency_pair=BTC_USDT` → **403 "does not have wallet
+  permission"**. The key has futures read but not wallet. Once wallet read is
+  added, fetch `futures_taker_fee` / `futures_maker_fee` (VIP-adjusted) here.
+  Until then only contract defaults (taker 0.075% / maker −0.01% rebate) are
+  available — NOT VIP-adjusted.
+
+### To build (when unblocked)
+- New `/api/gate/*` server routes (per security rule): `fee` (`/wallet/fee`,
+  needs wallet perm), `risk-tiers` (`/futures/usdt/risk_limit_tiers`, public),
+  `contract` (`/futures/usdt/contracts/BTC_USDT`, public). Hooks: `useFee`, etc.
+- Planner computes effective (blended) MMR from the ladder for the planned
+  notional, then liq via the formula above; show R:R and net-of-fee TP/SL.

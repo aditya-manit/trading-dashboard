@@ -175,7 +175,10 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
 
 // Released (already-fired) card: recessed tint, 4-col spec table — Forecast +
 // Actual (with Hot/Soft surprise chip), and If-<condition> + realized Reaction.
-function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
+function ReleasedCard({ e, info, loading }: { e: CalendarEvent; info?: ReleasedInfo; loading?: boolean }) {
+  // While the (slow) released map is still loading, show a shimmer for the
+  // enriched cells instead of a bare "—" — a "—" reads like a lost figure.
+  const pending = loading && !info;
   const forecast = (e.forecast || '').trim() || '—';
   // Actual reflects the figure vs FORECAST (independent of BTC): Hot (higher) →
   // red ▲, Soft (lower) → green ▼, In-line (equal / no forecast) → grey =. The
@@ -217,7 +220,9 @@ function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
         <div style={{ ...valCell, borderRight: '1px solid #f0efec' }}><span style={{ fontWeight: 800, fontSize: 12, color: '#1a1813' }}>{forecast}</span></div>
         <div style={labCell}><span style={lab}>Actual</span></div>
         <div style={valCell}>
-          {info?.note ? (
+          {pending ? (
+            <Skel w={48} />
+          ) : info?.note ? (
             <HoverTip tip={info.note} width={230}>
               <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.01em', color: actualColor, borderBottom: '1px dashed #cfccc4' }}>{caret}{info.actual}</span>
             </HoverTip>
@@ -226,9 +231,9 @@ function ReleasedCard({ e, info }: { e: CalendarEvent; info?: ReleasedInfo }) {
           )}
         </div>
         <div style={{ ...labCell, ...tb }}><span style={lab}>{info?.condition ? `If ${firstWord(info.condition)}` : 'If'}</span></div>
-        <div style={{ ...valCell, ...tb, borderRight: '1px solid #f0efec' }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.ifReaction ?? []} /></span></div>
+        <div style={{ ...valCell, ...tb, borderRight: '1px solid #f0efec' }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}>{pending ? <Skel w={64} /> : <AssetArrows assets={info?.ifReaction ?? []} />}</span></div>
         <div style={{ ...labCell, ...tb }}><span style={lab}>Reaction</span></div>
-        <div style={{ ...valCell, ...tb }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}><AssetArrows assets={info?.reaction ?? []} /></span></div>
+        <div style={{ ...valCell, ...tb }}><span style={{ fontWeight: 600, fontSize: 11, color: '#56544b' }}>{pending ? <Skel w={64} /> : <AssetArrows assets={info?.reaction ?? []} />}</span></div>
       </div>
     </div>
   );
@@ -356,14 +361,14 @@ function NewsEmpty({ query }: { query: string }) {
 // V5 "departure-board" news header: pulse + next release + big live countdown +
 // time-until progress bar + this-week impact legend + View all (handoff 17).
 function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
-  next: CalendarEvent;
+  next: CalendarEvent | null;
   progressPct: number;
   counts: { usMacro: number; centralBank: number };
   total: number;
   onViewAll: () => void;
 }) {
-  const c = IMPACT_COLOR[next.impact] || '#df5338';
-  const tier = relevanceTag(next);
+  const c = next ? (IMPACT_COLOR[next.impact] || '#df5338') : '#df5338';
+  const tier = next ? relevanceTag(next) : null;
   const [vaHover, setVaHover] = useState(false);
   // Legend uses our own tiers (US Macro / Central Bank), matching the card tags.
   const legend: [string, number, string][] = [['#0ea5e9', counts.usMacro, 'US Macro'], ['#7c5cff', counts.centralBank, 'Central bank']];
@@ -380,25 +385,37 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
         </div>
       </div>
       <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 9, padding: '11px 18px', minWidth: 280 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>Next release</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.015em', whiteSpace: 'nowrap' }}>{next.title}</span>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: c, flex: '0 0 auto' }} />
-              <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.06em', color: tier.color, whiteSpace: 'nowrap' }}>{next.country} · {tier.label}</span>
+      {next ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 9, padding: '11px 18px', minWidth: 280 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+              <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>Next release</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.015em', whiteSpace: 'nowrap' }}>{next.title}</span>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: c, flex: '0 0 auto' }} />
+                <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.06em', color: tier!.color, whiteSpace: 'nowrap' }}>{next.country} · {tier!.label}</span>
+              </div>
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
+              <CountdownFull date={next.date} style={{ fontSize: 23, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, whiteSpace: 'nowrap' }} />
+              <span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#d6b98a' }}>until release</span>
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
-            <CountdownFull date={next.date} style={{ fontSize: 23, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, whiteSpace: 'nowrap' }} />
-            <span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#d6b98a' }}>until release</span>
+          <div style={{ height: 5, borderRadius: 99, background: '#f3f1ec', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${progressPct}%`, background: '#c9821f', borderRadius: 99, transition: 'width .4s ease' }} />
           </div>
         </div>
-        <div style={{ height: 5, borderRadius: 99, background: '#f3f1ec', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progressPct}%`, background: '#c9821f', borderRadius: 99, transition: 'width .4s ease' }} />
+      ) : (
+        // No upcoming releases left this week — keep the board, swap the
+        // countdown for a quiet "No upcoming news" (handoff 21 / dc.html).
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, padding: '11px 18px', minWidth: 200 }}>
+          <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>Next release</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#cfcdc4', flex: '0 0 auto' }} />
+            <span style={{ fontWeight: 800, fontSize: 14, color: '#9b988d', letterSpacing: '-0.015em' }}>No upcoming news</span>
+          </div>
         </div>
-      </div>
+      )}
       <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5, padding: '11px 16px', flex: '0 0 auto' }}>
         <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>This week</span>
@@ -548,11 +565,15 @@ export function PlanPage() {
   const stripEvents = upcomingHigh.slice(0, 4);
   const nextEvent = upcomingHigh[0];
 
-  // Header legend uses our own tiers (US Macro / Central Bank) over the upcoming
+  // All BTC-relevant events this week (the feed is already week-scoped). Used
+  // for the header's "This week" legend + "View all" total so they stay
+  // meaningful even after every release has fired.
+  const weekHigh = (Array.isArray(calRaw) ? calRaw : []).filter(isBtcRelevant);
+  // Header legend uses our own tiers (US Macro / Central Bank) over this week's
   // relevant events — we don't surface generic High/Med/Low.
   const tierCounts = {
-    usMacro: upcomingHigh.filter((e) => e.country === 'USD').length,
-    centralBank: upcomingHigh.filter((e) => e.country !== 'USD').length,
+    usMacro: weekHigh.filter((e) => e.country === 'USD').length,
+    centralBank: weekHigh.filter((e) => e.country !== 'USD').length,
   };
   // Progress bar = imminence over a fixed 24h window (the countdown gives the
   // exact time; the bar is the at-a-glance "how soon"). >24h away → ~5% (a
@@ -565,10 +586,12 @@ export function PlanPage() {
   }
 
   // Released (already-fired) relevant events this week, most-recent first.
+  // Show ALL of them — the Released tab must match the header's week-wide count
+  // (capping at 4 hid earlier same-day events, e.g. the FOMC Statement/rate when
+  // the press conf + BoE were more recent). Enrichment may lag for the oldest.
   const releasedEvents = (Array.isArray(calRaw) ? calRaw : [])
     .filter((e) => isBtcRelevant(e) && new Date(e.date).getTime() < now.getTime())
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 4);
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   // Drawer search: match on event title or currency.
   const q = newsQuery.trim().toLowerCase();
   const matchQ = (e: CalendarEvent) => !q || e.title.toLowerCase().includes(q) || e.country.toLowerCase().includes(q);
@@ -609,20 +632,22 @@ export function PlanPage() {
 
       {/* market news */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {nextEvent ? (
-          <NewsHeader next={nextEvent} progressPct={newsProgress} counts={tierCounts} total={upcomingHigh.length} onViewAll={() => setNewsOpen(true)} />
-        ) : (
+        {calLoading ? (
           <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #efedea', borderRadius: 14, padding: '16px 18px', fontWeight: 700, fontSize: 13, color: '#897f70', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
-            {calLoading ? 'Loading economic calendar…' : 'No high-impact events ahead this week'}
+            Loading economic calendar…
+          </div>
+        ) : (
+          <NewsHeader next={nextEvent ?? null} progressPct={newsProgress} counts={tierCounts} total={weekHigh.length} onViewAll={() => setNewsOpen(true)} />
+        )}
+        {/* strip cards — hidden entirely when there are no upcoming events
+            (the empty banner above already says so) */}
+        {(calLoading || stripEvents.length > 0) && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+            {calLoading
+              ? [0, 1, 2, 3].map((i) => <div key={i} style={{ height: 150, background: '#fff', border: '1px solid #f0efec', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }} />)
+              : stripEvents.map((e, i) => <StripCard key={i} e={e} loading={insightsLoading} def={defMap?.[e.title]} />)}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
-          {calLoading
-            ? [0, 1, 2, 3].map((i) => <div key={i} style={{ height: 150, background: '#fff', border: '1px solid #f0efec', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }} />)
-            : stripEvents.length > 0
-              ? stripEvents.map((e, i) => <StripCard key={i} e={e} loading={insightsLoading} def={defMap?.[e.title]} />)
-              : <div style={{ gridColumn: '1 / -1', background: '#fff', border: '1px solid #f0efec', borderRadius: 13, padding: '16px 18px', fontWeight: 600, fontSize: 12.5, color: '#897f70' }}>No high-impact events remaining this week.</div>}
-        </div>
       </div>
 
       {/* news drawer */}
@@ -678,7 +703,7 @@ export function PlanPage() {
                       <span style={{ flex: 1, height: 1, background: '#efedea' }} />
                       {releasedLoading && <span style={{ fontWeight: 600, fontSize: 9.5, color: '#bba074' }}>confirming actuals…</span>}
                     </div>
-                    {releasedFiltered.map((e, i) => <ReleasedCard key={i} e={e} info={releasedMap?.[eventKey(e)]} />)}
+                    {releasedFiltered.map((e, i) => <ReleasedCard key={i} e={e} info={releasedMap?.[eventKey(e)]} loading={releasedLoading} />)}
                   </div>
                 )
               ) : newsGroups.length === 0 ? (

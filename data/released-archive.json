@@ -1,4 +1,73 @@
 {
+  "JPY|BOJ Policy Rate|2026-06-15": {
+    "actual": "1.0%",
+    "surprise": "In line",
+    "bearishForBtc": true,
+    "condition": "hawkish",
+    "ifReaction": [
+      {
+        "sym": "crypto",
+        "dir": "down"
+      }
+    ],
+    "reaction": [
+      {
+        "sym": "BTC",
+        "dir": "down"
+      },
+      {
+        "sym": "stocks",
+        "dir": "up"
+      }
+    ],
+    "note": "Raised to 1.0% as expected; 7-1 vote. Hawkish tone on continued hikes, but BTC fell post-announcement while stocks rallied on Iran peace deal."
+  },
+  "JPY|BOJ Press Conference|2026-06-16": {
+    "actual": "1.0%",
+    "surprise": "In line",
+    "bearishForBtc": true,
+    "condition": "hawkish",
+    "ifReaction": [
+      {
+        "sym": "crypto",
+        "dir": "down"
+      }
+    ],
+    "reaction": [
+      {
+        "sym": "BTC",
+        "dir": "up"
+      },
+      {
+        "sym": "stocks",
+        "dir": "down"
+      }
+    ],
+    "note": "Rate hiked to 1.0% as expected—hawkish tone on inflation, but BTC rallied on US-Iran deal; stocks fell on tech weakness."
+  },
+  "JPY|Monetary Policy Statement|2026-06-15": {
+    "actual": "1.0%",
+    "surprise": "In line",
+    "bearishForBtc": true,
+    "condition": "hawkish",
+    "ifReaction": [
+      {
+        "sym": "crypto",
+        "dir": "flat"
+      }
+    ],
+    "reaction": [
+      {
+        "sym": "BTC",
+        "dir": "flat"
+      },
+      {
+        "sym": "stocks",
+        "dir": "flat"
+      }
+    ],
+    "note": "Rate hiked 25bp to 1.0% as expected; JGB taper paused (dovish offset). BTC held $66K, stocks mixed."
+  },
   "USD|FOMC Economic Projections|2026-06-17": {
     "actual": "3.8%",
     "surprise": "Hot",
