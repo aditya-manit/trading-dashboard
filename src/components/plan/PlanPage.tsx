@@ -364,6 +364,7 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
 }) {
   const c = IMPACT_COLOR[next.impact] || '#df5338';
   const tier = relevanceTag(next);
+  const [vaHover, setVaHover] = useState(false);
   // Legend uses our own tiers (US Macro / Central Bank), matching the card tags.
   const legend: [string, number, string][] = [['#0ea5e9', counts.usMacro, 'US Macro'], ['#7c5cff', counts.centralBank, 'Central bank']];
   return (
@@ -412,8 +413,14 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
         </div>
       </div>
       <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
-      <button onClick={onViewAll} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', border: 'none', padding: '0 18px', fontWeight: 700, fontSize: 12, color: '#56544b', flex: '0 0 auto' }}>
-        View all <span style={{ fontWeight: 800, color: '#c9821f' }}>{total}</span> →
+      <button onClick={onViewAll} onMouseEnter={() => setVaHover(true)} onMouseLeave={() => setVaHover(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontFamily: 'inherit', background: vaHover ? '#faf8ff' : 'transparent', border: 'none', padding: '0 16px', flex: '0 0 auto', alignSelf: 'stretch', transition: 'all .15s' }}>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-start' }}>
+          <span style={{ fontWeight: 600, fontSize: 12.5, color: '#1a1813', letterSpacing: '-0.015em', whiteSpace: 'nowrap' }}>View all</span>
+          <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#bba074', whiteSpace: 'nowrap' }}>{total} events</span>
+        </span>
+        <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#f4f3f0', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1a1813" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+        </span>
       </button>
     </div>
   );
