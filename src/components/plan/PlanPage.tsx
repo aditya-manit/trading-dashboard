@@ -338,6 +338,21 @@ function NewsCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def
   );
 }
 
+// Illustrated empty state when a drawer search matches nothing (handoff 19).
+function NewsEmpty({ query }: { query: string }) {
+  return (
+    <div style={{ padding: '40px 24px 30px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 11, alignItems: 'center' }}>
+      <span style={{ width: 48, height: 48, borderRadius: 14, background: '#f4f3f0', display: 'grid', placeItems: 'center' }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#b3b0a6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4" /><path d="M16 2v4" /><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M3 10h18" /><path d="m14 14-4 4" /><path d="m10 14 4 4" /></svg>
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <span style={{ fontWeight: 800, fontSize: 13.5, color: '#1a1813', letterSpacing: '-0.01em' }}>No events found</span>
+        <span style={{ fontWeight: 500, fontSize: 12, color: '#a8a69b', lineHeight: 1.45 }}>Nothing matches “{query}” in this view.</span>
+      </div>
+    </div>
+  );
+}
+
 // V5 "departure-board" news header: pulse + next release + big live countdown +
 // time-until progress bar + this-week impact legend + View all (handoff 17).
 function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
@@ -648,7 +663,7 @@ export function PlanPage() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 18px', display: 'flex', flexDirection: 'column', gap: 22 }}>
               {newsTab === 'released' ? (
                 releasedFiltered.length === 0 ? (
-                  <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>{q ? `No released events match “${newsQuery.trim()}”.` : 'No high-impact events released yet this week.'}</span>
+                  q ? <NewsEmpty query={newsQuery.trim()} /> : <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>No high-impact events released yet this week.</span>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -660,7 +675,7 @@ export function PlanPage() {
                   </div>
                 )
               ) : newsGroups.length === 0 ? (
-                <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>{q ? `No upcoming events match “${newsQuery.trim()}”.` : 'No high-impact events remaining this week.'}</span>
+                q ? <NewsEmpty query={newsQuery.trim()} /> : <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>No high-impact events remaining this week.</span>
               ) : newsGroups.map((g) => (
                 <div key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
