@@ -66,7 +66,14 @@ function saveCache() {
 const ARCHIVE_FILE = join(process.cwd(), 'data', 'released-archive.json');
 const archive = new Map<string, ReleasedInfo>();
 let archiveLoaded = false;
-const SETTLE_MS = 4 * 3_600_000; // wait ~4h after release before archiving (let the reaction settle)
+// Two-stage timing after a release fires:
+//   FETCH_AFTER_MS (2h) — don't web-search the actual until the figure has had
+//     time to be reported/indexed, so the first pull lands a CONFIRMED number
+//     rather than burning a search on a too-fresh event (which returns blank).
+//   SETTLE_MS (4h) — once the reaction has settled, promote the cached outcome
+//     into the permanent committed archive, never to be re-fetched.
+const FETCH_AFTER_MS = 2 * 3_600_000;
+const SETTLE_MS = 4 * 3_600_000;
 const relKey = (country: string, title: string, date: string) => `${country}|${title}|${date.slice(0, 10)}`;
 
 function loadArchive() {
@@ -251,7 +258,9 @@ Your FINAL message must be ONLY a JSON object (no prose, no code fences):
 {"actual":"<the figure ONLY, in the SAME format/units as the forecast>","surprise":"Hot|Soft|In line","bearishForBtc":true|false,"condition":"ONE word bullish-for-currency scenario, e.g. hawkish, hot, beat, fewer (no qualifiers)","ifReaction":[{"sym":"crypto","dir":"up|down|flat"}],"reaction":[{"sym":"BTC","dir":"up|down|flat"},{"sym":"stocks","dir":"up|down|flat"}],"note":"<optional, <=140 chars: a useful detail — vs forecast/previous, a notable move, or what stood out. Empty string if nothing noteworthy.>"}
 
 Rules:
-- "actual": if the release HAS a numeric reading, give JUST that figure in the forecast's format (data: "0.4%"; rate decision: the SINGLE policy rate e.g. "3.75%", never a range). If the release has NO number — a policy STATEMENT, PRESS CONFERENCE, speech, or minutes — give a SHORT 1-2 word qualitative outcome instead (e.g. "Hawkish", "Dovish", "Hawkish hold"). NEVER invent a number or repeat a rate range (e.g. "3.625%" or "3.50%-3.75%") for a non-numeric event.
+- "actual": if the release HAS a numeric reading, give JUST that figure in the forecast's format (data: "0.4%"; rate decision: the SINGLE policy rate e.g. "3.75%", never a range). If the release has NO number — a policy STATEMENT, SUMMARY, PRESS CONFERENCE, speech, or minutes — give a SHORT 1-2 word qualitative outcome instead (e.g. "Hawkish", "Dovish", "Hawkish hold"). NEVER invent a number or repeat a rate range (e.g. "3.625%" or "3.50%-3.75%") for a non-numeric event.
+- MATCH THE FORECAST'S FORMAT EXACTLY. If the forecast is a VOTE SPLIT like "1-0-8", the actual MUST be the SAME N-part split in the same order (e.g. "0-2-7") — never collapse it to "7-2" or a single number.
+- A "...Summary" / "...Statement" / "...Minutes" / "...Press Conference" is the COMMENTARY, not the decision — give its TONE ("Hawkish hold"), NEVER the policy rate. The rate belongs to the rate-decision event; give the right event the credit.
 - "surprise": how the release compared to what was EXPECTED — this drives the Actual's colour, so be precise.
   • Forecast given → Hot = actual above forecast, Soft = below, In line = equals it.
   • No forecast figure (statement, dot plot, press conf) → judge vs the PRIOR reading / consensus you find: Hot if clearly more hawkish/stronger than expected (e.g. dot plot revised UP), Soft if more dovish/weaker, In line if it matched.
@@ -271,7 +280,13 @@ EXAMPLES (input → output):
 {"actual":"0.4%","surprise":"Hot","bearishForBtc":true,"condition":"hot","ifReaction":[{"sym":"BTC","dir":"down"}],"reaction":[{"sym":"BTC","dir":"up"},{"sym":"stocks","dir":"up"}],"note":"Hot 0.4% vs 0.3%, yet BTC rallied on positioning — reaction diverged from the usual drop."}
 
 {"currency":"USD","event":"FOMC Statement","forecast":""} (no number — hawkish text) →
-{"actual":"Hawkish","surprise":"Hot","bearishForBtc":true,"condition":"hawkish","ifReaction":[{"sym":"crypto","dir":"down"}],"reaction":[{"sym":"BTC","dir":"down"},{"sym":"stocks","dir":"down"}],"note":"Dropped the easing bias and flagged upside inflation risks — no figure, tone hawkish."}`;
+{"actual":"Hawkish","surprise":"Hot","bearishForBtc":true,"condition":"hawkish","ifReaction":[{"sym":"crypto","dir":"down"}],"reaction":[{"sym":"BTC","dir":"down"},{"sym":"stocks","dir":"down"}],"note":"Dropped the easing bias and flagged upside inflation risks — no figure, tone hawkish."}
+
+{"currency":"GBP","event":"MPC Official Bank Rate Votes","forecast":"1-0-8"} (two members dissented for a hike) →
+{"actual":"0-2-7","surprise":"Hot","bearishForBtc":true,"condition":"hawkish","ifReaction":[{"sym":"crypto","dir":"down"}],"reaction":[{"sym":"BTC","dir":"down"},{"sym":"stocks","dir":"up"}],"note":"2 of 9 dissented for a hike vs none expected — same 3-part split format, hawkish surprise."}
+
+{"currency":"GBP","event":"Monetary Policy Summary","forecast":""} (rate held, hawkish minutes) →
+{"actual":"Hawkish hold","surprise":"In line","bearishForBtc":true,"condition":"hawkish","ifReaction":[{"sym":"crypto","dir":"down"}],"reaction":[{"sym":"BTC","dir":"down"},{"sym":"stocks","dir":"up"}],"note":"Held; minutes leaned hawkish on sticky services inflation — TONE, not the 3.75% rate (that's the rate event)."}`;
 
 export async function enrichReleased(
   events: { country: string; title: string; date: string; forecast?: string }[],
@@ -285,9 +300,14 @@ export async function enrichReleased(
   const uniq = new Map<string, { country: string; title: string; date: string; forecast?: string }>();
   for (const e of events) uniq.set(relKey(e.country, e.title, e.date), e);
 
-  // Fetch only occurrences absent from BOTH the permanent archive and the
-  // transient cache. Archived events are final — never re-fetched.
-  const toFetch = [...uniq.entries()].filter(([occ]) => !archive.has(occ) && !releasedCache.has(occ)).map(([, e]) => e);
+  // Fetch only occurrences that are (a) absent from BOTH the archive and the
+  // transient cache, AND (b) at least FETCH_AFTER_MS past release — so the
+  // first (and usually only) web search lands a confirmed figure instead of a
+  // blank. Archived events are final; too-fresh events wait and show "—" until
+  // they settle, then pull cleanly.
+  const toFetch = [...uniq.entries()]
+    .filter(([occ, e]) => !archive.has(occ) && !releasedCache.has(occ) && Date.now() - new Date(e.date).getTime() > FETCH_AFTER_MS)
+    .map(([, e]) => e);
   if (apiKey && toFetch.length) {
     await pool(toFetch, 5, async (e) => {
       try {
@@ -346,10 +366,12 @@ async function fetchReleased(
 
   const actual = String(o.actual ?? '').trim();
   const reaction = (Array.isArray(o.reaction) ? o.reaction : []).slice(0, 3).map(asset);
-  // The event is over — accept the result as final as long as we got SOMETHING
-  // (an actual or a reaction). Only a total blank retries (e.g. a press
-  // conference has no numeric actual but does have a reaction/note).
-  if (!actual && reaction.length === 0) throw new Error('nothing confirmed');
+  // Require a CONFIRMED actual. A post-release event always has one (a figure,
+  // or a qualitative tone like "Hawkish hold"). An empty actual means the figure
+  // wasn't confirmable yet — throw so it is NOT cached and re-pulls next time,
+  // instead of freezing on a flat-guess reaction. (This was the bug that left
+  // the BoE summary/votes blank: empty actual + flat reaction got cached final.)
+  if (!actual) throw new Error('actual not confirmed yet');
   return {
     actual,
     surprise: String(o.surprise ?? 'In line'),

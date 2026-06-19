@@ -1,4 +1,73 @@
 {
+  "GBP|MPC Official Bank Rate Votes|2026-06-18": {
+    "actual": "2-0-7",
+    "surprise": "Hot",
+    "bearishForBtc": true,
+    "condition": "hawkish",
+    "ifReaction": [
+      {
+        "sym": "crypto",
+        "dir": "down"
+      }
+    ],
+    "reaction": [
+      {
+        "sym": "BTC",
+        "dir": "down"
+      },
+      {
+        "sym": "stocks",
+        "dir": "up"
+      }
+    ],
+    "note": "2 of 9 dissented for a hike vs 1 expected — hawkish split."
+  },
+  "GBP|Monetary Policy Summary|2026-06-18": {
+    "actual": "Hawkish hold",
+    "surprise": "Hot",
+    "bearishForBtc": true,
+    "condition": "hawkish",
+    "ifReaction": [
+      {
+        "sym": "crypto",
+        "dir": "down"
+      }
+    ],
+    "reaction": [
+      {
+        "sym": "BTC",
+        "dir": "down"
+      },
+      {
+        "sym": "stocks",
+        "dir": "up"
+      }
+    ],
+    "note": "Held at 3.75% but more members voted to hike than expected — hawkish lean."
+  },
+  "GBP|Official Bank Rate|2026-06-18": {
+    "actual": "3.75%",
+    "surprise": "In line",
+    "bearishForBtc": false,
+    "condition": "neutral",
+    "ifReaction": [
+      {
+        "sym": "crypto",
+        "dir": "flat"
+      }
+    ],
+    "reaction": [
+      {
+        "sym": "BTC",
+        "dir": "flat"
+      },
+      {
+        "sym": "stocks",
+        "dir": "up"
+      }
+    ],
+    "note": "BoE held at 3.75% as universally expected; no surprise. Broader market relief on Iran peace deal."
+  },
   "JPY|BOJ Policy Rate|2026-06-15": {
     "actual": "1.0%",
     "surprise": "In line",

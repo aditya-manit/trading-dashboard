@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useState, type CSSProperties } from 'react';
+import { memo, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
@@ -358,6 +358,23 @@ function NewsEmpty({ query }: { query: string }) {
   );
 }
 
+// Illustrated empty state for a tab with no events (no active search) —
+// icon chip + title + one-line caption, centered.
+function NewsZero({ icon, title, sub, tint }: { icon: ReactNode; title: string; sub: string; tint?: { bg: string; fg: string } }) {
+  return (
+    <div style={{ padding: '46px 24px 38px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 13, alignItems: 'center' }}>
+      <span style={{ position: 'relative', width: 54, height: 54, borderRadius: 16, background: tint?.bg ?? '#f4f3f0', display: 'grid', placeItems: 'center' }}>
+        <span style={{ position: 'absolute', inset: -5, borderRadius: 20, border: `1px solid ${tint?.bg ?? '#f1f0ec'}`, opacity: 0.6 }} />
+        {icon}
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', letterSpacing: '-0.01em' }}>{title}</span>
+        <span style={{ fontWeight: 500, fontSize: 12, color: '#a8a69b', lineHeight: 1.5, maxWidth: 250 }}>{sub}</span>
+      </div>
+    </div>
+  );
+}
+
 // V5 "departure-board" news header: pulse + next release + big live countdown +
 // time-until progress bar + this-week impact legend + View all (handoff 17).
 function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
@@ -695,7 +712,13 @@ export function PlanPage() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 18px', display: 'flex', flexDirection: 'column', gap: 22 }}>
               {newsTab === 'released' ? (
                 releasedFiltered.length === 0 ? (
-                  q ? <NewsEmpty query={newsQuery.trim()} /> : <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>No high-impact events released yet this week.</span>
+                  q ? <NewsEmpty query={newsQuery.trim()} /> : (
+                    <NewsZero
+                      title="Nothing released yet"
+                      sub="High-impact events show up here once they've fired this week."
+                      icon={<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#b3b0a6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" /></svg>}
+                    />
+                  )
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -707,7 +730,13 @@ export function PlanPage() {
                   </div>
                 )
               ) : newsGroups.length === 0 ? (
-                q ? <NewsEmpty query={newsQuery.trim()} /> : <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70' }}>No high-impact events remaining this week.</span>
+                q ? <NewsEmpty query={newsQuery.trim()} /> : (
+                  <NewsZero
+                    title="All clear"
+                    sub="No high-impact events left this week — nothing scheduled to trade around."
+                    icon={<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#b3b0a6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4" /><path d="M16 2v4" /><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M3 10h18" /><path d="m9 16 2 2 4-4" /></svg>}
+                  />
+                )
               ) : newsGroups.map((g) => (
                 <div key={g.key} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
