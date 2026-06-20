@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useSWRConfig } from 'swr';
+import { ProfileMenu } from './ProfileMenu';
 
 const TABS = [
   { id: 'overview',   label: 'Overview' },
@@ -157,7 +158,7 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2faa63', boxShadow: '0 0 0 3px rgba(47,170,99,0.16)', display: 'inline-block' }} />
           Read-only · {synced ? `synced ${synced}` : 'syncing…'}
         </button>
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(150deg,#d7d4cc,#bcb9af)', display: 'grid', placeItems: 'center', color: '#46443c', fontWeight: 700, fontSize: 13 }}>AV</div>
+        <ProfileMenu />
       </div>
     </div>
   );

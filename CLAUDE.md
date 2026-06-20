@@ -223,23 +223,92 @@ adding it). Do not build until the user confirms.
 
 ---
 
-## Planned (NOT yet built): KV persistence for the released archive
+## Planned (NOT yet built): Persistence backend — Supabase
 
-**Problem:** released outcomes are persisted to the **local filesystem**
-(`data/released-archive.json` committed + `.cache/event-insight.json`
-gitignored). On Vercel/serverless the FS is **read-only at runtime**, so events
-that fire *in production* are enriched only in per-instance memory (ephemeral,
-re-fetched on every cold start, never committed). Growing the archive durably
-today means: run locally → commit `data/released-archive.json` → push → redeploy.
+**Decided backend = Supabase** (one service for everything we need to write):
+Postgres for structured/persistent data, Supabase Storage for image files. Chosen
+over Turso/Neon/KV/Blob because it covers BOTH entries and files in one account.
+website https://supabase.com · pricing https://supabase.com/pricing
 
-**Fix (when we deploy):** add an **optional KV backend (Upstash Redis / Vercel
-KV)** — a key→JSON store, the exact shape we already have (`currency|title|date`
-→ `ReleasedInfo`). Same idea for reactions/prints/defs caches.
-- **Wire as a fallback:** if `KV_REST_API_URL` + `KV_REST_API_TOKEN` are set,
-  read/write KV; otherwise fall back to the committed file (so local dev with no
-  env stays exactly as now). KV works **identically local + prod** (it's a
-  network service, not disk) — no more local-populate-then-commit loop.
-- Touch points: `loadArchive`/`saveArchive` + `loadCache`/`saveCache` in
-  `lib/event-insight.ts` (and the defs cache in `lib/event-definitions.ts`).
-- Postgres/Blob would also work; KV is simplest for a flat key→JSON map.
-- Free tiers (Upstash/Vercel/Neon) are far bigger than this needs.
+**What goes where:**
+- **Postgres** → `plans`, `journal_entries`, and (migrate from the file) the
+  `released_archive`. Tables, not blobs.
+- **Storage** (S3-compatible, CDN URL) → trade **chart image files**; store only
+  the returned **URL** in a Postgres column, never the image bytes in the DB.
+
+**Why this exists:** Vercel's serverless FS is **read-only at runtime**, so the
+current file persistence (`data/released-archive.json` + `.cache/`) can't be
+written in prod (events enriched in-prod live only in per-instance memory).
+Supabase is network-backed → works **identically local + prod**, and unlike the
+commit-a-file workaround it's the right home for *user-authored* data (journal).
+
+**Tables (sketch):**
+```sql
+plans(id, created_at, entry, sl, tp, leverage, thesis, status)        -- planned/taken/invalidated
+journal_entries(id, created_at, trade_key, title, body, tags, chart_url)
+released_archive(occ_key PRIMARY KEY, info JSONB)                      -- currency|title|date → ReleasedInfo
+```
+
+**Integration (fits the repo's security model — same as the Gate API):**
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in env — **server-only**, never client.
+- All reads/writes go through `/api/*` server routes; client uses hooks
+  (`useJournal`, `usePlans`) that `fetch()` those routes — like `usePositions`.
+- Chart upload: `POST /api/journal/[id]/chart` → Supabase Storage (server-side
+  key) → save returned URL in the row → `<img src={url}>` in the drawer.
+- Migrate `loadArchive`/`saveArchive`/`loadCache` in `lib/event-insight.ts` to
+  read/write Supabase when env is set; fall back to the file when it isn't (so
+  local dev with no env is unchanged).
+
+**Sizing / plan:** Free tier is plenty on size (500 MB Postgres = 100k+ text
+entries; 1 GB Storage = thousands of chart PNGs). The real free ceiling is
+**bandwidth (5 GB/mo egress)**, not storage. Start on **Free**; upgrade to **Pro
+($25/mo)** when the journal holds data you can't lose — Pro's value is **daily
+backups** (Free has NO auto-restore) + no pausing, not size.
+
+**Keepalive cron (lives IN this project):** Free projects **pause after ~7 days
+idle**. Prevent it with a daily ping — define it in-repo, no external service:
+- `vercel.json` → `{ "crons": [{ "path": "/api/keepalive", "schedule": "0 9 * * *" }] }`
+  (Vercel Hobby allows one daily cron).
+- `/api/keepalive/route.ts` → one trivial query (`select 1` / fetch a row) to
+  reset the inactivity timer. A READ is enough — no write+delete churn.
+- NB: keepalive stops pausing but does NOT give backups — that's still the Pro
+  argument for "forever" data.
+
+**Open decision:** `journal_entries.trade_key` — link to the closed-position id
+(`position-close`) or stand-alone entries? Drives whether the drawer shows an
+attached journal note per trade.
+
+**Graceful default:** gate the whole feature on the Supabase env vars; with none
+set, hide the plans/journal/upload UI (local dev unaffected), mirroring the app.
+
+### Auth — single-user Google OAuth gate ✅ BUILT
+
+The whole app is locked to the **owner only** via Supabase Auth + Google OAuth.
+Files:
+- `src/proxy.ts` — **the gate** (Next 16 renamed `middleware.ts` → `proxy.ts`,
+  Node runtime). Requires a Supabase session AND `user.email === OWNER_EMAIL`;
+  else → redirect `/login` (pages) or `401` (`/api/*`). **Inert** unless all of
+  `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` +
+  `OWNER_EMAIL` are set (so a keyless clone isn't bricked). No bypass switch —
+  the lock is unconditional once configured (a temporary `DISABLE_AUTH` dev
+  toggle existed and was removed; don't reintroduce it).
+- `src/lib/supabase/{client,server}.ts` — `@supabase/ssr` browser + server
+  clients (publishable key + cookies). `cookies()` is async in Next 16.
+- `src/app/login/page.tsx` — login screen (favicon logo from `app/icon.svg`),
+  "Continue with Google"; shows "not authorized" + sign-out when a non-owner is
+  signed in (`?error=unauthorized`).
+- `src/app/auth/callback/route.ts` — `exchangeCodeForSession`.
+- `src/app/auth/signout/route.ts` — POST → `signOut()` → `/login`.
+- `src/components/layout/ProfileMenu.tsx` — Topbar avatar (Google
+  `user_metadata.avatar_url`, `referrerPolicy="no-referrer"`, initials
+  fallback) → dropdown with name/email + **Sign out**. Replaced the static "AV".
+- **Env:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+  (browser-safe), `OWNER_EMAIL`. Supabase's **new key names**: publishable =
+  old anon, **`SUPABASE_SECRET_KEY`** = old service_role (server-only, for the
+  DB/storage phase — NOT used by the gate).
+- **Provider setup (one-time, in dashboards, not code):** Google Cloud OAuth web
+  client → Client ID/Secret into Supabase Auth → Google; Supabase **redirect
+  URLs** must include `http://localhost:3000/auth/callback` (+ prod URL); Site
+  URL set. Second lock: Supabase → **disable "Allow new users to sign up"** after
+  first login (blocks new accounts; the `OWNER_EMAIL` check is the authoritative
+  one — Supabase's toggle doesn't gate app access, only account creation).
