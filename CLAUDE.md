@@ -174,6 +174,7 @@ encoded in the component and no longer surprising.
 - **Definition tooltips** (`DefLabel` / `LabelWithTooltip` / `CellLabel`): `cursor:help`, dashed underline, color shift on hover, dark popup (`#1a1813`, 186px, `bottom:calc(100%+9px)`). In `RealizedPerformance.tsx`, `KpiStrip.tsx`, `KeyMetricsRow.tsx`.
 
 ### Workflow
+- **⚠️ ALWAYS port the version that is ACTUALLY RENDERED, not the first builder you find.** The `.dc.html` keeps many superseded variants of a component side-by-side (e.g. `boardCard` has `spec`/`ac`/`b` variants; the news card had A–E). Before porting, **trace which one the live template binds** — grep for the `renderVals`/template binding (e.g. `dropZone(..., 'ac')`, `{{ tpBoardIdeas }}`) and follow the `variant`/flag through. The handoff CLAUDE.md prose can lag the final pick — the binding in the dc.html is the source of truth. (Mistake made twice: shipped the older `spec` board card and an older news card by porting the first builder, not the bound variant. Check the binding first.)
 - **Design zips** land in `/Users/aditya/Downloads/Trading Dashboard-handoff (N).zip`. Extract to `/tmp/trading-handoff-N/`, then read the numbered `screenshots/*.png` in order (highest number = final pick — the design iterates within one zip). The exact CSS is in `project/Trading Dashboard (purple).dc.html` — grep it for pixel-accurate values rather than eyeballing screenshots.
 - Read the current component before editing. After changes, screenshot with Playwright (installed in repo) and read the PNG back:
   ```
@@ -280,6 +281,20 @@ attached journal note per trade.
 
 **Graceful default:** gate the whole feature on the Supabase env vars; with none
 set, hide the plans/journal/upload UI (local dev unaffected), mirroring the app.
+
+### ⚠️⚠️ TEMPORARY AUTH BYPASS IS ACTIVE — RE-ENABLE BEFORE SHIPPING ⚠️⚠️
+A dev bypass is currently ON so the agent can screenshot/verify the Plan funnel
+build past the login wall. **The app is UNLOCKED right now.** To restore the
+permanent fail-closed lock **exactly as it was**, do all three:
+1. `src/proxy.ts` — remove the `AUTH_DISABLED` const (the `process.env.DISABLE_AUTH`
+   line + its comment) AND the `if (AUTH_DISABLED) return NextResponse.next();`
+   first line of `proxy()`.
+2. `src/lib/auth-guard.ts` — remove the `if (process.env.DISABLE_AUTH === 'true') return null;`
+   line at the top of `requireOwner()`.
+3. `.env.local` — remove the `DISABLE_AUTH=true` line (+ its comment).
+Then restart the dev server. Verify: `GET /` → 307 → `/login`, `GET /api/gate/account` → 401.
+(`.env.local` is gitignored so prod never sees the flag, but the code lines must
+come out to match the committed fail-closed state.)
 
 ### Auth — single-user Google OAuth gate ✅ BUILT
 

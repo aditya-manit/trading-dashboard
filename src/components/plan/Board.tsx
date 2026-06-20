@@ -1,9 +1,8 @@
 'use client';
 
-import { useRef, useState, type CSSProperties } from 'react';
+import { useRef, useState } from 'react';
 import { type Plan, type Status, tpCompute, planToDraft, tpPlanName, tpMoney } from '@/lib/plan-model';
 import { planActions, usePlanStore } from '@/lib/plan-store';
-import { LiveMath } from './LiveMath';
 import { CoinIcon } from './coins';
 
 const COLS: { key: Status; label: string }[] = [
@@ -11,49 +10,31 @@ const COLS: { key: Status; label: string }[] = [
   { key: 'armed', label: 'Armed' },
   { key: 'triggered', label: 'Triggered' },
 ];
-const lbl = (t: string) => <span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#a8a69b' }}>{t}</span>;
+const money = (v: number) => (isFinite(v) ? tpMoney(v, v < 1000 ? 2 : 0) : '—');
 
+// Board card — the 'ac' variant the design actually renders: margin donut +
+// coin/name/dir/lev + entry, over big Risk·equity / Reward·equity numbers + bar.
 function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const [hover, setHover] = useState(false);
   const delT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragAt = useRef(0);
   const long = p.dir === 'long', col = long ? '#1f9d55' : '#df5338';
   const d = planToDraft(p), c = tpCompute(d);
-  const levHigh = Number(p.lev) > 5;
-  const dragAt = useRef(0);
+  const tp1 = c.rrList[0], rr = c.primaryR;
+  const rewardUSD = tp1 ? tp1.rewardUSD : NaN, rewardPct = isFinite(rewardUSD) ? (rewardUSD / c.Q) * 100 : NaN;
+  const riskW = isFinite(rr) && rr > 0 ? Math.max(8, Math.min(60, 100 / (1 + rr))) : 25;
+  const mp = Math.max(0, Math.min(100, c.marginPct || 0));
 
   return (
-    <div
-      draggable
-      onDragStart={(e) => { planActions; (window as unknown as { __tpDrag?: string }).__tpDrag = p.id; dragAt.current = Date.now(); e.dataTransfer.effectAllowed = 'move'; }}
+    <div draggable
+      onDragStart={(e) => { (window as unknown as { __tpDrag?: string }).__tpDrag = p.id; dragAt.current = Date.now(); e.dataTransfer.effectAllowed = 'move'; }}
       onClick={() => { if (Date.now() - dragAt.current > 250) onOpen(p); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative', background: '#fff', border: '1px solid #ece9e3', borderLeft: `3px solid ${col}`, borderRadius: 14, overflow: 'hidden', cursor: 'pointer', boxShadow: hover ? '0 4px 16px rgba(20,18,12,0.07)' : '0 1px 2px rgba(20,20,12,0.03)', transition: 'box-shadow .15s, border-color .15s' }}
-    >
-      {p.chart ? (
-        <div style={{ width: '100%', overflow: 'hidden', borderBottom: '1px solid #f1f0ed', background: '#fbfaf8' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={p.chart} alt="" style={{ display: 'block', width: '100%', height: 'auto' }} />
-        </div>
-      ) : null}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '9px 38px 9px 13px', borderBottom: '1px solid #f1f0ed' }}>
-        <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.01em', color: '#1a1813', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpPlanName(p)}</span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.72fr', borderBottom: '1px solid #e4e2db', background: '#faf9f7' }}>
-        <div style={{ padding: '8px 12px', borderRight: '1px solid #e4e2db', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>{lbl('Market')}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}><CoinIcon sym={p.sym} /><span style={{ fontWeight: 800, fontSize: 13, color: '#1a1813', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.symLabel || p.sym + '/USDT.P'}</span></div>
-        </div>
-        <div style={{ padding: '8px 12px', borderRight: '1px solid #e4e2db', display: 'flex', flexDirection: 'column', gap: 4 }}>{lbl('Direction')}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">{long ? <><path d="M7 17 17 7" /><path d="M8 7h9v9" /></> : <><path d="M7 7 17 17" /><path d="M17 8v9H8" /></>}</svg>
-            <span style={{ fontWeight: 800, fontSize: 13, color: col }}>{long ? 'Long' : 'Short'}</span>
-          </div>
-        </div>
-        <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>{lbl('Leverage')}
-          <span style={{ fontWeight: 800, fontSize: 13, color: levHigh ? '#df5338' : '#1a1813', fontVariantNumeric: 'tabular-nums' }}>{p.lev}×</span>
-        </div>
-      </div>
-      <LiveMath c={c} d={d} dense idSuffix={p.id} />
+      style={{ position: 'relative', background: '#fff', border: '1px solid #efedea', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column', boxShadow: hover ? '0 6px 18px rgba(20,18,12,0.08)' : '0 1px 3px rgba(20,20,12,0.04)', transition: 'box-shadow .15s' }}>
+      {/* direction bookmark */}
+      <div style={{ position: 'absolute', top: 0, right: 24, width: 26, height: 34, background: col, clipPath: 'polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)', zIndex: 2 }} />
+      {/* delete */}
       <div style={{ position: 'absolute', top: 6, right: 7, zIndex: 4, opacity: hover || confirmDel ? 1 : 0, transition: 'opacity .12s' }}>
         {confirmDel ? (
           <button onClick={(e) => { e.stopPropagation(); if (delT.current) clearTimeout(delT.current); planActions.deletePlan(p.id); }} title="Confirm delete" style={{ cursor: 'pointer', border: 'none', background: '#df5338', color: '#fff', padding: 4, display: 'inline-flex', borderRadius: 8, boxShadow: '0 2px 6px rgba(223,83,56,0.3)' }}>
@@ -65,6 +46,46 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
           </button>
         )}
       </div>
+      {/* head: donut + name/dir/lev + entry */}
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 13, padding: '12px 15px 9px' }}>
+        <div style={{ position: 'relative', width: 66, height: 66, flex: '0 0 auto', alignSelf: 'center', borderRadius: '50%', background: `conic-gradient(#7c5cff 0 ${mp}%,#f0efeb ${mp}% 100%)` }}>
+          <div style={{ position: 'absolute', inset: 7, background: '#fff', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.03em', color: '#1a1813', lineHeight: 1 }}>{isFinite(c.marginPct) ? Math.round(c.marginPct) : '—'}<span style={{ fontSize: 10, color: '#7c5cff' }}>%</span></span>
+            <span style={{ fontWeight: 700, fontSize: 6, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#bbb3a8' }}>margin</span>
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 11, paddingRight: 42 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><CoinIcon sym={p.sym} /><span style={{ fontWeight: 800, fontSize: 13.5, letterSpacing: '-0.015em', color: '#1a1813', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpPlanName(p)}</span></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 800, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: col }}>
+                <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">{long ? <><path d="M7 17 17 7" /><path d="M8 7h9v9" /></> : <><path d="M7 7 17 17" /><path d="M17 8v9H8" /></>}</svg>{long ? 'Long' : 'Short'}
+              </span>
+              <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#d6d4cc' }} />
+              <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}><span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.02em', color: '#1a1813' }}>{p.lev}×</span><span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#b3b0a6' }}>lev</span></span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: '1px solid #f1f0ed', paddingTop: 3 }}>
+            <span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#a8a69b' }}>Entry</span>
+            <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '-0.01em', color: '#1a1813' }}>{c.hasEntry ? money(c.E) : '—'}</span>
+          </div>
+        </div>
+      </div>
+      {/* score */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', alignItems: 'center', padding: '11px 15px 12px', borderTop: '1px solid #f3f2ef' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bbb3a8' }}>Risk · equity</span>
+          <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.035em', color: '#df5338', lineHeight: 1.05 }}>{isFinite(c.riskPct) ? '↓ ' + c.riskPct.toFixed(1) + '%' : '—'}</span>
+          <span style={{ fontWeight: 700, fontSize: 10, color: '#c9a99f' }}>{isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : '—'}</span>
+        </div>
+        <span style={{ width: 1, height: 38, background: '#eeede9' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-end' }}>
+          <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bbb3a8' }}>Reward · equity</span>
+          <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.035em', color: '#1f9d55', lineHeight: 1.05 }}>{isFinite(rewardPct) ? '↑ ' + rewardPct.toFixed(1) + '%' : '—'}</span>
+          <span style={{ fontWeight: 700, fontSize: 10, color: '#9cc4ab' }}>{isFinite(rewardUSD) ? '+' + money(rewardUSD) : '—'}</span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', height: 4 }}><div style={{ width: riskW + '%', background: '#df5338' }} /><div style={{ flex: 1, background: '#1f9d55' }} /></div>
     </div>
   );
 }
