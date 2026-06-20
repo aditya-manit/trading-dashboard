@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
 import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
+import { planActions } from '@/lib/plan-store';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 
@@ -889,9 +890,12 @@ export function PlanPage() {
               </span>
             )
           ) : allClear ? (
-            <span onClick={() => { persistPlan(step, true); setFinished(true); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 11, cursor: 'pointer', background: '#eef8f1', border: '1px solid #bfe3cd', borderRadius: 12, padding: '8px 16px' }}>
-              <span style={{ fontWeight: 800, fontSize: 13, color: '#1f9d55', letterSpacing: '0.02em' }}>{finished ? 'Plan complete' : 'Mark plan complete'}</span>
-              <span style={{ width: 24, height: 24, borderRadius: 7, background: '#1f9d55', display: 'grid', placeItems: 'center', color: '#fff', fontSize: 13, fontWeight: 800 }}>✓</span>
+            <span onClick={() => { persistPlan(step, true); setFinished(true); planActions.setView('editor'); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 13, cursor: 'pointer', background: '#7c5cff', border: 'none', borderRadius: 12, padding: '8px 9px 8px 18px', boxShadow: '0 4px 14px -4px rgba(124,92,255,0.5)' }}>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1 }}>
+                <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.72)' }}>Done exploring?</span>
+                <span style={{ fontWeight: 800, fontSize: 13, color: '#fff', letterSpacing: '-0.01em' }}>Plan this trade</span>
+              </span>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: 'rgba(255,255,255,0.18)', display: 'grid', placeItems: 'center', color: '#fff', fontSize: 15 }}>→</span>
             </span>
           ) : (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 11, cursor: 'not-allowed', background: '#f7f6f3', border: '1px solid #efedea', borderRadius: 12, padding: '6px 6px 6px 16px' }}>
