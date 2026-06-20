@@ -316,6 +316,26 @@ Files:
   first login (blocks new accounts; the `OWNER_EMAIL` check is the authoritative
   one — Supabase's toggle doesn't gate app access, only account creation).
 
+### 2FA / MFA — TOTP, re-prompt every 24h (built)
+On top of Google login the owner must pass a **TOTP** check (authenticator app)
+to reach **AAL2**, re-prompted every **24h** (`MFA_MAX_AGE_S = 24*3600`, defined
+in BOTH `proxy.ts` and `auth-guard.ts` — keep them equal).
+- **Enforcement:** the proxy decodes the session JWT (`aal` + `amr[].timestamp`);
+  `mfaOk = aal==='aal2' && newest TOTP amr < 24h`. Owner-but-not-`mfaOk` → `/mfa`
+  (pages) / `401 {mfa_required}` (api). `requireOwner()` re-checks the same on
+  every `/api/gate/*` (defense in depth). Decode is safe — `getUser()` validated
+  the JWT first; `getSession()` is just for the claims.
+- **Pages** (`src/app/mfa/`): `/mfa/setup` — one-time enroll (`mfa.enroll` totp →
+  QR + secret → `challenge`+`verify`); `/mfa` — step-up/24h re-prompt (challenge a
+  verified factor). Both use `components/auth/AuthCard.tsx` (`AuthCard` + 6-digit
+  `CodeForm`). `/mfa` with no verified factor → `/mfa/setup`; setup clears
+  abandoned unverified factors before enrolling.
+- **Flow:** Google callback → session AAL1 → proxy → `/mfa` → (no factor) →
+  `/mfa/setup` → enroll → AAL2 → dashboard. Verifying refreshes the TOTP
+  timestamp, resetting the 24h window.
+- **Needs Supabase MFA/TOTP enabled** in the project (Authentication settings;
+  on by default). QR is a `data:` URI — already allowed by the CSP `img-src`.
+
 ### Security hardening (built)
 - **Defense in depth on the API:** the proxy gate is "optimistic" (Next's own
   caveat), so every `/api/gate/*` route also calls **`requireOwner()`**

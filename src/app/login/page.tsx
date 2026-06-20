@@ -62,8 +62,8 @@ function LoginInner() {
           </div>
         )}
         {!configured && (
-          <div style={{ background: '#fff7e6', border: '1px solid #f3e3bf', color: '#8a6400', fontSize: 12, fontWeight: 600, borderRadius: 11, padding: '10px 12px', marginBottom: 16, lineHeight: 1.45 }}>
-            Sign-in isn’t configured — this build is missing the Supabase keys. Set <b>NEXT_PUBLIC_SUPABASE_URL</b> + <b>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</b> in the host env and redeploy.
+          <div style={{ background: '#fff7e6', border: '1px solid #f3e3bf', color: '#8a6400', fontSize: 12.5, fontWeight: 600, borderRadius: 11, padding: '10px 12px', marginBottom: 16, lineHeight: 1.45 }}>
+            Sign-in isn’t configured.
           </div>
         )}
 

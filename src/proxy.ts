@@ -3,27 +3,37 @@ import { NextResponse, type NextRequest } from 'next/server';
 import type { User } from '@supabase/supabase-js';
 
 // Single-user auth gate (Next 16 Proxy — the renamed middleware). FAIL CLOSED:
-// the dashboard is served only to a Supabase session whose email === OWNER_EMAIL.
-// If the auth env is missing or misconfigured, NOBODY is authorized — every
-// request redirects to /login (or 401s for /api/*) and the app never serves data
-// unlocked. (It also can't be logged into without the env, which is the point.)
+// the app is served only to the owner (Google session whose email === OWNER_EMAIL)
+// who has ALSO passed a TOTP 2FA check within the last 24h (AAL2 + fresh). Missing
+// env, wrong email, or stale/absent MFA → /login or /mfa (pages) / 401 (api).
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const OWNER_EMAIL = process.env.OWNER_EMAIL?.toLowerCase();
 
-// Paths reachable without a (valid) session.
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/signout'];
+const MFA_MAX_AGE_S = 24 * 3600; // re-prompt for the 2FA code every 24h
+
+// Decode a JWT payload (no verification — getUser() already validated it).
+function decodeJwt(token: string): { aal?: string; amr?: { method: string; timestamp: number }[] } {
+  try {
+    let b = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    b += '='.repeat((4 - (b.length % 4)) % 4);
+    return JSON.parse(atob(b));
+  } catch {
+    return {};
+  }
+}
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));
+  const isMfa = path === '/mfa' || path.startsWith('/mfa/');
 
   let response = NextResponse.next({ request });
   let user: User | null = null;
+  let mfaOk = false;
 
-  // Read the session only when the Supabase env is present; otherwise `user`
-  // stays null → unauthorized (fail closed).
   if (SUPABASE_URL && SUPABASE_KEY) {
     const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
       cookies: {
@@ -37,38 +47,48 @@ export async function proxy(request: NextRequest) {
         },
       },
     });
-    // getUser() validates the JWT and refreshes the cookie. Guarded so a Supabase
-    // or network hiccup can't 500 every route — on error, treat as no session.
     try {
       user = (await supabase.auth.getUser()).data.user;
+      if (user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const c = decodeJwt(session.access_token);
+          const totpTs = (c.amr || [])
+            .filter((m) => m.method === 'totp')
+            .reduce((a, m) => Math.max(a, m.timestamp || 0), 0);
+          mfaOk = c.aal === 'aal2' && totpTs > 0 && Date.now() / 1000 - totpTs < MFA_MAX_AGE_S;
+        }
+      }
     } catch {
       user = null;
     }
   }
 
-  // Authorized only with a configured OWNER_EMAIL AND a matching session.
   const authorized = !!OWNER_EMAIL && !!user && user.email?.toLowerCase() === OWNER_EMAIL;
-
-  if (!authorized && !isPublic) {
-    // API calls get a clean 401; pages get bounced to /login.
-    if (path.startsWith('/api/')) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-    }
+  const go = (p: string, err?: string) => {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    url.pathname = p;
     url.search = '';
-    // A signed-in-but-wrong-email user gets a distinct message on /login.
-    if (user) url.searchParams.set('error', 'unauthorized');
+    if (err) url.searchParams.set('error', err);
     return NextResponse.redirect(url);
+  };
+
+  // 1) Not the owner → login (or 401 for API).
+  if (!authorized) {
+    if (isPublic) return response;
+    if (path.startsWith('/api/')) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    return go('/login', user ? 'unauthorized' : undefined);
   }
 
-  // Already authorized but sitting on /login → send home.
-  if (authorized && path === '/login') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/';
-    url.search = '';
-    return NextResponse.redirect(url);
+  // Owner from here.
+  // 2) Owner without a fresh 2FA → must complete it (allow the /mfa pages + auth routes).
+  if (!mfaOk && !isMfa && !isPublic) {
+    if (path.startsWith('/api/')) return NextResponse.json({ error: 'mfa_required' }, { status: 401 });
+    return go('/mfa');
   }
+
+  // 3) Fully authed but sitting on /login or an /mfa page → home.
+  if (mfaOk && (path === '/login' || isMfa)) return go('/');
 
   return response;
 }
