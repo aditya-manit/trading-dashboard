@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { usePlanStore, planActions } from '@/lib/plan-store';
-import { tpCompute, planToDraft, tpPlanName, type Plan, type PlanDraft, type Status } from '@/lib/plan-model';
+import { tpCompute, planToDraft, tpPlanName, TP_EQUITY, type Plan, type PlanDraft, type Status } from '@/lib/plan-model';
+import { useAccount } from '@/hooks/useAccount';
+import { usePositions } from '@/hooks/usePositions';
+import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { LiveMath } from './LiveMath';
 import { RrDiagram } from './RrDiagram';
 import { CoinIcon } from './coins';
@@ -47,11 +50,19 @@ export function PlanDrawer() {
     u(); window.addEventListener('resize', u);
     return () => window.removeEventListener('resize', u);
   }, []);
+  // real account + live BTC mark (graceful fallback to the static refs)
+  const { data: account } = useAccount();
+  const { data: positions } = usePositions();
+  const { data: candles } = useBtcCandles(Math.floor(Date.now() / 1000) - 20 * 86400);
+  const equity = parseFloat(account?.total || '') || TP_EQUITY;
+  const btcPos = (positions || []).find((x) => x.contract === 'BTC_USDT' && x.size !== 0);
+  const btcMark = parseFloat(btcPos?.mark_price || '') || (candles && candles.length ? parseFloat(candles[candles.length - 1].c) : NaN) || undefined;
+
   const p = openPlanId ? plans.find((x) => x.id === openPlanId) : null;
   if (!p) return null;
 
   const long = p.dir === 'long', col = long ? '#1f9d55' : '#df5338';
-  const d = planToDraft(p), c = tpCompute(d);
+  const d = planToDraft(p), c = tpCompute(d, equity, p.sym === 'BTC' ? btcMark : undefined);
   const sm = STATUSES.find((s) => s.k === p.status) || STATUSES[0];
   const convCur = p.conv === 'high' ? 3 : p.conv === 'low' ? 1 : 2;
   const close = () => planActions.closePlan();
