@@ -5,10 +5,10 @@ import { type Plan, type Status, tpCompute, planToDraft, tpPlanName, tpMoney } f
 import { planActions, usePlanStore } from '@/lib/plan-store';
 import { CoinIcon } from './coins';
 
-const COLS: { key: Status; label: string }[] = [
-  { key: 'idea', label: 'Ideas' },
-  { key: 'armed', label: 'Armed' },
-  { key: 'triggered', label: 'Triggered' },
+const COLS: { key: Status; label: string; dot: string }[] = [
+  { key: 'idea', label: 'Ideas', dot: '#c9b8ff' },
+  { key: 'armed', label: 'Armed', dot: '#7c5cff' },
+  { key: 'triggered', label: 'Triggered', dot: '#1f9d55' },
 ];
 const money = (v: number) => (isFinite(v) ? tpMoney(v, v < 1000 ? 2 : 0) : '—');
 
@@ -98,31 +98,38 @@ export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap', padding: '6px 2px 0' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontWeight: 800, fontSize: 29, letterSpacing: '-0.025em', color: '#1a1813' }}>Plans.</span>
-          <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70' }}>Drag a plan between columns as it moves from idea → armed → triggered.</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#7c5cff' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c5cff' }} />Plans board
+          </span>
+          <span style={{ fontWeight: 800, fontSize: 29, letterSpacing: '-0.025em', color: '#1a1813', lineHeight: 1.08 }}>Your trade plans.</span>
+          <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>Ideas you’ve mapped, armed setups waiting on a trigger, and the ones now live. Execute on TradingView — this stays your record.</span>
         </div>
-        <button onClick={() => { planActions.clearDraft(); planActions.setView('editor'); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#7c5cff', color: '#fff', border: 'none', borderRadius: 12, padding: '11px 16px', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 1px 2px rgba(20,20,12,0.05)' }}>
-          <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>New plan
+        <button onClick={() => { planActions.clearDraft(); planActions.setView('editor'); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 11, background: '#7c5cff', color: '#fff', border: 'none', borderRadius: 13, padding: '11px 18px', fontFamily: 'inherit', fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em', cursor: 'pointer', boxShadow: '0 2px 8px rgba(124,92,255,0.28)', flex: '0 0 auto' }}>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>New plan
         </button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, alignItems: 'stretch' }}>
         {COLS.map((col) => {
           const items = plans.filter((p) => p.status === col.key);
           const isOver = overCol === col.key;
+          const empty = col.key === 'idea' ? 'No ideas yet' : col.key === 'armed' ? 'Nothing armed' : 'None triggered';
           return (
-            <div key={col.key}
-              onDragOver={(e) => { e.preventDefault(); if (overCol !== col.key) setOverCol(col.key); }}
-              onDragLeave={() => setOverCol((s) => (s === col.key ? null : s))}
-              onDrop={(e) => { e.preventDefault(); setOverCol(null); const id = (window as unknown as { __tpDrag?: string }).__tpDrag; if (id) planActions.movePlan(id, col.key); }}
-              style={{ display: 'flex', flexDirection: 'column', gap: 11, borderRadius: 16, padding: 12, background: isOver ? '#f7f4ff' : '#faf9f7', border: `1px solid ${isOver ? '#d9cffb' : '#efedea'}`, boxShadow: isOver ? 'inset 0 0 0 1px #d9cffb' : 'none', transition: 'all .14s', minHeight: 200 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 4px' }}>
-                <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#56544b' }}>{col.label}</span>
-                <span style={{ fontWeight: 800, fontSize: 11, color: '#a8a69b', background: '#fff', border: '1px solid #ecebe6', borderRadius: 99, padding: '1px 8px', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+            <div key={col.key} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 2px' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.dot }} />
+                <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#1a1813' }}>{col.label}</span>
+                <span style={{ fontWeight: 800, fontSize: 10.5, color: '#a8a69b', background: '#f1f0ed', borderRadius: 99, padding: '2px 8px', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
               </div>
-              {items.length === 0 ? (
-                <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: '#bdbbb1', fontWeight: 600, fontSize: 12, padding: '24px 0', textAlign: 'center' }}>Drag a plan here</div>
-              ) : items.map((p) => <BoardCard key={p.id} p={p} onOpen={onOpen} />)}
+              <div
+                onDragOver={(e) => { e.preventDefault(); if (overCol !== col.key) setOverCol(col.key); }}
+                onDragLeave={() => setOverCol((s) => (s === col.key ? null : s))}
+                onDrop={(e) => { e.preventDefault(); setOverCol(null); const id = (window as unknown as { __tpDrag?: string }).__tpDrag; if (id) planActions.movePlan(id, col.key); }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 11, flex: 1, minHeight: 88, borderRadius: 14, padding: 6, transition: 'background .12s, box-shadow .12s', background: isOver ? '#f7f4ff' : 'transparent', boxShadow: isOver ? 'inset 0 0 0 2px #d3c4ff' : 'inset 0 0 0 1px transparent' }}>
+                {items.length === 0 ? (
+                  <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: '#bdbbb1', fontWeight: 600, fontSize: 12, padding: '24px 0', textAlign: 'center' }}>{empty}</div>
+                ) : items.map((p) => <BoardCard key={p.id} p={p} onOpen={onOpen} />)}
+              </div>
             </div>
           );
         })}
