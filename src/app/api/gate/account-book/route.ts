@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { gateRequest } from '@/lib/gate-client';
+import { requireOwner } from '@/lib/auth-guard';
 import type { GateAccountBookEntry } from '@/types/gate';
 
 // Gate.io account_book constraints:
@@ -14,6 +15,8 @@ const MAX_WINDOWS = 6;           // 6 × 30 days = 180 days (Gate.io hard limit)
 const MAX_PAGES_PER_WINDOW = 20; // 20 × 1000 = 20k entries per window max
 
 export async function GET() {
+  const denied = await requireOwner();
+  if (denied) return denied;
   try {
     const now = Math.floor(Date.now() / 1000);
     const seen = new Set<string>();

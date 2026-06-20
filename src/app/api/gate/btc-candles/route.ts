@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
+import { requireOwner } from '@/lib/auth-guard';
 
 // Gate.io spot candlestick returns array-of-arrays:
 // [time_str, quote_volume, close, high, low, open, ...]
 // We normalise to { t: number, c: string } before sending to client.
 
 export async function GET(req: Request) {
+  const denied = await requireOwner();
+  if (denied) return denied;
   const { searchParams } = new URL(req.url);
   const limit = searchParams.get('limit') ?? '400';
   const from  = searchParams.get('from');

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { gateRequest } from '@/lib/gate-client';
+import { requireOwner } from '@/lib/auth-guard';
 import type { GateFuturesPositionClose } from '@/types/gate';
 
 // Gate.io constraint: `from` cannot be more than 180 days before now (absolute, not relative to `to`).
@@ -8,6 +9,8 @@ const LIMIT = 1000;
 const MAX_PAGES = 50;
 
 export async function GET() {
+  const denied = await requireOwner();
+  if (denied) return denied;
   try {
     const now = Math.floor(Date.now() / 1000);
     const from = now - 179 * 86400; // stay just inside the 180-day limit

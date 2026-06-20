@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { gateRequest } from '@/lib/gate-client';
+import { requireOwner } from '@/lib/auth-guard';
 import type { GateFuturesPosition } from '@/types/gate';
 
 export async function GET() {
+  const denied = await requireOwner();
+  if (denied) return denied;
   try {
     const positions = await gateRequest<GateFuturesPosition[]>(
       '/futures/usdt/positions',

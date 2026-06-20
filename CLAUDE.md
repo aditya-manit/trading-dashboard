@@ -312,3 +312,21 @@ Files:
   URL set. Second lock: Supabase → **disable "Allow new users to sign up"** after
   first login (blocks new accounts; the `OWNER_EMAIL` check is the authoritative
   one — Supabase's toggle doesn't gate app access, only account creation).
+
+### Security hardening (built)
+- **Defense in depth on the API:** the proxy gate is "optimistic" (Next's own
+  caveat), so every `/api/gate/*` route also calls **`requireOwner()`**
+  (`lib/auth-guard.ts`) — re-verifies the session + `OWNER_EMAIL` server-side and
+  401s otherwise. Open only when auth env is unset (keyless local clone).
+- **Security headers** (`next.config.ts` `headers()`): CSP, HSTS,
+  `X-Frame-Options: DENY` (anti-clickjacking), `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy`, `Permissions-Policy`. The **CSP** is tuned to the app's real
+  sources (inline styles → `'unsafe-inline'`; Next bootstrap scripts; Google
+  avatars `*.googleusercontent.com`; Supabase `*.supabase.co`; self-hosted
+  `next/font`). Dev adds `'unsafe-eval'` + `ws://localhost:*` for Fast Refresh.
+  If you add a new external source (image host, API, font CDN), widen the CSP or
+  it'll be blocked.
+- **Account security is the real perimeter:** login is Google, so 2FA/passkey on
+  the owner's Google (+ Supabase/Vercel/GitHub) accounts matters most (done).
+- **Backstop:** the Gate API key is read-only (no trade/withdraw), so even a full
+  breach can't move funds — never grant it trade/withdraw permission.

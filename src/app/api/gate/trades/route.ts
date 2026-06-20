@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { gateRequest } from '@/lib/gate-client';
+import { requireOwner } from '@/lib/auth-guard';
 import type { GateFuturesTrade } from '@/types/gate';
 
 export async function GET(request: Request) {
+  const denied = await requireOwner();
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const limit = searchParams.get('limit') ?? '200';
   const offset = searchParams.get('offset') ?? '0';
