@@ -29,7 +29,7 @@ const SEED_LINKS: Record<string, string> = {
 };
 
 let state: PlanState = {
-  view: 'journal',
+  view: 'workbook',
   draft: TP_BLANK(),
   plans: [],
   editingId: null,
@@ -52,7 +52,7 @@ let hydrated = false;
 function hydrate() {
   if (hydrated || typeof window === 'undefined') return;
   hydrated = true;
-  const view = (localStorage.getItem(PLAN_KEYS.view) as PlanView) || 'journal';
+  const view = (localStorage.getItem(PLAN_KEYS.view) as PlanView) || 'workbook';
   const draft = read<PlanDraft>(PLAN_KEYS.draft, TP_BLANK());
   let plans = read<Plan[]>(PLAN_KEYS.board, []);
   if (!plans.length) plans = TP_SEED();

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { ProfileMenu } from './ProfileMenu';
+import { usePlanStore, planActions, type PlanView } from '@/lib/plan-store';
 
 const TABS = [
   { id: 'overview',   label: 'Overview' },
@@ -11,7 +12,11 @@ const TABS = [
   { id: 'history',    label: 'History' },
 ];
 
-const PLAN_TABS = ['Workbook', 'Plans', 'Journal'];
+const PLAN_TABS: { label: string; v: PlanView; active: PlanView[] }[] = [
+  { label: 'Workbook', v: 'workbook', active: ['workbook'] },
+  { label: 'Plans', v: 'board', active: ['board', 'editor'] },
+  { label: 'Journal', v: 'journal', active: ['journal'] },
+];
 
 type Page = 'dashboard' | 'plan';
 
@@ -20,6 +25,7 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
   const [synced, setSynced] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const onPlan = page === 'plan';
+  const { view: planView, plans } = usePlanStore();
 
   useEffect(() => { setSynced('just now'); }, []);
 
@@ -101,26 +107,29 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
       {/* Nav tabs */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f6f5f2', border: '1px solid #eeede9', borderRadius: 12, padding: 4 }}>
         {onPlan
-          ? PLAN_TABS.map(label => {
-              const isActive = label === 'Workbook';
+          ? PLAN_TABS.map(({ label, v, active }) => {
+              const isActive = active.includes(planView);
               return (
                 <button
                   key={label}
+                  onClick={() => planActions.setView(v)}
                   style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 7,
                     fontWeight: isActive ? 700 : 600,
                     fontSize: 13.5,
-                    color: isActive ? '#6a45d8' : '#c3c1b8',
+                    color: isActive ? '#6a45d8' : '#8c8a81',
                     background: isActive ? 'linear-gradient(135deg,#f1ecff,#e1d6ff)' : 'transparent',
                     padding: '8px 16px',
                     borderRadius: 9,
                     boxShadow: isActive ? '0 1px 2px rgba(110,70,210,0.10)' : 'none',
                     border: 'none',
-                    cursor: isActive ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     fontFamily: 'inherit',
                     transition: 'all .15s ease',
                   }}
                 >
                   {label}
+                  {label === 'Plans' && plans.length ? <span style={{ fontWeight: 800, fontSize: 10.5, color: isActive ? '#7c5cff' : '#b3b0a6', background: isActive ? '#fff' : '#efeee9', borderRadius: 99, padding: '1px 7px', fontVariantNumeric: 'tabular-nums' }}>{plans.length}</span> : null}
                 </button>
               );
             })

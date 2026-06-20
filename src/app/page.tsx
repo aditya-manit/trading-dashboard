@@ -10,7 +10,7 @@ import { KpiStrip } from '@/components/stats/KpiStrip';
 import { PositionsTable } from '@/components/positions/PositionsTable';
 import { KeyMetricsRow } from '@/components/stats/KeyMetricsRow';
 import { PositionHistoryTable } from '@/components/positions-history/PositionHistoryTable';
-import { PlanPage } from '@/components/plan/PlanPage';
+import { PlanFunnel } from '@/components/plan/PlanFunnel';
 
 export default function DashboardPage() {
   const [page, setPage] = useState<'dashboard' | 'plan'>('plan');
@@ -21,7 +21,7 @@ export default function DashboardPage() {
         <Topbar page={page} onPageChange={setPage} />
         <div style={{ padding: 30, display: 'flex', flexDirection: 'column', gap: 22 }}>
           {page === 'plan' ? (
-            <PlanPage />
+            <PlanFunnel />
           ) : (
             <>
               <section id="overview" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
