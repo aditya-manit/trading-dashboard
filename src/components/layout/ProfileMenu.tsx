@@ -14,14 +14,16 @@ export function ProfileMenu() {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    createSupabaseBrowserClient().auth.getUser().then(({ data }) => {
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) return; // auth not configured — keep the static fallback
+    supabase.auth.getUser().then(({ data }) => {
       const u = data.user;
       if (!u) return;
       const m = (u.user_metadata || {}) as Record<string, string>;
       const name = m.full_name || m.name || u.email?.split('@')[0] || 'Account';
       const initials = name.trim().split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
       setProfile({ email: u.email || '', name, avatar: m.avatar_url || m.picture || null, initials });
-    });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {

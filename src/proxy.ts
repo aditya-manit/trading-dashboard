@@ -34,8 +34,15 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  // getUser() also refreshes the session cookie when needed.
-  const { data: { user } } = await supabase.auth.getUser();
+  // getUser() validates the JWT and refreshes the cookie. Guarded so a Supabase
+  // or network hiccup can't 500 every route — on error, treat as no session
+  // (you'll land on /login and can retry).
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null;
+  try {
+    user = (await supabase.auth.getUser()).data.user;
+  } catch {
+    user = null;
+  }
 
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));

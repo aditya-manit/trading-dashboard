@@ -12,6 +12,7 @@ function LoginInner() {
   const signIn = async () => {
     setBusy(true);
     const supabase = createSupabaseBrowserClient();
+    if (!supabase) { setBusy(false); return; }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
