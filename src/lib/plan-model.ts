@@ -144,8 +144,10 @@ export interface Compute {
 
 // Core trade math — risk, sizing, R:R, liquidation, validity. Faithful port of
 // the design's tpCompute (qty is in units of the asset; notional = qty × price).
-export function tpCompute(d: PlanDraft, equity = TP_EQUITY): Compute {
-  const mkt = TP_MARKETS[d.sym] || TP_MARKETS.BTC;
+export function tpCompute(d: PlanDraft, equity = TP_EQUITY, markOverride?: number): Compute {
+  const base = TP_MARKETS[d.sym] || TP_MARKETS.BTC;
+  // real live mark when the caller has one (e.g. BTC from Gate); else the static ref
+  const mkt = markOverride && isFinite(markOverride) ? { ...base, mark: markOverride } : base;
   const Q = equity;
   const L = Math.max(1, tpNum(d.lev) || 5);
 

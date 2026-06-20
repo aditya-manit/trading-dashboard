@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   type PlanDraft, type SizeMode, type Sym, type Dir, type Conv,
-  tpCompute, tpFmtNum, tpNum, tpMoney, tpAutoName, TP_MARKETS, type Plan, type Status,
+  tpCompute, tpFmtNum, tpNum, tpMoney, tpAutoName, TP_MARKETS, TP_EQUITY, type Plan, type Status,
 } from '@/lib/plan-model';
 import { planActions, usePlanStore } from '@/lib/plan-store';
+import { useAccount } from '@/hooks/useAccount';
+import { usePositions } from '@/hooks/usePositions';
+import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { LiveMath } from './LiveMath';
 import { RrDiagram } from './RrDiagram';
 
@@ -24,7 +27,7 @@ const num = (n: string) => <span style={{ fontWeight: 800, fontSize: 15, color: 
 const ttl = (t: string) => <span style={{ fontWeight: 800, fontSize: 13.5, color: '#1a1813', letterSpacing: '-0.01em' }}>{t}</span>;
 
 // ── Identity (instrument / direction / conviction spec-tables) ──────────────
-function IdentitySection({ d }: { d: PlanDraft }) {
+function IdentitySection({ d, btcMark }: { d: PlanDraft; btcMark?: number }) {
   const brand: Record<Sym, string> = { BTC: '#f7931a', ETH: '#627eea', SOL: '#9945ff' };
   const tint: Record<Sym, string> = { BTC: 'rgba(247,147,26,0.10)', ETH: 'rgba(98,126,234,0.10)', SOL: 'rgba(153,69,255,0.10)' };
   const gs = (a: boolean): CSSProperties => ({ filter: a ? 'none' : 'grayscale(1)', opacity: a ? 1 : 0.5, flex: '0 0 auto' });
@@ -51,13 +54,13 @@ function IdentitySection({ d }: { d: PlanDraft }) {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', borderBottom: '1px solid #f1f0ed' }}>
-        {syms.map((k, i) => { const a = d.sym === k, m = TP_MARKETS[k];
+        {syms.map((k, i) => { const a = d.sym === k, base = TP_MARKETS[k]; const mark = k === 'BTC' && btcMark ? btcMark : base.mark;
           return (
             <div key={k} onClick={() => planActions.setDraft({ sym: k })} style={{ ...cellBase, borderRight: i < 2 ? '1px solid #f1f0ed' : 'none', background: a ? tint[k] : 'transparent' }}>
               {logo(k, a)}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{lab(a, k)}{a ? <span style={{ width: 6, height: 6, borderRadius: '50%', background: brand[k] }} /> : null}</span>
-                {sub(a, '$' + m.mark.toLocaleString('en-US', { maximumFractionDigits: m.mark < 1000 ? 2 : 0 }))}
+                {sub(a, '$' + mark.toLocaleString('en-US', { maximumFractionDigits: mark < 1000 ? 2 : 0 }))}
               </div>
             </div>
           );
@@ -184,7 +187,18 @@ export function Editor() {
   const store = usePlanStore();
   const d = store.draft;
   const editing = store.editingId ? store.plans.find((p) => p.id === store.editingId) : null;
-  const c = tpCompute(d);
+
+  // real account + market values (graceful fallback to the static refs while loading)
+  const { data: account } = useAccount();
+  const { data: positions } = usePositions();
+  const { data: candles } = useBtcCandles(Math.floor(Date.now() / 1000) - 20 * 86400);
+  const equity = parseFloat(account?.total || '') || TP_EQUITY;
+  const btcPos = (positions || []).find((p) => p.contract === 'BTC_USDT' && p.size !== 0);
+  const btcMark = parseFloat(btcPos?.mark_price || '') || (candles && candles.length ? parseFloat(candles[candles.length - 1].c) : NaN) || undefined;
+  const userId = btcPos?.user || (positions || [])[0]?.user;
+  const acctLabel = userId ? `CX-${String(userId).slice(-4)}` : '';
+
+  const c = tpCompute(d, equity, d.sym === 'BTC' ? btcMark : undefined);
   const [full, setFull] = useState<string | null>(null);
   const [levAlert, setLevAlert] = useState(false);
   const prevLev = useRef(d.lev);
@@ -221,7 +235,7 @@ export function Editor() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end', paddingBottom: 3 }}>
           <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>{TP_MARKETS[d.sym].label} · mark</span>
           <span style={{ fontWeight: 800, fontSize: 20, color: '#1a1813', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{tpMoney(c.mkt.mark, c.mkt.mark < 1000 ? 2 : 0)}</span>
-          <span style={{ fontWeight: 600, fontSize: 11, color: '#b3b0a6' }}>Equity $284,712 · CX-4471</span>
+          <span style={{ fontWeight: 600, fontSize: 11, color: '#b3b0a6' }}>Equity {tpMoney(equity, 0)}{acctLabel ? ` · ${acctLabel}` : ''}</span>
         </div>
       </div>
 
@@ -250,7 +264,7 @@ export function Editor() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.32fr 1fr', gap: 20, alignItems: 'start' }}>
         {/* LEFT inputs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={card}><div style={cardHead}>{num('2')}{ttl('Identity')}</div><IdentitySection d={d} /></div>
+          <div style={card}><div style={cardHead}>{num('2')}{ttl('Identity')}</div><IdentitySection d={d} btcMark={btcMark} /></div>
 
           <div style={card}>
             <div style={{ ...cardHead, justifyContent: 'space-between' }}>
