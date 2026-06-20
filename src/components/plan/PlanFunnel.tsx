@@ -1,19 +1,22 @@
 'use client';
 
 import { usePlanStore, planActions } from '@/lib/plan-store';
-import { planToDraft } from '@/lib/plan-model';
 import { PlanPage } from './PlanPage';
 import { Editor } from './Editor';
 import { Board } from './Board';
+import { PlanDrawer } from './PlanDrawer';
 
 // Top-level Plan view switcher (workbook · editor · board · journal). Workbook is
-// the existing PlanPage (5-step + live news). Journal is built in a later phase.
+// the existing PlanPage (5-step + live news). The plan-detail drawer overlays any
+// view (top-level, like the design). Journal is built in a later phase.
 export function PlanFunnel() {
   const { view } = usePlanStore();
-  if (view === 'editor') return <Editor />;
-  if (view === 'board') return <Board onOpen={(p) => planActions.startEdit(p.id, planToDraft(p))} />;
-  if (view === 'journal') return <JournalSoon />;
-  return <PlanPage />;
+  return (
+    <>
+      {view === 'editor' ? <Editor /> : view === 'board' ? <Board onOpen={(p) => planActions.openPlan(p.id)} /> : view === 'journal' ? <JournalSoon /> : <PlanPage />}
+      <PlanDrawer />
+    </>
+  );
 }
 
 function JournalSoon() {

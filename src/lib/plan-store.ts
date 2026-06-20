@@ -19,6 +19,7 @@ interface PlanState {
   draft: PlanDraft;
   plans: Plan[];
   editingId: string | null;
+  openPlanId: string | null; // plan-detail drawer
   links: Record<string, string>;
   journal: Record<string, JournalRecord>;
   ready: boolean; // hydrated from localStorage (client only)
@@ -33,6 +34,7 @@ let state: PlanState = {
   draft: TP_BLANK(),
   plans: [],
   editingId: null,
+  openPlanId: null,
   links: {},
   journal: {},
   ready: false,
@@ -108,7 +110,17 @@ export const planActions = {
   },
   startEdit(id: string, draft: PlanDraft) {
     write(PLAN_KEYS.draft, draft); writeRaw(PLAN_KEYS.editing, id); writeRaw(PLAN_KEYS.view, 'editor');
-    set({ draft, editingId: id, view: 'editor' });
+    set({ draft, editingId: id, view: 'editor', openPlanId: null });
+  },
+  openPlan(id: string) { set({ openPlanId: id }); },
+  closePlan() { set({ openPlanId: null }); },
+  duplicatePlan(id: string) {
+    const src = state.plans.find((p) => p.id === id);
+    if (!src) return;
+    const copy: Plan = { ...src, id: 'tp_' + Date.now().toString(36), status: 'idea', createdAt: Date.now(), name: (src.name || '') + (src.name ? ' copy' : '') };
+    const plans = [copy, ...state.plans];
+    write(PLAN_KEYS.board, plans);
+    set({ plans, openPlanId: copy.id });
   },
   cancelEdit() { try { localStorage.removeItem(PLAN_KEYS.draft); localStorage.removeItem(PLAN_KEYS.editing); } catch {} writeRaw(PLAN_KEYS.view, 'board'); set({ draft: TP_BLANK(), editingId: null, view: 'board' }); },
   updateThesis(id: string, field: keyof PlanDraft, value: string) {
