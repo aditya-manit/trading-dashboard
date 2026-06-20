@@ -464,32 +464,37 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
 // ─── Step metadata (verbatim from handoff 15 planMeta) ────────────────────────
 type PlanStep = {
   n: number; title: string; color: string; soft: string; border: string; shadow: string;
-  rail: string; short: string; lead: string; caption: string; ask: string[]; rule: string;
+  rail: string; short: string; lead: string; hl: string[]; caption: string; ask: string[]; rule: string;
 };
 
 const PLAN_META: PlanStep[] = [
   { n: 1, title: 'Where is the nearest support & resistance?', color: '#7c5cff', soft: '#f3eefe', border: '#e7ddfb', shadow: 'rgba(124,92,255,0.32)', rail: 'Levels', short: 'Levels',
-    lead: 'Price is always traveling between support and resistance. Mark both before you enter.',
+    lead: 'Price is always traveling between support and resistance. Before you enter, mark both.',
+    hl: ['support and resistance', 'mark both'],
     caption: 'Price is pinned to support — a long has the whole range to run, a short has nowhere to go.',
     ask: ['I am NOT buying into resistance', 'I am NOT shorting into support', 'There is room for price to move my way'],
     rule: 'Never buy into resistance or short into support.' },
   { n: 2, title: 'What is the higher timeframe doing?', color: '#1f9d55', soft: '#edf7f0', border: '#cfe9da', shadow: 'rgba(31,157,85,0.3)', rail: 'Trend', short: 'Trend',
     lead: 'Trade with the trend, not against it. The higher timeframe decides which way you are allowed to lean.',
+    hl: ['with the trend', 'higher timeframe'],
     caption: 'Price pulled back inside an uptrend — a long goes with the trend, a short fights it.',
     ask: ['Is the higher-timeframe trend up, down, or sideways?', 'Does my trade go WITH that trend?', 'If it is counter-trend, is my proof strong enough?'],
     rule: 'Trade with the trend. Against it, you need much stronger proof.' },
   { n: 3, title: 'Has price actually confirmed my idea?', color: '#2f6fc8', soft: '#eef3fb', border: '#d6e3f5', shadow: 'rgba(47,111,200,0.32)', rail: 'Confirmation', short: 'Confirm',
     lead: 'Do not predict the move — let price prove it. Wait for the break, and then for the hold.',
+    hl: ['let price prove it', 'the break', 'the hold'],
     caption: 'Price broke the level and retested it — the break held, so the move is confirmed. A reclaim would have been a fakeout.',
     ask: ['Has the level actually broken, or am I guessing?', 'Did it hold the break, or instantly reclaim?', 'Am I reacting to price, or to hope?'],
     rule: 'Trade confirmations, not predictions.' },
   { n: 4, title: 'If I enter now, where is my stop?', color: '#7c5cff', soft: '#f3eefe', border: '#e4d8fb', shadow: 'rgba(124,92,255,0.32)', rail: 'Stop', short: 'Stop',
     lead: 'Decide where you are wrong before you decide where you are right. The stop comes first — always.',
+    hl: ['where you are wrong', 'where you are right', 'stop comes first'],
     caption: 'The stop sits just below the major level — on structure, where losing it truly means the idea failed. Not inside the noise.',
     ask: ['Where exactly is my idea invalidated?', 'Is the stop on structure, or on emotion?', 'Is the risk small enough to survive being wrong?'],
     rule: 'Entry comes after stop placement, never before.' },
   { n: 5, title: 'Why would the other side be trapped?', color: '#e07b2f', soft: '#fdf2e8', border: '#f6dcc1', shadow: 'rgba(224,123,47,0.3)', rail: 'Liquidity', short: 'Traps',
     lead: 'Every move needs a loser. Find who is offside and where their stops sit — that is the fuel for your move.',
+    hl: ['needs a loser', 'who is offside', 'their stops sit', 'the fuel'],
     caption: 'Price swept the stops above resistance, trapped the late longs, then reversed — their forced exits are the fuel.',
     ask: ['Who is wrong if price pushes up?', 'Who is wrong if price pushes down?', 'Where are their stops stacked?'],
     rule: 'Trade where trapped traders are forced to exit.' },
@@ -527,6 +532,62 @@ const STEPPER_ICONS = [
 ];
 
 const pad2 = (n: number) => ('0' + n).slice(-2);
+
+// Big lead paragraph with purple-highlighted keywords (planLeadEl / _leadRich).
+function LeadText({ lead, hl }: { lead: string; hl: string[] }) {
+  const base: CSSProperties = { margin: 0, fontWeight: 700, fontSize: 27, lineHeight: 1.3, letterSpacing: '-0.025em', color: '#1a1813' };
+  if (!hl.length) return <p style={base}>{lead}</p>;
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('(' + hl.map(esc).join('|') + ')', 'gi');
+  const parts: ReactNode[] = [];
+  let last = 0, m: RegExpExecArray | null;
+  re.lastIndex = 0;
+  while ((m = re.exec(lead))) {
+    if (m.index > last) parts.push(lead.slice(last, m.index));
+    parts.push(<span key={m.index} style={{ color: '#7c5cff', fontWeight: 800, fontSize: '1.34em', letterSpacing: '-0.015em' }}>{m[0]}</span>);
+    last = m.index + m[0].length;
+  }
+  if (last < lead.length) parts.push(lead.slice(last));
+  return <p style={base}>{parts}</p>;
+}
+
+// Pre-flight checks as a full-width chevron/arrow connected strip (planChecksVEl):
+// arrow-shaped cells with a green connector gradient that fills as checks confirm.
+function ChecksStrip({ step, ask, checks, toggle }: { step: number; ask: string[]; checks: Record<string, boolean>; toggle: (k: string) => void }) {
+  const n = ask.length, aw = 20, gap = 5, bw = 24, N0 = '#e7e5dd', G0 = '#2fa862';
+  const done = ask.map((_, i) => !!checks[`${step}-${i}`]);
+  const doneCount = done.filter(Boolean).length;
+  const cw = `(100% - ${(n - 1) * gap}px)/${n}`;
+  let stops = `${N0} 0px`;
+  for (let gi = 0; gi < n - 1; gi++) {
+    const gc = done[gi] ? G0 : N0;
+    const goff = gi * gap + gap / 2;
+    const ga = `calc(${gi + 1}*${cw} + ${goff - bw}px)`;
+    const gb = `calc(${gi + 1}*${cw} + ${goff + bw}px)`;
+    stops += `, ${N0} ${ga}, ${gc} ${ga}, ${gc} ${gb}, ${N0} ${gb}`;
+  }
+  stops += `, ${N0} 100%`;
+  const ratio = n ? doneCount / n : 0;
+  const border = doneCount === 0 ? '#e6e4dc' : `oklch(${0.92 - ratio * 0.22} ${0.02 + ratio * 0.13} 150)`;
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', gap, borderRadius: 16, overflow: 'hidden', border: `1px solid ${border}`, background: `linear-gradient(90deg, ${stops})`, transition: 'border-color .25s ease' }}>
+      {ask.map((text, i) => {
+        const f = i === 0, l = i === n - 1, dn = done[i];
+        const clip = f
+          ? `polygon(0 0, calc(100% - ${aw}px) 0, 100% 50%, calc(100% - ${aw}px) 100%, 0 100%)`
+          : l
+            ? `polygon(0 0, 100% 0, 100% 100%, 0 100%, ${aw}px 50%)`
+            : `polygon(0 0, calc(100% - ${aw}px) 0, 100% 50%, calc(100% - ${aw}px) 100%, 0 100%, ${aw}px 50%)`;
+        return (
+          <div key={i} onClick={() => toggle(`${step}-${i}`)} style={{ flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: `calc((100% - ${(n - 1) * gap}px)/${n})`, minWidth: 0, boxSizing: 'border-box', cursor: 'pointer', paddingTop: 17, paddingBottom: 17, paddingLeft: f ? 20 : aw + 18, paddingRight: l ? 20 : aw + 14, clipPath: clip, background: '#fff', display: 'flex', flexDirection: 'column', gap: 10, transition: 'background .2s ease' }}>
+            <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: dn ? '#1c8f4d' : '#fff', border: dn ? 'none' : '1.5px solid #d6d4cc', boxShadow: dn ? '0 2px 6px -1px rgba(28,143,77,0.45)' : 'none', fontWeight: 800, fontSize: 11, color: dn ? '#fff' : '#a8a69b', transition: 'all .2s ease' }}>{dn ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : i + 1}</span>
+            <span style={{ fontWeight: 600, fontSize: 13, color: dn ? '#16703c' : '#56544b', lineHeight: 1.4 }}>{text}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function PlanPage() {
   const [step, setStep] = useState(0);
@@ -813,49 +874,20 @@ export function PlanPage() {
           </div>
         </div>
 
-        {/* body: diagram | checks */}
+        {/* body: diagram | big lead */}
         <div style={{ display: 'flex', alignItems: 'stretch' }}>
           <div style={{ flex: 1, minWidth: 0, padding: '22px 28px', display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center' }}>
             <StepDiagram key={step} step={step} />
             <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70', lineHeight: 1.5, padding: '0 2px' }}>{meta.caption}</span>
           </div>
           <div style={{ flex: '0 0 auto', width: 1, background: '#f4f3f0' }} />
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 22, padding: '24px 28px' }}>
-            <p style={{ margin: 0, fontWeight: 600, fontSize: 15.5, lineHeight: 1.55, color: '#56544b' }}>{meta.lead}</p>
-            <div style={{ height: 1, background: '#f4f3f0', margin: '0 -28px' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 7, background: '#f3eefe', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                  </span>
-                  <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#8c8a81' }}>Pre-flight checks</span>
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: 78 }}>
-                    {meta.ask.map((_, i) => (
-                      <span key={i} style={{ flex: 1, height: 5, borderRadius: 99, background: checks[`${step}-${i}`] ? '#1f9d55' : '#e7e5de', transition: 'background .3s ease' }} />
-                    ))}
-                  </div>
-                  <span style={{ fontWeight: 700, fontSize: 12, color: '#1f9d55', minWidth: 34 }}>{doneCount} / {meta.ask.length}</span>
-                </div>
-              </div>
-              <div style={{ borderTop: '1px solid #f2f1ee' }}>
-                {meta.ask.map((text, i) => {
-                  const k = `${step}-${i}`; const done = !!checks[k];
-                  return (
-                    <button key={k} onClick={() => toggleCheck(k)} style={{ display: 'flex', alignItems: 'stretch', width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', border: 'none', borderBottom: '1px solid #f2f1ee' }}>
-                      <span style={{ flex: '0 0 auto', width: 46, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em', color: done ? '#1f9d55' : '#cbc9c0', borderRight: '1px solid #f2f1ee', transition: 'color .2s' }}>{pad2(i + 1)}</span>
-                      <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '13px 6px 13px 16px', fontWeight: 600, fontSize: 13.5, color: done ? '#1a1813' : '#56544b', transition: 'color .2s' }}>
-                        {text}
-                        <span style={{ flex: '0 0 auto', width: 20, height: 20, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, color: '#fff', background: done ? '#1f9d55' : 'transparent', border: done ? 'none' : '1.5px solid #dcdad2', transition: 'all .2s' }}>{done ? '✓' : ''}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '24px 30px' }}>
+            <LeadText lead={meta.lead} hl={meta.hl} />
           </div>
+        </div>
+        {/* pre-flight checks — full-width chevron strip */}
+        <div style={{ padding: '6px 30px 20px' }}>
+          <ChecksStrip step={step} ask={meta.ask} checks={checks} toggle={toggleCheck} />
         </div>
 
         {/* footer nav */}
