@@ -287,11 +287,14 @@ The whole app is locked to the **owner only** via Supabase Auth + Google OAuth.
 Files:
 - `src/proxy.ts` — **the gate** (Next 16 renamed `middleware.ts` → `proxy.ts`,
   Node runtime). Requires a Supabase session AND `user.email === OWNER_EMAIL`;
-  else → redirect `/login` (pages) or `401` (`/api/*`). **Inert** unless all of
-  `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` +
-  `OWNER_EMAIL` are set (so a keyless clone isn't bricked). No bypass switch —
-  the lock is unconditional once configured (a temporary `DISABLE_AUTH` dev
-  toggle existed and was removed; don't reintroduce it).
+  else → redirect `/login` (pages) or `401` (`/api/*`). **FAIL CLOSED**: if the
+  auth env (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` +
+  `OWNER_EMAIL`) is missing/misconfigured, NOBODY is authorized — it never serves
+  the dashboard unlocked (and can't be logged into either; that's intended — user
+  explicitly chose locked-out over open). No bypass switch — a temporary
+  `DISABLE_AUTH` dev toggle existed and was removed; don't reintroduce it. The
+  client/ProfileMenu/login still no-op gracefully on missing env so a
+  misconfigured deploy redirects to `/login` rather than white-screening.
 - `src/lib/supabase/{client,server}.ts` — `@supabase/ssr` browser + server
   clients (publishable key + cookies). `cookies()` is async in Next 16.
 - `src/app/login/page.tsx` — login screen (favicon logo from `app/icon.svg`),
@@ -317,7 +320,7 @@ Files:
 - **Defense in depth on the API:** the proxy gate is "optimistic" (Next's own
   caveat), so every `/api/gate/*` route also calls **`requireOwner()`**
   (`lib/auth-guard.ts`) — re-verifies the session + `OWNER_EMAIL` server-side and
-  401s otherwise. Open only when auth env is unset (keyless local clone).
+  401s otherwise. **Fail closed** — if auth env is unset it 401s too (never opens).
 - **Security headers** (`next.config.ts` `headers()`): CSP, HSTS,
   `X-Frame-Options: DENY` (anti-clickjacking), `X-Content-Type-Options: nosniff`,
   `Referrer-Policy`, `Permissions-Policy`. The **CSP** is tuned to the app's real

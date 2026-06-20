@@ -8,18 +8,21 @@ const AUTH_ENABLED = !!(
   OWNER_EMAIL
 );
 
+const deny = () => NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
 // Authoritative server-side owner check for API routes — defense in depth behind
 // the proxy gate. (Next's docs call proxy/middleware checks "optimistic"; the
 // real check belongs next to the data.) Returns a 401 response to short-circuit,
-// or null to proceed. If auth isn't configured (keyless local clone), open.
+// or null to proceed. FAIL CLOSED: if auth isn't configured, deny (never expose
+// data when there's no way to verify the owner).
 export async function requireOwner(): Promise<NextResponse | null> {
-  if (!AUTH_ENABLED) return null;
+  if (!AUTH_ENABLED) return deny();
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user && user.email?.toLowerCase() === OWNER_EMAIL) return null;
   } catch {
-    // fall through → 401
+    // fall through → deny
   }
-  return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  return deny();
 }

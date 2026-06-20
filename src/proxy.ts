@@ -1,12 +1,12 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import type { User } from '@supabase/supabase-js';
 
-// Single-user auth gate (Next 16 Proxy — the renamed middleware). Locks the whole
-// app to the owner: a request passes only if there's a Supabase session AND the
-// user's email matches OWNER_EMAIL. Anyone else is sent to /login.
-//
-// Graceful default: if Supabase env or OWNER_EMAIL is not configured, the gate is
-// inert (local dev without auth keys behaves exactly as before).
+// Single-user auth gate (Next 16 Proxy — the renamed middleware). FAIL CLOSED:
+// the dashboard is served only to a Supabase session whose email === OWNER_EMAIL.
+// If the auth env is missing or misconfigured, NOBODY is authorized — every
+// request redirects to /login (or 401s for /api/*) and the app never serves data
+// unlocked. (It also can't be logged into without the env, which is the point.)
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -16,37 +16,38 @@ const OWNER_EMAIL = process.env.OWNER_EMAIL?.toLowerCase();
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/signout'];
 
 export async function proxy(request: NextRequest) {
-  // Auth not configured → don't gate anything.
-  if (!SUPABASE_URL || !SUPABASE_KEY || !OWNER_EMAIL) return NextResponse.next();
-
-  let response = NextResponse.next({ request });
-
-  const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
-      },
-    },
-  });
-
-  // getUser() validates the JWT and refreshes the cookie. Guarded so a Supabase
-  // or network hiccup can't 500 every route — on error, treat as no session
-  // (you'll land on /login and can retry).
-  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null;
-  try {
-    user = (await supabase.auth.getUser()).data.user;
-  } catch {
-    user = null;
-  }
-
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));
-  const authorized = !!user && user.email?.toLowerCase() === OWNER_EMAIL;
+
+  let response = NextResponse.next({ request });
+  let user: User | null = null;
+
+  // Read the session only when the Supabase env is present; otherwise `user`
+  // stays null → unauthorized (fail closed).
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        },
+      },
+    });
+    // getUser() validates the JWT and refreshes the cookie. Guarded so a Supabase
+    // or network hiccup can't 500 every route — on error, treat as no session.
+    try {
+      user = (await supabase.auth.getUser()).data.user;
+    } catch {
+      user = null;
+    }
+  }
+
+  // Authorized only with a configured OWNER_EMAIL AND a matching session.
+  const authorized = !!OWNER_EMAIL && !!user && user.email?.toLowerCase() === OWNER_EMAIL;
 
   if (!authorized && !isPublic) {
     // API calls get a clean 401; pages get bounced to /login.
