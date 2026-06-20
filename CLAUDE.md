@@ -174,7 +174,12 @@ encoded in the component and no longer surprising.
 - **Definition tooltips** (`DefLabel` / `LabelWithTooltip` / `CellLabel`): `cursor:help`, dashed underline, color shift on hover, dark popup (`#1a1813`, 186px, `bottom:calc(100%+9px)`). In `RealizedPerformance.tsx`, `KpiStrip.tsx`, `KeyMetricsRow.tsx`.
 
 ### Workflow
-- **⚠️ ALWAYS port the version that is ACTUALLY RENDERED, not the first builder you find.** The `.dc.html` keeps many superseded variants of a component side-by-side (e.g. `boardCard` has `spec`/`ac`/`b` variants; the news card had A–E). Before porting, **trace which one the live template binds** — grep for the `renderVals`/template binding (e.g. `dropZone(..., 'ac')`, `{{ tpBoardIdeas }}`) and follow the `variant`/flag through. The handoff CLAUDE.md prose can lag the final pick — the binding in the dc.html is the source of truth. (Mistake made twice: shipped the older `spec` board card and an older news card by porting the first builder, not the bound variant. Check the binding first.)
+- **⚠️ ALWAYS port the version that is ACTUALLY RENDERED — run this checklist BEFORE writing a line of any component:**
+  1. **Re-read the handoff `project/CLAUDE.md` paragraph for that exact component** — it states the final intent (it literally documented the drawer's `tpPlanStage` ≥900px side panel, and the `ac` board card).
+  2. **Grep ALL references** in the dc.html: the render fn + where it's *bound* (`{{ … }}` / `dropZone(…, 'ac')`) + **companion fns** (`*Stage`, `*Drawer`, `*Full`) + **responsive / variant gates** (`StageOn`, `>= 900`, `TP_STAGE_MIN`, `dense`, `compact`, `variant ===`).
+  3. **Write down the modes** (default · responsive · variants) and build the one shown **at desktop width** (≥900 = stage), not the fallback.
+  4. **Screenshot at 1440px and compare** to the described behaviour before calling it done.
+  The dc.html keeps superseded variants side-by-side (e.g. `boardCard` has `spec`/`ac`/`b`; the drawer has a `<900` fallback + a `≥900` stage). Mistakes made (now fixed): shipped the older `spec` board card and the drawer's `<900` fallback by porting the first/only code block I saw. The binding + companion fns in the dc.html are the source of truth.
 - **Design zips** land in `/Users/aditya/Downloads/Trading Dashboard-handoff (N).zip`. Extract to `/tmp/trading-handoff-N/`, then read the numbered `screenshots/*.png` in order (highest number = final pick — the design iterates within one zip). The exact CSS is in `project/Trading Dashboard (purple).dc.html` — grep it for pixel-accurate values rather than eyeballing screenshots.
 - Read the current component before editing. After changes, screenshot with Playwright (installed in repo) and read the PNG back:
   ```
