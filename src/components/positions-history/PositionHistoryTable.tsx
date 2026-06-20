@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { usePositionHistory } from '@/hooks/usePositionHistory';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GateFuturesPositionClose } from '@/types/gate';
+import { PlanLinkCell } from '@/components/plan/PlanLinkCell';
 
 const PAGE_SIZE = 8;
 const FONT = "'Plus Jakarta Sans', sans-serif";
@@ -232,6 +233,14 @@ export function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose;
                 <span style={{ fontWeight: 700, fontSize: 12.5, color: '#1a1813' }}>{btcSize} BTC</span>
               </div>
             </div>
+          </div>
+
+          {/* Linked plan */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, border: '1px solid #f0efec', borderRadius: 14, padding: '13px 16px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 11, fontWeight: 500, fontSize: 13, color: '#9b988d' }}>
+              <GrayChip icon={ICONS.shield} />Trade plan
+            </span>
+            <PlanLinkCell pid={`BTC/USDT.P#${p.time}`} />
           </div>
 
           {/* Exposure */}

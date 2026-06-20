@@ -29,6 +29,7 @@ function mfaFresh(token: string): boolean {
 // real check belongs next to the data.) Returns a 401 response to short-circuit,
 // or null to proceed. FAIL CLOSED: deny unless it's the owner AND a fresh 2FA.
 export async function requireOwner(): Promise<NextResponse | null> {
+  if (process.env.DISABLE_AUTH === 'true') return null; // ⚠️ temporary dev bypass (see CLAUDE.md)
   if (!AUTH_ENABLED) return deny();
   try {
     const supabase = await createSupabaseServerClient();

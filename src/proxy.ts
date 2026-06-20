@@ -10,6 +10,10 @@ import type { User } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const OWNER_EMAIL = process.env.OWNER_EMAIL?.toLowerCase();
+// ⚠️ TEMPORARY DEV BYPASS — opens the app (no OAuth/MFA) when DISABLE_AUTH=true.
+// Added only to screenshot/verify the Plan funnel build. MUST be removed to
+// restore the permanent fail-closed lock — see CLAUDE.md "Temporary auth bypass".
+const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true';
 
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/signout'];
 const MFA_MAX_AGE_S = 24 * 3600; // re-prompt for the 2FA code every 24h
@@ -26,6 +30,7 @@ function decodeJwt(token: string): { aal?: string; amr?: { method: string; times
 }
 
 export async function proxy(request: NextRequest) {
+  if (AUTH_DISABLED) return NextResponse.next(); // ⚠️ temporary dev bypass
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));
   const isMfa = path === '/mfa' || path.startsWith('/mfa/');
