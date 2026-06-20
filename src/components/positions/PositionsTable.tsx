@@ -5,6 +5,7 @@ import { usePositions } from '@/hooks/usePositions';
 import { useAccount } from '@/hooks/useAccount';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GateFuturesPosition } from '@/types/gate';
+import { PlanLinkCell } from '@/components/plan/PlanLinkCell';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 const BTC_CONTRACT_SIZE = 0.0001;
@@ -156,6 +157,12 @@ function PositionDetailDrawer({ p, totalValue, onClose }: { p: GateFuturesPositi
             </div>
           </div>
 
+          {/* Linked plan */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingBottom: 4, borderBottom: '1px solid #f5f4f1' }}>
+            <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#b0aea3' }}>Plan</span>
+            <PlanLinkCell pid="BTC/USDT.P" />
+          </div>
+
           {/* Exposure */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <SectionDivider label="Exposure" />
@@ -285,7 +292,7 @@ function PositionRow({ p, totalValue, onOpen }: { p: GateFuturesPosition; totalV
       onMouseLeave={() => setHovered(false)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '1.4fr .8fr .9fr .9fr .9fr 1.5fr 1fr 30px',
+        gridTemplateColumns: '1.4fr .8fr .9fr .9fr .9fr 1.2fr 1fr 1.2fr 30px',
         gap: 12,
         padding: '15px 8px',
         alignItems: 'center',
@@ -318,6 +325,7 @@ function PositionRow({ p, totalValue, onOpen }: { p: GateFuturesPosition; totalV
       <span style={{ textAlign: 'right' as const, fontWeight: 700, color: pnl >= 0 ? '#1f9d55' : '#df5338' }}>
         {pnl >= 0 ? '+$' : '-$'}{fmt(Math.abs(pnl), 0)}
       </span>
+      <span onClick={(e) => e.stopPropagation()} style={{ minWidth: 0 }}><PlanLinkCell pid="BTC/USDT.P" openDrawer={onOpen} /></span>
       <span style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', color: '#9d8cf0', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>›</span>
     </div>
   );
@@ -398,13 +406,14 @@ export function PositionsTable() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr .8fr .9fr .9fr .9fr 1.5fr 1fr 30px', gap: 12, padding: '13px 4px', fontWeight: 600, fontSize: 11, letterSpacing: '0.05em', color: '#b0aea3', textTransform: 'uppercase' as const, borderBottom: '1px solid #f2f1ee' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr .8fr .9fr .9fr .9fr 1.2fr 1fr 1.2fr 30px', gap: 12, padding: '13px 4px', fontWeight: 600, fontSize: 11, letterSpacing: '0.05em', color: '#b0aea3', textTransform: 'uppercase' as const, borderBottom: '1px solid #f2f1ee' }}>
               <span>Instrument</span><span>Side</span>
               <span style={{ textAlign: 'right' as const }}>Size</span>
               <span style={{ textAlign: 'right' as const }}>Entry</span>
               <span style={{ textAlign: 'right' as const }}>Mark</span>
               <span>Allocation</span>
               <span style={{ textAlign: 'right' as const }}>uPnL</span>
+              <span>Plan</span>
               <span />
             </div>
             {positions.map((p, idx) => (
