@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { usePositionHistory } from '@/hooks/usePositionHistory';
+import { useAccount } from '@/hooks/useAccount';
 import { usePlanStore, planActions } from '@/lib/plan-store';
-import { tpPlanName, planToDraft, tpCompute } from '@/lib/plan-model';
+import { tpPlanName, planToDraft, tpCompute, TP_EQUITY } from '@/lib/plan-model';
 import {
   mapTrade, journalBuild, filterEntries, jMoney,
   type JEntry, type JStats, type JFilter, type AdhCheck,
@@ -17,14 +18,16 @@ const baseSym = (sym: string) => (sym.split('/')[0] as 'BTC' | 'ETH' | 'SOL');
 
 export function Journal() {
   const { data, isLoading } = usePositionHistory();
+  const { data: account } = useAccount();
+  const equity = parseFloat(account?.total || '') || TP_EQUITY;
   const { links, plans, journal } = usePlanStore();
   const [filter, setFilter] = useState<JFilter>('all');
   const [openPid, setOpenPid] = useState<string | null>(null);
 
   const { entries, stats } = useMemo(() => {
     const trades = (data || []).filter((p) => Math.abs(parseFloat(p.max_size) || 0) > 0).map(mapTrade);
-    return journalBuild(trades, links, plans, journal);
-  }, [data, links, plans, journal]);
+    return journalBuild(trades, links, plans, journal, equity);
+  }, [data, links, plans, journal, equity]);
 
   const list = filterEntries(entries, filter);
   const openEntry = openPid ? entries.find((e) => e.t.pid === openPid) || null : null;
@@ -307,14 +310,16 @@ function SpecRow({ label, vPlan, vAct, pc, ac }: { label: string; vPlan: string;
 
 function DrawerBody({ e }: { e: JEntry }) {
   const { journal } = usePlanStore();
+  const { data: account } = useAccount();
+  const equity = parseFloat(account?.total || '') || TP_EQUITY;
   const t = e.t, long = t.sideLong, dirCol = long ? '#1f9d55' : '#df5338', up = t.up;
   const plan = e.plan, adh = e.adh;
   const rec = journal[t.pid] || {};
 
   // plan reference values for the spec table
   let pMarPct = NaN; let pDraft: ReturnType<typeof planToDraft> | null = null;
-  if (plan) { try { pDraft = planToDraft(plan); pMarPct = tpCompute(pDraft).marginPct; } catch { pMarPct = NaN; } }
-  const aMarPct = (t.marginN / 284712.4) * 100;
+  if (plan) { try { pDraft = planToDraft(plan); pMarPct = tpCompute(pDraft, equity).marginPct; } catch { pMarPct = NaN; } }
+  const aMarPct = (t.marginN / equity) * 100;
   const planMarTxt = plan ? (isFinite(pMarPct) ? pMarPct.toFixed(1) + '% of equity' : '—') : '—';
   const actMarTxt = t.marginStr + (isFinite(aMarPct) ? ' · ' + aMarPct.toFixed(1) + '%' : '');
   const marOver = !!plan && isFinite(pMarPct) && isFinite(aMarPct) && aMarPct > Math.min(pMarPct, 50) + 0.05;

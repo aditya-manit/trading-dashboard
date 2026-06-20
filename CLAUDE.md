@@ -231,6 +231,18 @@ adding it). Do not build until the user confirms.
 
 ## Planned (NOT yet built): Persistence backend — Supabase
 
+**⚠️ CURRENT STATE — Plan funnel persistence is localStorage (decided, interim).**
+The whole Plan funnel (Editor draft, Plans board, position⇄plan links, Journal
+grades/notes) persists to **localStorage** via `lib/plan-store.ts` (`tdplan_*`
+keys: `tdplan_view`, `tdplan_tp_draft`, `tdplan_board`, `tdplan_pos_links`,
+`tdplan_journal`). This is the **interim** store — the Supabase migration below
+is the eventual home for plans/journal (user-authored data you can't lose). The
+adherence equity basis is the **real account total** (`useAccount().total`,
+falling back to `TP_EQUITY` while loading), and trade keys derive from the
+contract (`contractToSym`/`tradePid` in `lib/journal.ts`, e.g. `BTC/USDT.P#<time>`)
+— NOT hardcoded to BTC. Keep links + journal keyed by `tradePid(p)` so the
+trade-drawer link cell and the Journal stay in sync.
+
 **Decided backend = Supabase** (one service for everything we need to write):
 Postgres for structured/persistent data, Supabase Storage for image files. Chosen
 over Turso/Neon/KV/Blob because it covers BOTH entries and files in one account.

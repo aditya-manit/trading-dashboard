@@ -126,6 +126,12 @@ const fmtLev = (lev: string) => {
   return !n || n === 0 ? 'Cross' : `${n}x`;
 };
 
+// Gate contract ("BTC_USDT") → display symbol ("BTC/USDT.P"). Derived, not
+// hardcoded — links + journal share this so any contract maps consistently.
+export const contractToSym = (contract: string): string => (contract ? contract.replace('_', '/') + '.P' : 'BTC/USDT.P');
+// Stable per-trade key shared by the trade-drawer link cell and the journal.
+export const tradePid = (p: GateFuturesPositionClose): string => `${contractToSym(p.contract)}#${p.time}`;
+
 export function mapTrade(p: GateFuturesPositionClose): JTrade {
   const pnlN = parseFloat(p.pnl) || 0;
   const up = pnlN >= 0;
@@ -136,8 +142,8 @@ export function mapTrade(p: GateFuturesPositionClose): JTrade {
   const notional = notionalUsd(p);
   const marginN = levN > 0 && notional > 0 ? notional / levN : 0;
   return {
-    pid: `BTC/USDT.P#${p.time}`,
-    sym: 'BTC/USDT.P',
+    pid: tradePid(p),
+    sym: contractToSym(p.contract),
     date: new Date(p.time * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     sideLong, up,
     lev: fmtLev(p.leverage),
@@ -165,10 +171,10 @@ const num = (v: unknown): number => {
 };
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
 
-export function journalAdherence(t: JTrade, plan: Plan | null): Adherence {
+export function journalAdherence(t: JTrade, plan: Plan | null, equity = TP_EQUITY): Adherence {
   if (!plan) return { key: 'unplanned', label: 'Unplanned', color: '#9b988d', bg: '#f3f2ef', border: '#e9e7e1', checks: null, followed: false, scored: false };
   const d: PlanDraft = planToDraft(plan);
-  const c = tpCompute(d);
+  const c = tpCompute(d, equity);
   const isLong = plan.dir === 'long';
   const dirMatch = plan.dir === (t.sideLong ? 'long' : 'short');
   const win = t.up;
@@ -182,7 +188,7 @@ export function journalAdherence(t: JTrade, plan: Plan | null): Adherence {
   const pMarginPct = isFinite(c.marginPct) ? c.marginPct : NaN;
 
   const aEntry = t.entryN, aExit = t.exitN, aLev = t.levN;
-  const aMarginPct = (t.marginN / TP_EQUITY) * 100;
+  const aMarginPct = (t.marginN / equity) * 100;
 
   const checks: AdhCheck[] = [];
   const dims: { weight: number; s: number }[] = [];
@@ -271,11 +277,12 @@ export function journalBuild(
   links: Record<string, string>,
   plans: Plan[],
   jr: Record<string, JournalRecord>,
+  equity = TP_EQUITY,
 ): { entries: JEntry[]; stats: JStats } {
   const entries: JEntry[] = trades.map((t) => {
     const planId = links[t.pid];
     const plan = planId ? plans.find((p) => p.id === planId) || null : null;
-    return { t, plan, adh: journalAdherence(t, plan), planned: !!plan, reviewed: !!(jr[t.pid] && jr[t.pid].reviewed), rec: jr[t.pid] || {} };
+    return { t, plan, adh: journalAdherence(t, plan, equity), planned: !!plan, reviewed: !!(jr[t.pid] && jr[t.pid].reviewed), rec: jr[t.pid] || {} };
   });
   const planned = entries.filter((e) => e.planned);
   const unplanned = entries.filter((e) => !e.planned);
