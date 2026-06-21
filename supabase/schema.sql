@@ -65,6 +65,14 @@ alter table public.released_archive enable row level security;
 alter table public.event_insight    enable row level security;
 alter table public.event_defs       enable row level security;
 
+-- service_role (our secret key) needs table-level GRANTs — RLS-bypass alone isn't
+-- enough. Supabase usually auto-grants, but grant explicitly to be safe. anon /
+-- authenticated are deliberately NOT granted, so the browser key can touch nothing.
+grant usage on schema public to service_role;
+grant all privileges on all tables in schema public to service_role;
+grant all privileges on all sequences in schema public to service_role;
+alter default privileges in schema public grant all on tables to service_role;
+
 -- ── Storage bucket for trade chart images ────────────────────────────────────
 -- Public-read bucket with unguessable paths; uploads happen server-side with the
 -- service_role key. <img src={publicUrl}> works directly. (If you'd rather keep

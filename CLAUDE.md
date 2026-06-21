@@ -229,8 +229,47 @@ adding it). Do not build until the user confirms.
 
 ---
 
-## Planned (NOT yet built): Persistence backend — Supabase
+## Persistence backend — Supabase (BEING BUILT)
 
+### ⚠️⚠️ REMOVE TEST DATA BEFORE SHIPPING ⚠️⚠️
+During the Supabase migration we created **throwaway test rows** (test plans,
+links, journal grades/notes) and **test chart images in Storage** to verify each
+action end-to-end. **These must be deleted before real use.** To wipe everything:
+```sql
+truncate public.plans, public.links, public.journal_entries,
+         public.released_archive, public.event_insight, public.event_defs;
+```
+(or `delete from` per table to keep some), and empty the **`charts`** Storage
+bucket (Supabase → Storage → charts → select all → delete). The released_archive
+real history (if re-populated from `data/released-archive.json`) should be kept —
+only delete the *test* rows there. Ask the user before truncating released_archive.
+
+### Schema
+`supabase/schema.sql` — 6 tables (RLS on, no policies → service_role only) + a
+public `charts` Storage bucket. **Includes explicit `grant … to service_role`**
+(Supabase didn't auto-grant; without it every query is `42501 permission denied`).
+Re-runnable. Run it in the Supabase **SQL Editor**.
+
+### How it's wired
+- `lib/supabase/admin.ts` — server-only service_role client (`SUPABASE_SECRET_KEY`),
+  null when env unset. ws polyfill for Node 20 (supabase-js realtime needs a
+  global WebSocket; Node 22/Vercel has it).
+- Routes (all `requireOwner`-gated, all return `{configured:false}` 501 when env
+  unset): `/api/plans` (GET/POST/DELETE), `/api/plans/chart` (base64 → Storage →
+  public URL), `/api/links`, `/api/journal`.
+- `lib/plan-store.ts` — `syncRemote()` on hydrate pulls plans/links/journal; when
+  configured Supabase is the source of truth (`remote=true`) and every mutation
+  writes through the API; else localStorage. Chart base64 uploaded to Storage on
+  save, swapped for the URL on the plan. **In remote mode the board starts from
+  Postgres (no seed/localStorage import) — deliberately, to avoid polluting the
+  real DB with demo data.**
+- Still TODO: migrate `released_archive` + the calendar caches
+  (`event_insight`/`event_defs`) in `lib/event-insight.ts` / `event-definitions.ts`
+  to Supabase (file fallback when env unset).
+
+---
+
+## (superseded note) Plan funnel persistence — localStorage interim
 **⚠️ CURRENT STATE — Plan funnel persistence is localStorage (decided, interim).**
 The whole Plan funnel (Editor draft, Plans board, position⇄plan links, Journal
 grades/notes) persists to **localStorage** via `lib/plan-store.ts` (`tdplan_*`
