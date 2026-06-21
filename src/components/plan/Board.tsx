@@ -4,11 +4,23 @@ import { useRef, useState } from 'react';
 import { type Plan, type Status, tpCompute, planToDraft, tpPlanName, tpMoney } from '@/lib/plan-model';
 import { planActions, usePlanStore } from '@/lib/plan-store';
 import { CoinIcon } from './coins';
+import { StatsBar } from './StatsBar';
 
-const COLS: { key: Status; label: string; dot: string }[] = [
-  { key: 'idea', label: 'Ideas', dot: '#c9b8ff' },
-  { key: 'armed', label: 'Armed', dot: '#7c5cff' },
-  { key: 'triggered', label: 'Triggered', dot: '#1f9d55' },
+type EmptyCfg = { ink: string; ring: string; tint: string; sub: string; icon: 'plus' | 'target' | 'bolt'; title: string };
+type Lane = {
+  key: Status; label: string; caption: string; num: string; glow: string; glowOp: number;
+  empty: EmptyCfg; drop: { ring: string; tint: string };
+};
+const LANES: Lane[] = [
+  { key: 'idea', label: 'Ideas', caption: 'plans mapped', num: '#e8920f', glow: '#ffa31a', glowOp: 0.28,
+    empty: { ink: '#d98a1f', ring: '#efd9b2', tint: '#fffaf1', sub: 'Map a setup to start your first idea', icon: 'plus', title: 'No ideas yet' },
+    drop: { ring: '#f4c884', tint: '#fff7ec' } },
+  { key: 'armed', label: 'Armed', caption: 'waiting on trigger', num: '#7c5cff', glow: '#7c5cff', glowOp: 0.26,
+    empty: { ink: '#7c5cff', ring: '#ddd2fb', tint: '#fbfaff', sub: 'Ideas ready to fire show up here', icon: 'target', title: 'Nothing armed' },
+    drop: { ring: '#d3c4ff', tint: '#f7f4ff' } },
+  { key: 'triggered', label: 'Triggered', caption: 'now live', num: '#1f9d55', glow: '#1f9d55', glowOp: 0.24,
+    empty: { ink: '#1f9d55', ring: '#bbe1cb', tint: '#f6fbf8', sub: 'Live trades appear here once they trigger', icon: 'bolt', title: 'None triggered' },
+    drop: { ring: '#abdcc0', tint: '#edf7f1' } },
 ];
 const money = (v: number) => (isFinite(v) ? tpMoney(v, v < 1000 ? 2 : 0) : '—');
 
@@ -92,6 +104,29 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
   );
 }
 
+function EmptyLane({ e }: { e: EmptyCfg }) {
+  const clickable = e.icon === 'plus';
+  const icon = e.icon === 'plus'
+    ? <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={e.ink} strokeWidth={2.5} strokeLinecap="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+    : e.icon === 'target'
+      ? <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={e.ink} strokeWidth={2}><circle cx={12} cy={12} r={8} /><circle cx={12} cy={12} r={3.4} fill={e.ink} stroke="none" /></svg>
+      : <svg width={17} height={17} viewBox="0 0 24 24" fill={e.ink} stroke="none"><path d="M13 2 4 14h5.5L8.5 22 20 9h-6.2z" /></svg>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9, textAlign: 'center', padding: '32px 18px', borderRadius: 16, border: '1.5px dashed ' + e.ring, background: e.tint }}>
+      <div
+        onClick={clickable ? () => { planActions.clearDraft(); planActions.setView('editor'); } : undefined}
+        title={clickable ? 'Plan a new idea' : undefined}
+        onMouseEnter={clickable ? (ev) => { ev.currentTarget.style.transform = 'translateY(-1px)'; ev.currentTarget.style.boxShadow = '0 4px 12px rgba(217,138,31,.22)'; } : undefined}
+        onMouseLeave={clickable ? (ev) => { ev.currentTarget.style.transform = 'none'; ev.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,.04)'; } : undefined}
+        style={{ width: 42, height: 42, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '1px solid ' + e.ring, boxShadow: '0 2px 5px rgba(0,0,0,.04)', marginBottom: 1, cursor: clickable ? 'pointer' : 'default', transition: 'transform .14s ease, box-shadow .14s ease' }}>
+        {icon}
+      </div>
+      <span style={{ fontWeight: 800, fontSize: 12.5, letterSpacing: '0.01em', color: '#6f6a60' }}>{e.title}</span>
+      <span style={{ fontWeight: 600, fontSize: 10.5, lineHeight: 1.5, color: '#b0ada3', maxWidth: 156 }}>{e.sub}</span>
+    </div>
+  );
+}
+
 export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
   const store = usePlanStore();
   const [overCol, setOverCol] = useState<Status | null>(null);
@@ -107,30 +142,42 @@ export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
           <span style={{ fontWeight: 800, fontSize: 29, letterSpacing: '-0.025em', color: '#1a1813', lineHeight: 1.08 }}>Your trade plans.</span>
           <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>Ideas you’ve mapped, armed setups waiting on a trigger, and the ones now live. Execute on TradingView — this stays your record.</span>
         </div>
-        <button onClick={() => { planActions.clearDraft(); planActions.setView('editor'); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 11, background: '#7c5cff', color: '#fff', border: 'none', borderRadius: 13, padding: '11px 18px', fontFamily: 'inherit', fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em', cursor: 'pointer', boxShadow: '0 2px 8px rgba(124,92,255,0.28)', flex: '0 0 auto' }}>
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>New plan
+        <button onClick={() => { planActions.clearDraft(); planActions.setView('editor'); }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#e9e1ff'; e.currentTarget.style.borderColor = '#c9b6ff'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = '#f1ecff'; e.currentTarget.style.borderColor = '#d9ccff'; }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: '#f1ecff', border: '1px solid #d9ccff', borderRadius: 11, padding: '8px 8px 8px 15px', fontFamily: 'inherit', cursor: 'pointer', flex: '0 0 auto', transition: 'border-color .15s, background .15s' }}>
+          <span style={{ fontWeight: 700, fontSize: 13.5, color: '#5a3ff0', letterSpacing: '-0.01em' }}>New plan</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 7, background: '#7c5cff', boxShadow: '0 2px 6px rgba(124,92,255,0.35)' }}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+          </span>
         </button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, alignItems: 'stretch' }}>
-        {COLS.map((col) => {
-          const items = plans.filter((p) => p.status === col.key);
-          const isOver = overCol === col.key;
-          const empty = col.key === 'idea' ? 'No ideas yet' : col.key === 'armed' ? 'Nothing armed' : 'None triggered';
+
+      <StatsBar plans={plans} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: 16, alignItems: 'stretch' }}>
+        {LANES.map((lane) => {
+          const items = plans.filter((p) => p.status === lane.key);
+          const isOver = overCol === lane.key;
           return (
-            <div key={col.key} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 2px' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.dot }} />
-                <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#1a1813' }}>{col.label}</span>
-                <span style={{ fontWeight: 800, fontSize: 10.5, color: '#a8a69b', background: '#f1f0ed', borderRadius: 99, padding: '2px 8px', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+            <div key={lane.key} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* lane glow halo */}
+              <div style={{ position: 'absolute', top: 30, left: '50%', transform: 'translateX(-50%)', width: '84%', height: 170, borderRadius: '50%', background: lane.glow, filter: 'blur(58px)', opacity: lane.glowOp, pointerEvents: 'none', zIndex: 0 }} />
+              {/* number-led header */}
+              <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 11, padding: '0 6px' }}>
+                <span style={{ fontWeight: 800, fontSize: 34, lineHeight: 0.85, letterSpacing: '-0.03em', color: lane.num, fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#1a1813' }}>{lane.label}</span>
+                  <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b' }}>{lane.caption}</span>
+                </div>
               </div>
+              {/* drop zone */}
               <div
-                onDragOver={(e) => { e.preventDefault(); if (overCol !== col.key) setOverCol(col.key); }}
-                onDragLeave={() => setOverCol((s) => (s === col.key ? null : s))}
-                onDrop={(e) => { e.preventDefault(); setOverCol(null); const id = (window as unknown as { __tpDrag?: string }).__tpDrag; if (id) planActions.movePlan(id, col.key); }}
-                style={{ display: 'flex', flexDirection: 'column', gap: 11, flex: 1, minHeight: 88, borderRadius: 14, padding: 6, transition: 'background .12s, box-shadow .12s', background: isOver ? '#f7f4ff' : 'transparent', boxShadow: isOver ? 'inset 0 0 0 2px #d3c4ff' : 'inset 0 0 0 1px transparent' }}>
-                {items.length === 0 ? (
-                  <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: '#bdbbb1', fontWeight: 600, fontSize: 12, padding: '24px 0', textAlign: 'center' }}>{empty}</div>
-                ) : items.map((p) => <BoardCard key={p.id} p={p} onOpen={onOpen} />)}
+                onDragOver={(e) => { e.preventDefault(); if (overCol !== lane.key) setOverCol(lane.key); }}
+                onDragLeave={() => setOverCol((s) => (s === lane.key ? null : s))}
+                onDrop={(e) => { e.preventDefault(); setOverCol(null); const id = (window as unknown as { __tpDrag?: string }).__tpDrag; if (id) planActions.movePlan(id, lane.key); }}
+                style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 11, flex: 1, minHeight: 88, borderRadius: 14, padding: 6, transition: 'background .12s, box-shadow .12s', background: isOver ? lane.drop.tint : 'transparent', boxShadow: isOver ? 'inset 0 0 0 2px ' + lane.drop.ring : 'inset 0 0 0 1px transparent' }}>
+                {items.length === 0 ? <EmptyLane e={lane.empty} /> : items.map((p) => <BoardCard key={p.id} p={p} onOpen={onOpen} />)}
               </div>
             </div>
           );
