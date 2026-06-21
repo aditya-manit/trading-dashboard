@@ -71,11 +71,11 @@ export function Journal() {
 
 // ── ring ──────────────────────────────────────────────────────────────────────
 function Ring({ pct, color, sz = 58 }: { pct: number; color: string; sz?: number }) {
-  const R = sz / 2 - 5, C = 2 * Math.PI * R, off = C * (1 - Math.max(0, Math.min(100, pct)) / 100);
+  const SW = Math.max(5.5, sz * 0.095), R = sz / 2 - SW / 2 - 2, C = 2 * Math.PI * R, off = C * (1 - Math.max(0, Math.min(100, pct)) / 100);
   return (
     <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`} style={{ flex: '0 0 auto' }}>
-      <circle cx={sz / 2} cy={sz / 2} r={R} fill="none" stroke="#efeee9" strokeWidth={5.5} />
-      <circle cx={sz / 2} cy={sz / 2} r={R} fill="none" stroke={color} strokeWidth={5.5} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off} transform={`rotate(-90 ${sz / 2} ${sz / 2})`} style={{ transition: 'stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)' }} />
+      <circle cx={sz / 2} cy={sz / 2} r={R} fill="none" stroke="#efeee9" strokeWidth={SW} />
+      <circle cx={sz / 2} cy={sz / 2} r={R} fill="none" stroke={color} strokeWidth={SW} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off} transform={`rotate(-90 ${sz / 2} ${sz / 2})`} style={{ transition: 'stroke-dashoffset .6s cubic-bezier(.22,1,.36,1)' }} />
       <text x={sz / 2} y={sz / 2 + 5} textAnchor="middle" fontFamily={FONT} fontWeight={800} fontSize={sz * 0.27} fill="#1a1813">{pct}%</text>
     </svg>
   );
@@ -101,8 +101,8 @@ function Kpis({ s }: { s: JStats }) {
     <div style={{ display: 'flex', flexWrap: 'wrap', background: '#fff', border: '1px solid #ece9e3', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
       <div style={cellStyle}>
         {cap('Plan adherence')}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-          <Ring pct={s.adherence} color={adhColor} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+          <Ring pct={s.adherence} color={adhColor} sz={80} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <span style={{ fontWeight: 800, fontSize: 13, color: '#1a1813' }}>{s.followedN} of {s.plannedN} followed</span>
             {sub('of planned trades stuck to the rules')}
