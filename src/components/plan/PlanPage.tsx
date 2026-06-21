@@ -29,6 +29,18 @@ function dayHeader(iso: string, now: Date) {
   return `${rel ? rel + ' · ' : ''}${date}`.toUpperCase();
 }
 
+// Day-aware time, e.g. "Today 18:00" / "Tomorrow 18:00" / "Thursday 18:00"
+// (within the week) / "Jun 25 18:00" (further out).
+function fmtWhen(iso: string) {
+  const d = dayDiff(iso, new Date());
+  const t = fmtTime(iso);
+  if (d === 0) return `Today ${t}`;
+  if (d === 1) return `Tomorrow ${t}`;
+  if (d === -1) return `Yesterday ${t}`;
+  if (d >= 2 && d <= 6) return `${new Date(iso).toLocaleDateString('en-US', { weekday: 'long' })} ${t}`;
+  return `${new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${t}`;
+}
+
 // Memoized so it only re-renders (and replays its entrance animation) when the
 // step changes — toggling pre-flight checks must NOT remount it.
 const StepDiagram = memo(function StepDiagram({ step }: { step: number }) {
@@ -51,7 +63,10 @@ function CountdownFull({ date, style }: { date: string; style?: CSSProperties })
   if (ms <= 0) return <span style={base}>live now</span>;
   const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
   const p = (n: number) => String(n).padStart(2, '0');
-  return <span style={base}>{(d > 0 ? `${d}d ` : '') + (d > 0 || h > 0 ? `${h}h ` : '') + `${p(m)}m ${p(s)}s`}</span>;
+  // Days out → just "3d 22h" (seconds-precision is noise that far away). Under a
+  // day → keep the ticking "5h 23m 07s" / "23m 07s" so it feels live up close.
+  const out = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${p(m)}m ${p(s)}s` : `${p(m)}m ${p(s)}s`;
+  return <span style={base}>{out}</span>;
 }
 
 // Per-card countdown: "in 2d 4h" / "in 5h 23m" / "in 5m 12s" (seconds under 1h).
@@ -261,7 +276,7 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
           <EventName title={e.title} def={def} />
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
-          <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b' }}>{fmtTime(e.date)}</span>
+          <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b', whiteSpace: 'nowrap' }}>{fmtWhen(e.date)}</span>
           <CountdownLabel date={e.date} />
         </div>
       </div>
