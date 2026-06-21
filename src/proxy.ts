@@ -15,7 +15,9 @@ const OWNER_EMAIL = process.env.OWNER_EMAIL?.toLowerCase();
 // restore the permanent fail-closed lock — see CLAUDE.md "Temporary auth bypass".
 const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true';
 
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/signout'];
+// /api/keepalive is hit by the Vercel cron (no user session) — it guards itself
+// with CRON_SECRET, so it's safe to let past the owner gate.
+const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/signout', '/api/keepalive'];
 const MFA_MAX_AGE_S = 24 * 3600; // re-prompt for the 2FA code every 24h
 
 // Decode a JWT payload (no verification — getUser() already validated it).
