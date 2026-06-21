@@ -926,9 +926,9 @@ export function PlanPage() {
           </div>
         </div>
 
-        {/* body: diagram | big lead */}
+        {/* body: diagram (wider) | big lead */}
         <div style={{ display: 'flex', alignItems: 'stretch' }}>
-          <div style={{ flex: 1, minWidth: 0, padding: '22px 28px', display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center' }}>
+          <div style={{ flex: 1.4, minWidth: 0, padding: '4px 14px', display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
             <StepDiagram key={step} step={step} />
             <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70', lineHeight: 1.5, padding: '0 2px' }}>{meta.caption}</span>
           </div>

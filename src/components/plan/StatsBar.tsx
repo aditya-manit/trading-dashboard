@@ -81,9 +81,10 @@ const ACell = ({ lab, valTxt, frac, col }: { lab: string; valTxt: string; frac: 
 );
 const VDiv = () => <div style={{ width: 1, alignSelf: 'stretch', background: C.line }} />;
 
-const levCol = (l: number) => (l > 5 ? (l >= 10 ? '#b5341f' : C.red) : (({ 3: '#cbbcf7', 4: '#a78bf0', 5: '#7c5cff' } as Record<number, string>)[l] || '#7c5cff'));
-const marPal = ['#ece6fb', '#d9cdf7', '#bca7f5', '#9476ee', '#7c5cff', '#6f4ff5'];
-const marCol = (i: number, n: number) => marPal[Math.min(marPal.length - 1, n <= 1 ? marPal.length - 1 : Math.round((i / (n - 1)) * (marPal.length - 1)))];
+// Threshold coloring (risk ramp): ≤5× safe green → amber → red → dark red.
+const levCol = (l: number) => (l <= 5 ? '#1f9d55' : l <= 7 ? IDEA : l < 10 ? '#df5338' : '#b5341f');
+// Conviction ramp: High green · Med amber (caution) · Low grey.
+const convHi = '#1f9d55', convMe = IDEA, convLo = '#c2bfb4';
 const fmtPct = (v: number) => (isFinite(v) ? v.toFixed(2) + '%' : '—');
 
 export function StatsBar({ plans }: { plans: Plan[] }) {
@@ -105,24 +106,17 @@ export function StatsBar({ plans }: { plans: Plan[] }) {
   });
   const levBuckets = Object.keys(levMap).map(Number).sort((a, b) => a - b).map((l) => ({ lev: l, n: levMap[l] }));
 
-  let marginBuckets: { n: number; label: string }[] = [];
-  if (marginVals.length) {
-    const mn = Math.min(...marginVals), mx = Math.max(...marginVals);
-    const rnd = (v: number) => { const r = Math.round(v * 10) / 10; return r % 1 === 0 ? String(r) : r.toFixed(1); };
-    if (mx - mn < 0.5) {
-      marginBuckets = [{ n: marginVals.length, label: rnd(mn) + '%' }];
-    } else {
-      const raw = (mx - mn) / 4, pow = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / pow;
-      const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * pow;
-      const start = Math.floor(mn / step) * step;
-      for (let lo = start; lo < mx + 1e-9; lo += step) marginBuckets.push({ n: 0, label: rnd(lo) + '-' + rnd(lo + step) + '%' });
-      marginVals.forEach((m) => { let idx = Math.floor((m - start) / step + 1e-9); if (idx < 0) idx = 0; if (idx >= marginBuckets.length) idx = marginBuckets.length - 1; marginBuckets[idx].n++; });
-    }
-  }
+  // Margin bucketed into the SAME fixed threshold bands as the color ramp, so
+  // each color is its own bar: ≤50 green · 50–65 amber · 65–80 red · >80 dark.
+  const marBars = [
+    { label: '≤50%', col: '#1f9d55', lo: -Infinity, hi: 50, n: 0 },
+    { label: '50–65%', col: IDEA, lo: 50, hi: 65, n: 0 },
+    { label: '65–80%', col: '#df5338', lo: 65, hi: 80, n: 0 },
+    { label: '>80%', col: '#b5341f', lo: 80, hi: Infinity, n: 0 },
+  ];
+  marginVals.forEach((v) => { const bk = marBars.find((b) => v > b.lo && v <= b.hi); if (bk) bk.n++; });
   const avgRisk = riskN ? riskSum / riskN : NaN, avgReward = rewN ? rewSum / rewN : NaN, avgRR = rrN ? rrSum / rrN : NaN;
   const MAXR = 2.0, MAXW = 5.0;
-
-  const marBars = marginBuckets.length ? marginBuckets : [{ n: 0, label: '-' }];
 
   return (
     <div style={{ background: '#fff', border: '1px solid ' + C.line, borderRadius: 20, boxShadow: '0 1px 3px rgba(20,20,12,0.05)', padding: '24px 28px', display: 'flex', alignItems: 'stretch', gap: 28 }}>
@@ -131,8 +125,8 @@ export function StatsBar({ plans }: { plans: Plan[] }) {
         <CircleCell lab="Plans" segs={[{ n: stage.idea, col: IDEA }, { n: stage.armed, col: C.purp }, { n: stage.triggered, col: C.green }]} leg={[{ col: IDEA, n: stage.idea, label: 'Idea' }, { col: C.purp, n: stage.armed, label: 'Armed' }, { col: C.green, n: stage.triggered, label: 'Live' }]} />
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Eb t="Conviction" />
-          <SplitBar segs={[{ n: conv.high, col: C.purp }, { n: conv.med, col: C.lilac }, { n: conv.low, col: C.pale }]} />
-          <Legend items={[{ col: C.purp, n: conv.high, label: 'High' }, { col: C.lilac, n: conv.med, label: 'Med' }, { col: C.pale, n: conv.low, label: 'Low' }]} />
+          <SplitBar segs={[{ n: conv.high, col: convHi }, { n: conv.med, col: convMe }, { n: conv.low, col: convLo }]} />
+          <Legend items={[{ col: convHi, n: conv.high, label: 'High' }, { col: convMe, n: conv.med, label: 'Med' }, { col: convLo, n: conv.low, label: 'Low' }]} />
         </div>
         <ACell lab="Avg risk" valTxt={fmtPct(avgRisk)} frac={avgRisk / MAXR} col={C.red} />
         <ACell lab="Avg reward" valTxt={fmtPct(avgReward)} frac={avgReward / MAXW} col={C.green} />
@@ -154,7 +148,7 @@ export function StatsBar({ plans }: { plans: Plan[] }) {
       <VDiv />
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Eb t="Margin" />
-        <Hist bars={marBars.map((b, i) => ({ n: b.n, label: b.label, col: marCol(i, marBars.length) }))} H={152} />
+        <Hist bars={marBars.map((b) => ({ n: b.n, label: b.label, col: b.col }))} H={152} />
       </div>
     </div>
   );

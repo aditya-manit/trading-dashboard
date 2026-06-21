@@ -161,7 +161,8 @@ export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
         </button>
       </div>
 
-      <StatsBar plans={plans} />
+      {/* own layer so the lane glows below never bleed onto the stats card */}
+      <div style={{ position: 'relative', zIndex: 2 }}><StatsBar plans={plans} /></div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: 16, alignItems: 'stretch' }}>
         {LANES.map((lane) => {
