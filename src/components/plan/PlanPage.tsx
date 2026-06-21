@@ -770,10 +770,11 @@ export function PlanPage() {
               </div>
               <div style={{ display: 'inline-flex', alignItems: 'center', background: '#efece6', border: '1px solid #e7e3da', borderRadius: 10, padding: 3, gap: 3, flex: '0 0 auto' }}>
                 {(['upcoming', 'released'] as const).map((t) => {
-                  // While All is on the tabs read inactive; clicking one untoggles All.
-                  const active = !showAll && newsTab === t;
+                  // All on ⇒ Released reads active (it's the superset). Clicking
+                  // Released keeps All on; only Upcoming turns it off.
+                  const active = newsTab === t;
                   return (
-                    <button key={t} onClick={() => { setNewsTab(t); setShowAll(false); }} style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', background: active ? '#fff' : 'transparent', color: active ? '#1a1813' : '#8c8a81', boxShadow: active ? '0 1px 2px rgba(20,20,12,0.08)' : 'none', transition: 'all .18s' }}>
+                    <button key={t} onClick={() => { setNewsTab(t); if (t === 'upcoming') setShowAll(false); }} style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', background: active ? '#fff' : 'transparent', color: active ? '#1a1813' : '#8c8a81', boxShadow: active ? '0 1px 2px rgba(20,20,12,0.08)' : 'none', transition: 'all .18s' }}>
                       {t === 'upcoming' ? 'Upcoming' : 'Released'}
                     </button>
                   );
