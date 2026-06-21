@@ -479,6 +479,45 @@ async function fetchReleased(
 // Used to fill the "2 prints" reactions with real numbers, not model guesses.
 let candleCache: { at: number; map: Map<string, number> } | null = null;
 
+// BTC's REACTION to an event: the move over [release, release+hours] measured on
+// 1h Gate candles (vs btcDailyMoves' whole-day move). Isolates the post-release
+// reaction. releaseMs = the print date carrying the event's ET release time.
+// In-memory cached per (release, hours) so repeat loads don't re-hit Gate.
+const windowCache = new Map<string, { at: number; val: number | undefined }>();
+export async function btcWindowMove(releaseMs: number, hours = 4): Promise<number | undefined> {
+  if (!isFinite(releaseMs)) return undefined;
+  const ck = `${Math.round(releaseMs / 1000)}|${hours}`;
+  const hit = windowCache.get(ck);
+  if (hit && Date.now() - hit.at < 6 * 3_600_000) return hit.val;
+  let val: number | undefined;
+  try {
+    const startSec = Math.floor(releaseMs / 1000);
+    const from = startSec - 3600, to = startSec + (hours + 1) * 3600;
+    const res = await fetch(
+      `https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=BTC_USDT&interval=1h&from=${from}&to=${to}`,
+      { next: { revalidate: 3600 } },
+    );
+    if (res.ok) {
+      const raw: string[][] = await res.json();
+      const candles = raw
+        .map((c) => ({ t: parseInt(c[0], 10), open: parseFloat(c[5]), close: parseFloat(c[2]) }))
+        .filter((c) => c.open > 0)
+        .sort((a, b) => a.t - b.t);
+      if (candles.length) {
+        // candle whose hour contains the release (else the first at/after it)
+        const startC = candles.find((c) => c.t <= startSec && startSec < c.t + 3600) ?? candles.find((c) => c.t >= startSec - 3600);
+        if (startC) {
+          const endTime = startC.t + hours * 3600;
+          const endC = candles.filter((c) => c.t < endTime).pop() ?? startC;
+          val = ((endC.close - startC.open) / startC.open) * 100;
+        }
+      }
+    }
+  } catch { /* no intraday that far back → undefined, caller falls back to daily */ }
+  windowCache.set(ck, { at: Date.now(), val });
+  return val;
+}
+
 export async function btcDailyMoves(): Promise<Map<string, number>> {
   if (candleCache && Date.now() - candleCache.at < 3_600_000) return candleCache.map;
   const map = new Map<string, number>();

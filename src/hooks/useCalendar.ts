@@ -7,9 +7,11 @@ export type AssetDir = 'up' | 'down' | 'flat';
 export interface EventInsight {
   condition: string;
   assets: { sym: string; dir: AssetDir }[];
-  // Last ≤2 occurrences of this event: the date (Claude's estimate of when the
-  // event last fired) + BTC's measured daily % move on that date (from Gate).
-  prints?: { date: string; pct: number }[];
+  // Last ≤2 occurrences of this event (date from Claude+web-search) + BTC's
+  // measured move from Gate: `pct` = whole-day move, `reactPct` = the 4h
+  // post-release reaction (1h candles). The card plots/leads with reactPct and
+  // shows pct as the muted "day" figure; reactPct may be absent for old dates.
+  prints?: { date: string; pct: number; reactPct?: number }[];
 }
 
 // What actually printed for an already-released event (Claude + web search).

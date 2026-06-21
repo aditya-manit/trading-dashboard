@@ -95,21 +95,31 @@ function Tag({ e }: { e: CalendarEvent }) {
   return <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.05em', color: t.color }}>{t.label}</span>;
 }
 
-// One "print" row: date · magnitude bar · signed % (real BTC move from Gate).
-function PrintBar({ p }: { p: { date: string; pct: number } }) {
-  const up = p.pct >= 0;
+// One "print" row: date · magnitude bar (4h reaction) · signed 4h % (bold) ·
+// full-day % (small, muted, 'd'). Falls back to the day move when the 4h
+// reaction is missing (no intraday candles that far back).
+function PrintBar({ p }: { p: { date: string; pct: number; reactPct?: number } }) {
+  const hasReact = typeof p.reactPct === 'number';
+  const primary = hasReact ? (p.reactPct as number) : p.pct; // bar + bold lead with the reaction
+  const up = primary >= 0;
   const color = up ? '#1f9d55' : '#df5338';
-  const width = Math.min(100, Math.max(8, Math.abs(p.pct) * 40));
+  const width = Math.min(100, Math.max(8, Math.abs(primary) * 40));
   const label = new Date(`${p.date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const dayUp = p.pct >= 0;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ fontWeight: 600, fontSize: 9, color: '#a8a69b', width: 36, flex: '0 0 auto' }}>{label}</span>
       <div style={{ flex: 1, height: 5, borderRadius: 3, background: '#f4f3f0', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${width}%`, background: color, borderRadius: 3 }} />
       </div>
-      <span style={{ fontWeight: 700, fontSize: 10, color, width: 38, textAlign: 'right', flex: '0 0 auto', fontVariantNumeric: 'tabular-nums' }}>
-        {up ? '+' : '−'}{Math.abs(p.pct).toFixed(1)}%
+      <span title="BTC's move in the 4h after the release" style={{ fontWeight: 700, fontSize: 10, color, width: 36, textAlign: 'right', flex: '0 0 auto', fontVariantNumeric: 'tabular-nums' }}>
+        {up ? '+' : '−'}{Math.abs(primary).toFixed(1)}%
       </span>
+      {hasReact ? (
+        <span title="BTC's full-day move" style={{ fontWeight: 600, fontSize: 9, color: '#b3b0a6', flex: '0 0 auto', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+          {dayUp ? '+' : '−'}{Math.abs(p.pct).toFixed(1)}<span style={{ fontSize: 7 }}>d</span>
+        </span>
+      ) : null}
     </div>
   );
 }
