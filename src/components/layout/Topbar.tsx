@@ -163,12 +163,22 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <button
-          onClick={handleRefresh}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 600, fontSize: 12.5, color: '#8c8a81', background: '#f6f5f2', border: '1px solid #eeede9', padding: '7px 13px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2faa63', boxShadow: '0 0 0 3px rgba(47,170,99,0.16)', display: 'inline-block' }} />
-          Read-only · {synced ? `synced ${synced}` : 'syncing…'}
+        {/* Segmented sync pill: lock·Read-only | hairline | live-pulse·Synced */}
+        <button onClick={handleRefresh} title="Refresh" style={{ display: 'inline-flex', alignItems: 'stretch', background: '#fff', border: '1px solid #e9e6df', borderRadius: 999, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.05)', fontSize: 12.5, padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <style>{'@keyframes tbPulse{0%{transform:scale(.5);opacity:.45;}70%{opacity:0;}100%{transform:scale(1.9);opacity:0;}}'}</style>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 13px', color: '#8c8a81', fontWeight: 600 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a8a69b" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+            Read-only
+          </span>
+          <span style={{ width: 1, background: '#ece9e3' }} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 13px' }}>
+            <span style={{ position: 'relative', display: 'inline-flex', width: 8, height: 8, flex: '0 0 auto', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ position: 'absolute', width: 8, height: 8, borderRadius: '50%', background: '#1f9d55', opacity: 0.5, animation: 'tbPulse 1.9s ease-out infinite' }} />
+              <span style={{ position: 'relative', width: 8, height: 8, borderRadius: '50%', background: '#1f9d55' }} />
+            </span>
+            <span style={{ fontWeight: 700, color: '#39372f' }}>Synced</span>
+            <span style={{ fontWeight: 600, color: '#a8a69b' }}>{synced ?? '…'}</span>
+          </span>
         </button>
         <ProfileMenu />
       </div>
