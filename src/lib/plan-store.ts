@@ -138,9 +138,11 @@ export const planActions = {
   },
   deletePlan(id: string) {
     const plans = state.plans.filter((p) => p.id !== id);
-    set({ plans });
+    // drop links that pointed at this plan (server cascades too; keep client in sync)
+    const links = Object.fromEntries(Object.entries(state.links).filter(([, pid]) => pid !== id));
+    set({ plans, links });
     if (state.remote) void apiDeletePlan(id);
-    else write(PLAN_KEYS.board, plans);
+    else { write(PLAN_KEYS.board, plans); write(PLAN_KEYS.links, links); }
   },
   movePlan(id: string, status: Status) {
     const plans = state.plans.map((p) => (p.id === id ? { ...p, status } : p));

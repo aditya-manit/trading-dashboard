@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth-guard';
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { supabaseAdmin, CHARTS_BUCKET } from '@/lib/supabase/admin';
 import type { Plan } from '@/lib/plan-model';
 
 // Plans board persistence. When Supabase isn't configured the route reports
@@ -38,6 +38,14 @@ export async function DELETE(req: Request) {
   if (!sb) return NextResponse.json({ configured: false }, { status: 501 });
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'missing id' }, { status: 400 });
+
+  // Cascade: remove the plan's links and its chart image(s) so nothing dangles.
+  await sb.from('links').delete().eq('plan_id', id);
+  try {
+    const { data: files } = await sb.storage.from(CHARTS_BUCKET).list(id);
+    if (files && files.length) await sb.storage.from(CHARTS_BUCKET).remove(files.map((f) => `${id}/${f.name}`));
+  } catch { /* storage best-effort */ }
+
   const { error } = await sb.from('plans').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
