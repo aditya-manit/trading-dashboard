@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 // Plain-language definitions of economic-calendar releases, shown on hover over
 // an event name. Curated seed below (no API needed); anything not in the seed
@@ -52,27 +53,44 @@ const defCache = new Map<string, string>();
 const CACHE_FILE = join(process.cwd(), '.cache', 'event-defs.json');
 let loaded = false;
 
-function load() {
+async function load() {
   if (loaded) return;
   loaded = true;
   for (const [k, v] of Object.entries(SEED_DEFS)) defCache.set(k, v);
+  const sb = supabaseAdmin();
+  if (sb) {
+    try {
+      const { data } = await sb.from('event_defs').select('title, definition');
+      for (const r of data || []) defCache.set(r.title as string, String(r.definition));
+    } catch { /* unreachable → seed only, misses re-fetch */ }
+    return;
+  }
   try {
     const raw = JSON.parse(readFileSync(CACHE_FILE, 'utf8')) as Record<string, string>;
     for (const [k, v] of Object.entries(raw)) defCache.set(k, String(v));
   } catch { /* no fetched-defs file yet */ }
 }
 
-function save() {
+// Persist only the fetched ones (seed lives in code).
+async function save() {
+  const fetched = [...defCache].filter(([k]) => !(k in SEED_DEFS));
+  const sb = supabaseAdmin();
+  if (sb) {
+    try {
+      const now = new Date().toISOString();
+      const rows = fetched.map(([title, definition]) => ({ title, definition, updated_at: now }));
+      if (rows.length) await sb.from('event_defs').upsert(rows);
+    } catch { /* best-effort */ }
+    return;
+  }
   try {
     mkdirSync(dirname(CACHE_FILE), { recursive: true });
-    // Persist only the fetched ones (seed lives in code).
-    const fetched = Object.fromEntries([...defCache].filter(([k]) => !(k in SEED_DEFS)));
-    writeFileSync(CACHE_FILE, JSON.stringify(fetched, null, 2));
+    writeFileSync(CACHE_FILE, JSON.stringify(Object.fromEntries(fetched), null, 2));
   } catch { /* read-only FS — stays in-memory */ }
 }
 
 export async function getDefinitions(titles: string[]): Promise<Record<string, string>> {
-  load();
+  await load();
   const want = [...new Set(titles.map(norm))];
   const missing = want.filter((t) => !defCache.has(t));
 
@@ -81,7 +99,7 @@ export async function getDefinitions(titles: string[]): Promise<Record<string, s
     try {
       const defs = await fetchDefs(apiKey, missing);
       missing.forEach((t, i) => { if (defs[i]) defCache.set(t, defs[i]); });
-      save();
+      await save();
     } catch (err) {
       console.error('[event-defs] fetch failed:', err);
     }

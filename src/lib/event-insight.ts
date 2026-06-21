@@ -1,6 +1,7 @@
 import type { AssetDir, ReleasedInfo } from '@/hooks/useCalendar';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 // Server-only enrichment via the Claude Messages API. Two tiers, cached by
 // `currency|title` and PERSISTED to disk so values don't change on restart /
@@ -28,13 +29,29 @@ const asset = (a: unknown): { sym: string; dir: AssetDir } => {
 
 export const insightKey = (country: string, title: string) => `${country}|${title}`;
 
-// ── Disk persistence (survives dev restarts & redeploys with a writable FS) ──
+// ── Persistence: Supabase when configured (durable on Vercel), else disk ──────
+// Supabase mode mirrors reactionCache+printsCache → `event_insight` and the
+// permanent `archive` → `released_archive`. The transient releasedCache (the
+// pre-settle stage) stays in-memory only — it's re-derivable and gets promoted
+// to the archive within hours, so it needs no durable home (same as today's
+// read-only-FS prod behaviour). File mode is unchanged (local dev / no env).
 const CACHE_FILE = join(process.cwd(), '.cache', 'event-insight.json');
 let cacheLoaded = false;
 
-function loadCache() {
+async function loadCache() {
   if (cacheLoaded) return;
   cacheLoaded = true;
+  const sb = supabaseAdmin();
+  if (sb) {
+    try {
+      const { data } = await sb.from('event_insight').select('key, reaction, prints');
+      for (const r of data || []) {
+        if (r.reaction) reactionCache.set(r.key as string, r.reaction as Reaction);
+        if (r.prints) printsCache.set(r.key as string, r.prints as { date: string }[]);
+      }
+    } catch { /* unreachable → empty caches, will re-enrich */ }
+    return;
+  }
   try {
     const raw = JSON.parse(readFileSync(CACHE_FILE, 'utf8')) as {
       reactions?: Record<string, Reaction>;
@@ -47,7 +64,17 @@ function loadCache() {
   } catch { /* no cache yet */ }
 }
 
-function saveCache() {
+async function saveCache() {
+  const sb = supabaseAdmin();
+  if (sb) {
+    try {
+      const keys = new Set([...reactionCache.keys(), ...printsCache.keys()]);
+      const now = new Date().toISOString();
+      const rows = [...keys].map((key) => ({ key, reaction: reactionCache.get(key) ?? null, prints: printsCache.get(key) ?? null, updated_at: now }));
+      if (rows.length) await sb.from('event_insight').upsert(rows);
+    } catch { /* best-effort cache */ }
+    return;
+  }
   try {
     mkdirSync(dirname(CACHE_FILE), { recursive: true });
     writeFileSync(CACHE_FILE, JSON.stringify({
@@ -76,16 +103,33 @@ const FETCH_AFTER_MS = 2 * 3_600_000;
 const SETTLE_MS = 4 * 3_600_000;
 const relKey = (country: string, title: string, date: string) => `${country}|${title}|${date.slice(0, 10)}`;
 
-function loadArchive() {
+async function loadArchive() {
   if (archiveLoaded) return;
   archiveLoaded = true;
+  const sb = supabaseAdmin();
+  if (sb) {
+    try {
+      const { data } = await sb.from('released_archive').select('occ_key, info');
+      for (const r of data || []) archive.set(r.occ_key as string, r.info as ReleasedInfo);
+    } catch { /* unreachable → empty, will re-fetch */ }
+    return;
+  }
   try {
     const raw = JSON.parse(readFileSync(ARCHIVE_FILE, 'utf8')) as Record<string, ReleasedInfo>;
     for (const [k, v] of Object.entries(raw)) archive.set(k, v);
   } catch { /* no archive yet */ }
 }
 
-function saveArchive() {
+async function saveArchive() {
+  const sb = supabaseAdmin();
+  if (sb) {
+    try {
+      const now = new Date().toISOString();
+      const rows = [...archive.entries()].map(([occ_key, info]) => ({ occ_key, info, updated_at: now }));
+      if (rows.length) await sb.from('released_archive').upsert(rows);
+    } catch { /* best-effort */ }
+    return;
+  }
   try {
     mkdirSync(dirname(ARCHIVE_FILE), { recursive: true });
     writeFileSync(ARCHIVE_FILE, JSON.stringify(Object.fromEntries([...archive.entries()].sort()), null, 2));
@@ -127,7 +171,7 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>
 export async function enrichReactions(
   events: { country: string; title: string }[],
 ): Promise<Record<string, Reaction>> {
-  loadCache();
+  await loadCache();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const result: Record<string, Reaction> = {};
   const uniq = new Map<string, { country: string; title: string }>();
@@ -169,7 +213,7 @@ export async function enrichReactions(
     } catch (err) {
       console.error('[event-insight] reactions failed:', err);
     }
-    saveCache();
+    await saveCache();
   }
 
   for (const k of uniq.keys()) { const v = reactionCache.get(k); if (v) result[k] = v; }
@@ -180,7 +224,7 @@ export async function enrichReactions(
 export async function enrichPrints(
   events: { country: string; title: string }[],
 ): Promise<Record<string, { date: string }[]>> {
-  loadCache();
+  await loadCache();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const result: Record<string, { date: string }[]> = {};
   const uniq = new Map<string, { country: string; title: string }>();
@@ -195,7 +239,7 @@ export async function enrichPrints(
         console.error(`[event-insight] prints ${e.country} ${e.title}:`, err);
       }
     });
-    saveCache();
+    await saveCache();
   }
 
   for (const k of uniq.keys()) { const v = printsCache.get(k); if (v) result[k] = v; }
@@ -291,8 +335,8 @@ EXAMPLES (input → output):
 export async function enrichReleased(
   events: { country: string; title: string; date: string; forecast?: string }[],
 ): Promise<Record<string, ReleasedInfo>> {
-  loadCache();
-  loadArchive();
+  await loadCache();
+  await loadArchive();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const result: Record<string, ReleasedInfo> = {};
 
@@ -317,7 +361,7 @@ export async function enrichReleased(
         console.error(`[event-insight] released ${e.country} ${e.title}:`, err);
       }
     });
-    saveCache();
+    await saveCache();
   }
 
   // Promote settled occurrences (≥4h after release) from the transient cache
@@ -328,7 +372,7 @@ export async function enrichReleased(
     const info = releasedCache.get(occ);
     if (info && Date.now() - new Date(e.date).getTime() > SETTLE_MS) { archive.set(occ, info); promoted = true; }
   }
-  if (promoted) saveArchive();
+  if (promoted) await saveArchive();
 
   // Result keyed by currency|title (what the client merges on); archive wins.
   for (const [occ, e] of uniq) {
