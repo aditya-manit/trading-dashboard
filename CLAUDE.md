@@ -263,9 +263,31 @@ Re-runnable. Run it in the Supabase **SQL Editor**.
   save, swapped for the URL on the plan. **In remote mode the board starts from
   Postgres (no seed/localStorage import) — deliberately, to avoid polluting the
   real DB with demo data.**
-- Still TODO: migrate `released_archive` + the calendar caches
-  (`event_insight`/`event_defs`) in `lib/event-insight.ts` / `event-definitions.ts`
-  to Supabase (file fallback when env unset).
+- `released_archive` + the calendar caches (`event_insight`/`event_defs`) are
+  also migrated (`lib/event-insight.ts` / `event-definitions.ts` read/write
+  Supabase when configured, file fallback otherwise). The committed
+  `data/released-archive.json` is kept in sync as the fallback. **Same-meeting
+  reaction unification:** `enrichReleased` clusters same-currency events within
+  36h (one meeting; minutes days later stay separate) and copies
+  reaction/condition/ifReaction from the rate-decision event onto its commentary
+  siblings (press conf / statement / summary) — per-event web-search can't see
+  siblings, so without this the same meeting showed contradictory BTC reactions.
+  actual/surprise/note stay per-event (a press-conf hawkish-tone surprise is
+  still its own; non-numeric events show TONE, never the rate).
+
+### ⏳ DEFERRED (user wants in a few months, NOT now) — journal entries survive Gate's window
+The journal is an **overlay**: trades are fetched **live from Gate**, then joined
+with stored `journal_entries` (grade/note) + `links` by `tradePid`
+(`BTC/USDT.P#<closeTime>`). Gate's `position-history` is a **rolling ~179-day
+(≈6mo) window**, so a trade older than that **drops out of the fetch** → its
+journal entry becomes **orphaned**: still in Supabase (NOT deleted), but not
+rendered because nothing in the live list matches it. It re-attaches if the trade
+returns. Today `journal_entries` stores only `grade/note/reviewed` — no trade
+context — so an orphaned entry can't render standalone. **Planned fix (deferred):**
+snapshot a few trade fields (date, side, entry/exit, pnl, lev) into the
+`journal_entries` row at write time, so the journal can show stored-but-orphaned
+entries after a trade ages out of Gate's window. User said current behaviour is
+fine for now; revisit in a few months.
 
 ---
 
