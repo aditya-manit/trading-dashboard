@@ -13,7 +13,10 @@ import { CoinIcon } from './coins';
 import { PlanLinkCell } from './PlanLinkCell';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
-const GRADE_COL: Record<string, string> = { A: '#1f9d55', B: '#7c9c3a', C: '#d98a1f', D: '#df5338' };
+// Grade colors — one source of truth, used in all 5 spots (KPI cell, Reviewed
+// filter, entry pill, drawer buttons, suggested chip). B brightened off A, C
+// darkened for legibility.
+const GRADE_COL: Record<string, string> = { A: '#1f9d55', B: '#a0c52a', C: '#ef9512', D: '#df5338' };
 const baseSym = (sym: string) => (sym.split('/')[0] as 'BTC' | 'ETH' | 'SOL');
 
 export function Journal() {
@@ -125,7 +128,7 @@ function Kpis({ s }: { s: JStats }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>{bar('Planned', s.winPlanned, '#1f9d55')}{bar('Unplanned', s.winUnplanned, '#b6b1a6')}</div>
         {sub(edge >= 0 ? `Planned trades win ${edge} pts more` : `Planned win ${Math.abs(edge)} pts less`, edge >= 0 ? '#1f9d55' : '#df5338')}
       </div>
-      <div style={{ flex: 1, minWidth: 0, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+      <div style={cellStyle}>
         {cap('Net P&L · by discipline')}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -139,6 +142,34 @@ function Kpis({ s }: { s: JStats }) {
           </div>
         </div>
         {sub('what discipline is actually worth')}
+      </div>
+      {/* 5 — grade distribution (manual reviews) */}
+      <div style={{ flex: 1, minWidth: 0, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+        {cap('Grades · reviewed')}
+        {(() => {
+          const gItems: [string, number, string][] = [['A', s.gradeA, GRADE_COL.A], ['B', s.gradeB, GRADE_COL.B], ['C', s.gradeC, GRADE_COL.C], ['D', s.gradeD, GRADE_COL.D]];
+          const gTot = s.gradeA + s.gradeB + s.gradeC + s.gradeD;
+          return (
+            <>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontWeight: 800, fontSize: 27, letterSpacing: '-0.03em', color: '#1a1813' }}>{gTot}</span>
+                <span style={{ fontWeight: 700, fontSize: 12, color: '#897f70' }}>graded</span>
+              </div>
+              <div style={{ display: 'flex', height: 8, borderRadius: 99, overflow: 'hidden', background: '#efeee9' }}>
+                {gItems.map(([l, n, col]) => (gTot > 0 && n > 0) ? <div key={l} style={{ width: (n / gTot * 100) + '%', background: col }} /> : null)}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+                {gItems.map(([l, n, col]) => (
+                  <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: col, flex: '0 0 auto' }} />
+                    <span style={{ fontWeight: 800, fontSize: 12, color: '#1a1813' }}>{l}</span>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: '#897f70', fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          );
+        })()}
       </div>
     </div>
   );
@@ -198,7 +229,7 @@ function Filters({ s, cur, onSet }: { s: JStats; cur: JFilter; onSet: (k: JFilte
       <FlowArrow />
       <Col eb={<Eyebrow t="Queue" />}>{chip('review', 'To review', s.toReview, '#7c5cff')}</Col>
       <FlowArrow />
-      <Col eb={<Eyebrow t="Reviewed" />}>{seg([['graded', 'All', '#c2bfb4', s.gradeA + s.gradeB + s.gradeC + s.gradeD], ['gA', 'A', '#1f9d55', s.gradeA], ['gB', 'B', '#7c9c3a', s.gradeB], ['gC', 'C', '#d98a1f', s.gradeC], ['gD', 'D', '#df5338', s.gradeD]])}</Col>
+      <Col eb={<Eyebrow t="Reviewed" />}>{seg([['graded', 'All', '#c2bfb4', s.gradeA + s.gradeB + s.gradeC + s.gradeD], ['gA', 'A', GRADE_COL.A, s.gradeA], ['gB', 'B', GRADE_COL.B, s.gradeB], ['gC', 'C', GRADE_COL.C, s.gradeC], ['gD', 'D', GRADE_COL.D, s.gradeD]])}</Col>
     </div>
   );
 }
@@ -481,7 +512,7 @@ function CheckRow({ c }: { c: AdhCheck }) {
 
 function Review({ e, rec }: { e: JEntry; rec: { grade?: string; note?: string } }) {
   const t = e.t, plan = e.plan, adh = e.adh;
-  const grades: [string, string, string, string][] = [['A', 'Textbook', '#1f9d55', '90–100'], ['B', 'Solid', '#7c9c3a', '75–89'], ['C', 'Sloppy', '#d98a1f', '60–74'], ['D', 'Tilt', '#df5338', '< 60']];
+  const grades: [string, string, string, string][] = [['A', 'Textbook', GRADE_COL.A, '90–100'], ['B', 'Solid', GRADE_COL.B, '75–89'], ['C', 'Sloppy', GRADE_COL.C, '60–74'], ['D', 'Tilt', GRADE_COL.D, '< 60']];
   const showSugg = !!plan && adh.scored;
   return (
     <div style={{ marginTop: 22 }}>

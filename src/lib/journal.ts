@@ -262,7 +262,7 @@ export function journalAdherence(t: JTrade, plan: Plan | null, equity = TP_EQUIT
   const score = !dirMatch ? 0 : (totW > 0 ? Math.round(rawScore / totW * 100) : 0);
   const followed = dirMatch && score >= 75;
   const sugg = !dirMatch ? 'D' : score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : 'D';
-  const gradeMeta: Record<string, [string, string]> = { A: ['#1f9d55', 'Textbook'], B: ['#7c9c3a', 'Solid'], C: ['#d98a1f', 'Sloppy'], D: ['#df5338', 'Off-plan'] };
+  const gradeMeta: Record<string, [string, string]> = { A: ['#1f9d55', 'Textbook'], B: ['#a0c52a', 'Solid'], C: ['#ef9512', 'Sloppy'], D: ['#df5338', 'Off-plan'] };
   const gm = gradeMeta[sugg];
 
   const palette = !dirMatch
