@@ -91,10 +91,13 @@ src/
 
 ## Pages & tab sections
 Top-level `page` state in `page.tsx` toggles between **Plan (default)** and **Dashboard**
-via the Topbar's Dashboard/Plan segmented control. Plan → `<PlanPage/>`; Dashboard →
+via the Topbar's Dashboard/Plan segmented control. Plan → `<PlanFunnel/>`; Dashboard →
 the scroll-nav sections below (scroll-spy active only on Dashboard).
 ```
-Plan (default) → PlanPage  (Topbar tabs: Workbook* / Plans / Journal — only Workbook live)
+Plan (default) → PlanFunnel  (Topbar tabs: Workbook / Plans / Journal — ALL live)
+   view switcher (lib/plan-store `view`): workbook → PlanPage · editor → Editor ·
+   board → Board · journal → Journal; PlanDrawer overlays any view. Plans tab shows
+   a count badge (plans), Journal tab a count badge (total closed trades).
 Dashboard:
   #overview   → Hero, EquityChart, HighlightCards, RealizedPerformance, KpiStrip
   #positions  → PositionsTable
@@ -104,11 +107,56 @@ Dashboard:
 
 ---
 
-## Session handover — current UI state (updated 2026-06-17, through handoff 16)
+## Session handover — current UI state (updated 2026-06-21, through handoff 26)
 
 This is the source of truth for component-level styling decisions that aren't
 obvious from the code. Keep it current; delete entries once they're plainly
 encoded in the component and no longer surprising.
+
+### Plan funnel — built components (handoff 22→26)
+The whole Plan funnel is ported and live. Files under `components/plan/`:
+- `PlanFunnel.tsx` — view switcher (workbook/editor/board/journal) + always-on `PlanDrawer`.
+- `Editor.tsx` — "Plan a trade" form (thesis 2×2, chart upload, identity, levels,
+  sizing 5-unit + % slider, leverage). Header **mark + equity are REAL** (live BTC
+  mark from open-position `mark_price` else latest Gate daily close; equity from
+  `useAccount().total`); threaded into `tpCompute(d, equity, mark)`. `CX-####` from
+  the futures user id when a position is open, else omitted.
+- `Board.tsx` — Plans board: `ac` cards (margin donut + coin/name/dir/lev +
+  **conviction dots** + entry + risk/reward + split bar). Cursor: `pointer` at rest,
+  `grabbing` while dragging. Lanes have colored **glow haloes** (no box) + **number-led
+  headers**; **modern empty states** (icon chip on dashed tinted card; the Ideas chip
+  opens the editor). Soft `#f1ecff` "New plan" pill. `StatsBar` sits on a `z-index:2`
+  layer so glows don't bleed onto it.
+- `StatsBar.tsx` — board stats band: direction/plans donuts, conviction split,
+  avg risk/reward/R:R, leverage + margin histograms. **Risk-ramp colors** (≤5×/≤50%
+  green → amber `#ffa31a` → red → dark `#b5341f`); margin in fixed bands (≤50/50-65/
+  65-80/>80), each its own bar; conviction High green / Med amber / Low grey.
+- `Journal.tsx` — post-trade review vs REAL Gate trades. **Filter bar = connected flow
+  diagram** (All Trades › Planned[All·Followed·Off-plan·Wrong dir] / Unplanned[No plan]
+  › Queue › Reviewed[All·A·B·C·D], chevron-joined, no box). Drawer has an **unlink**
+  (minus) button + adherence recomputes live. Opening a plan from the drawer closes
+  the journal drawer first (so the plan comes to front).
+- `PlanDrawer.tsx` — plan detail (desktop stage ≥900px: R/R map + chart; body spec/
+  risk/position/thesis). Real equity + mark threaded in. Chart = the plan's Storage URL.
+- `PlanLinkCell.tsx` — trade↔plan link picker. `linkSet` auto-moves the linked plan to
+  **Triggered**. Plan **delete cascades** → its links + chart Storage folder removed.
+- Math/model in `lib/plan-model.ts` (`tpCompute`, `planToDraft`); store in
+  `lib/plan-store.ts`; journal logic in `lib/journal.ts`.
+
+### News/calendar additions (handoff 24+)
+- News drawer **"All" toggle** (after Upcoming/Released): reads the full `released_archive`
+  across ALL weeks, newest-first (`/api/calendar/archive` + `useCalendarArchive`). Turning
+  it on sets the tab to Released; only clicking **Upcoming** untoggles it. The week-scoped
+  Released tab naturally empties when the ForexFactory feed rolls to a new week.
+- Header countdown rolls into days (`3d 22h`, no ticking seconds when far); strip cards
+  show day-aware time (`Today/Tomorrow/Thursday 18:00`, `fmtWhen`).
+- Released same-meeting reaction unified; non-numeric events show TONE not the rate (see
+  the released-archive notes below).
+
+### Workbook
+- Step diagram: column `flex:1.4`, minimal vertical padding, and the SVGs in
+  `planDiagrams.ts` carry **`max-height:340px;margin:0 auto`** so the diagram fills the
+  left section (~capped 340px tall, centered) without letterboxing or ballooning.
 
 ### Top-level pages: Dashboard ↔ Plan (`app/page.tsx`, `layout/Topbar.tsx`)
 - `page.tsx` holds `page: 'dashboard' | 'plan'` state and renders either the dashboard sections or `<PlanPage/>`. The Topbar's **Dashboard/Plan segmented toggle** (left, after the Gate.io pill) drives it — active = white text on `#23211b` (Dashboard) / `#7c5cff` (Plan).
@@ -229,7 +277,12 @@ adding it). Do not build until the user confirms.
 
 ---
 
-## Persistence backend — Supabase (BEING BUILT)
+## Persistence backend — Supabase (BUILT + DEPLOYED)
+
+**LIVE in production** (`https://trade-mocha-rho.vercel.app`) — env vars set in
+Vercel, deployed, keepalive cron registered (daily 09:00 UTC). Plans / links /
+journal / chart Storage / released_archive / calendar caches all read & write
+Supabase in prod and locally (file/localStorage fallback only when env is unset).
 
 ### ⚠️⚠️ REMOVE TEST DATA BEFORE SHIPPING ⚠️⚠️
 During the Supabase migration we created **throwaway test rows** (test plans,
@@ -291,8 +344,11 @@ fine for now; revisit in a few months.
 
 ---
 
-## (superseded note) Plan funnel persistence — localStorage interim
-**⚠️ CURRENT STATE — Plan funnel persistence is localStorage (decided, interim).**
+## (SUPERSEDED — now Supabase) Plan funnel persistence
+**Was localStorage; now Supabase-first (see "Persistence backend" above).** In
+remote mode `lib/plan-store.ts` uses Supabase as the source of truth (`remote=true`)
+and localStorage is only the fallback when the backend is unreachable / env unset.
+The historical localStorage design (kept for the fallback path):
 The whole Plan funnel (Editor draft, Plans board, position⇄plan links, Journal
 grades/notes) persists to **localStorage** via `lib/plan-store.ts` (`tdplan_*`
 keys: `tdplan_view`, `tdplan_tp_draft`, `tdplan_board`, `tdplan_pos_links`,
