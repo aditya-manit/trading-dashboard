@@ -779,7 +779,7 @@ export function PlanPage() {
                 })}
               </div>
               {/* All-time switch — every released event, any week, newest-first */}
-              <button onClick={() => setShowAll((v) => !v)} title="Show every released event across all weeks" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px 6px 7px', borderRadius: 9, border: '1px solid ' + (showAll ? '#c9b6ff' : '#e7e3da'), background: showAll ? '#7c5cff' : '#fff', cursor: 'pointer', fontFamily: 'inherit', flex: '0 0 auto', transition: 'all .18s' }}>
+              <button onClick={() => { const next = !showAll; setShowAll(next); if (next) setNewsTab('released'); }} title="Show every released event across all weeks" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px 6px 7px', borderRadius: 9, border: '1px solid ' + (showAll ? '#c9b6ff' : '#e7e3da'), background: showAll ? '#7c5cff' : '#fff', cursor: 'pointer', fontFamily: 'inherit', flex: '0 0 auto', transition: 'all .18s' }}>
                 <span style={{ position: 'relative', width: 24, height: 14, borderRadius: 99, background: showAll ? 'rgba(255,255,255,0.4)' : '#dcd9d1', transition: 'background .18s', flex: '0 0 auto' }}>
                   <span style={{ position: 'absolute', top: 2, left: showAll ? 12 : 2, width: 10, height: 10, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.25)', transition: 'left .18s' }} />
                 </span>
