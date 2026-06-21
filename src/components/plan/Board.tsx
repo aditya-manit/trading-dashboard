@@ -46,7 +46,7 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
       onDragEnd={() => setDragging(false)}
       onClick={() => { if (Date.now() - dragAt.current > 250) onOpen(p); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative', background: '#fff', border: '1px solid #efedea', borderRadius: 14, overflow: 'hidden', cursor: dragging ? 'grabbing' : 'grab', display: 'flex', flexDirection: 'column', opacity: dragging ? 0.45 : 1, boxShadow: dragging ? '0 12px 28px rgba(20,20,12,0.16)' : hover ? '0 6px 18px rgba(20,18,12,0.08)' : '0 1px 3px rgba(20,20,12,0.04)', transition: 'box-shadow .15s, opacity .12s' }}>
+      style={{ position: 'relative', background: '#fff', border: '1px solid #efedea', borderRadius: 14, overflow: 'hidden', cursor: dragging ? 'grabbing' : 'pointer', display: 'flex', flexDirection: 'column', opacity: dragging ? 0.45 : 1, boxShadow: dragging ? '0 12px 28px rgba(20,20,12,0.16)' : hover ? '0 6px 18px rgba(20,18,12,0.08)' : '0 1px 3px rgba(20,20,12,0.04)', transition: 'box-shadow .15s, opacity .12s' }}>
       {/* direction bookmark */}
       <div style={{ position: 'absolute', top: 0, right: 24, width: 26, height: 34, background: col, clipPath: 'polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)', zIndex: 2 }} />
       {/* delete */}
