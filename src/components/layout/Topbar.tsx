@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { ProfileMenu } from './ProfileMenu';
 import { usePlanStore, planActions, type PlanView } from '@/lib/plan-store';
+import { usePositionHistory } from '@/hooks/usePositionHistory';
 
 const TABS = [
   { id: 'overview',   label: 'Overview' },
@@ -26,6 +27,8 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
   const [activeTab, setActiveTab] = useState('overview');
   const onPlan = page === 'plan';
   const { view: planView, plans } = usePlanStore();
+  const { data: tradeData } = usePositionHistory();
+  const tradeCount = (tradeData || []).filter((p) => Math.abs(parseFloat(p.max_size) || 0) > 0).length;
 
   useEffect(() => { setSynced('just now'); }, []);
 
@@ -129,7 +132,7 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
                   }}
                 >
                   {label}
-                  {label === 'Plans' && plans.length ? <span style={{ fontWeight: 800, fontSize: 10.5, color: isActive ? '#7c5cff' : '#b3b0a6', background: isActive ? '#fff' : '#efeee9', borderRadius: 99, padding: '1px 7px', fontVariantNumeric: 'tabular-nums' }}>{plans.length}</span> : null}
+                  {(() => { const n = label === 'Plans' ? plans.length : label === 'Journal' ? tradeCount : 0; return n ? <span style={{ fontWeight: 800, fontSize: 10.5, color: isActive ? '#7c5cff' : '#b3b0a6', background: isActive ? '#fff' : '#efeee9', borderRadius: 99, padding: '1px 7px', fontVariantNumeric: 'tabular-nums' }}>{n}</span> : null; })()}
                 </button>
               );
             })
