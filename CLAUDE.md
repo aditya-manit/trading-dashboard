@@ -360,19 +360,21 @@ attached journal note per trade.
 **Graceful default:** gate the whole feature on the Supabase env vars; with none
 set, hide the plans/journal/upload UI (local dev unaffected), mirroring the app.
 
-### ⚠️⚠️ TEMPORARY AUTH BYPASS IS ACTIVE — RE-ENABLE BEFORE SHIPPING ⚠️⚠️
-A dev bypass is currently ON so the agent can screenshot/verify the Plan funnel
-build past the login wall. **The app is UNLOCKED right now.** To restore the
-permanent fail-closed lock **exactly as it was**, do all three:
-1. `src/proxy.ts` — remove the `AUTH_DISABLED` const (the `process.env.DISABLE_AUTH`
-   line + its comment) AND the `if (AUTH_DISABLED) return NextResponse.next();`
-   first line of `proxy()`.
-2. `src/lib/auth-guard.ts` — remove the `if (process.env.DISABLE_AUTH === 'true') return null;`
-   line at the top of `requireOwner()`.
-3. `.env.local` — remove the `DISABLE_AUTH=true` line (+ its comment).
-Then restart the dev server. Verify: `GET /` → 307 → `/login`, `GET /api/gate/account` → 401.
-(`.env.local` is gitignored so prod never sees the flag, but the code lines must
-come out to match the committed fail-closed state.)
+### Dev auth bypass — NODE_ENV-guarded, SAFE TO KEEP (not a prod risk)
+`DISABLE_AUTH=true` in `.env.local` opens the app (no OAuth/MFA) so the agent can
+screenshot/verify locally past the login wall. It is **guarded to dev only** —
+the check in both `src/proxy.ts` (`AUTH_DISABLED`) and `src/lib/auth-guard.ts`
+(`requireOwner`) is `process.env.DISABLE_AUTH === 'true' && process.env.NODE_ENV !== 'production'`.
+- **Local `next dev`** → NODE_ENV=development → bypass works (app unlocked locally).
+- **Every Vercel build** (production AND preview) → NODE_ENV=production → bypass
+  is **physically inert**, regardless of any env var. So it CANNOT unlock a
+  deployment — verified: `prod+DISABLE_AUTH=true → false`.
+- It's also not a remote attack surface: env vars aren't settable via HTTP; an
+  attacker would need to already own Vercel/GitHub/the machine (game-over anyway).
+So this stays in permanently — no "remove before shipping." Do NOT set
+`DISABLE_AUTH` in Vercel (belt+suspenders; it'd be inert regardless). The Gate
+key is read-only, capping blast radius to visibility even in a worst case.
+Local verify: `GET /` → 200, `GET /api/plans` → 200. Prod stays fail-closed.
 
 ### Auth — single-user Google OAuth gate ✅ BUILT
 

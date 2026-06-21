@@ -10,10 +10,12 @@ import type { User } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const OWNER_EMAIL = process.env.OWNER_EMAIL?.toLowerCase();
-// ⚠️ TEMPORARY DEV BYPASS — opens the app (no OAuth/MFA) when DISABLE_AUTH=true.
-// Added only to screenshot/verify the Plan funnel build. MUST be removed to
-// restore the permanent fail-closed lock — see CLAUDE.md "Temporary auth bypass".
-const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true';
+// DEV-ONLY auth bypass — opens the app (no OAuth/MFA) when DISABLE_AUTH=true,
+// AND ONLY in local `next dev` (NODE_ENV !== 'production'). Every Vercel build
+// (prod + preview) is NODE_ENV=production, so this is physically inert there no
+// matter what env vars exist — can't be enabled on a deployment. Safe to keep
+// for local screenshotting/verification. See CLAUDE.md "Dev auth bypass".
+const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true' && process.env.NODE_ENV !== 'production';
 
 // /api/keepalive is hit by the Vercel cron (no user session) — it guards itself
 // with CRON_SECRET, so it's safe to let past the owner gate.
