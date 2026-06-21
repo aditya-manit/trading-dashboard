@@ -13,7 +13,7 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.googleusercontent.com",
+  "img-src 'self' data: blob: https://*.googleusercontent.com https://*.supabase.co",
   "font-src 'self'",
   `connect-src 'self' https://*.supabase.co wss://*.supabase.co${dev ? " ws://localhost:* http://localhost:*" : ""}`,
   "frame-ancestors 'none'",
