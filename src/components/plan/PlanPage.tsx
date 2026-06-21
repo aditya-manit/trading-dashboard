@@ -3,7 +3,7 @@
 import { memo, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
-import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
+import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, useCalendarArchive, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
 import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
 import { planActions } from '@/lib/plan-store';
 
@@ -595,6 +595,7 @@ export function PlanPage() {
   const [finished, setFinished] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
   const [newsTab, setNewsTab] = useState<'upcoming' | 'released'>('upcoming');
+  const [showAll, setShowAll] = useState(false);
   const [newsQuery, setNewsQuery] = useState('');
 
   // Restore persisted progress
@@ -633,6 +634,7 @@ export function PlanPage() {
   const { data: insightMap } = useCalendarInsights();
   const { data: defMap } = useCalendarDefinitions();
   const { data: releasedMap } = useCalendarReleased();
+  const { data: archiveAll } = useCalendarArchive();
   const releasedLoading = releasedMap === undefined;
   const insightsLoading = insightMap === undefined;
   const now = new Date();
@@ -675,6 +677,12 @@ export function PlanPage() {
   const q = newsQuery.trim().toLowerCase();
   const matchQ = (e: CalendarEvent) => !q || e.title.toLowerCase().includes(q) || e.country.toLowerCase().includes(q);
   const releasedFiltered = releasedEvents.filter(matchQ);
+  // "All" toggle: every archived released event, all weeks, newest-first. Build a
+  // synthetic CalendarEvent (date at noon to keep the weekday tz-stable) + carry
+  // the stored ReleasedInfo straight onto the card.
+  const archiveCards = (archiveAll || [])
+    .map((a) => ({ e: { country: a.country, title: a.title, date: a.date.length <= 10 ? a.date + 'T12:00:00' : a.date, impact: 'High' } as CalendarEvent, info: a.info }))
+    .filter(({ e }) => matchQ(e));
   const newsGroups: { key: number; label: string; events: CalendarEvent[] }[] = [];
   for (const e of upcomingHigh) {
     if (!matchQ(e)) continue;
@@ -746,9 +754,9 @@ export function PlanPage() {
               </div>
               <button onClick={() => setNewsOpen(false)} style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: 9, border: '1px solid #e8e6e0', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#8c8a81', fontSize: 17, lineHeight: 1, fontFamily: 'inherit' }}>×</button>
             </div>
-            {/* Search + Upcoming/Released toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 22px 2px', flex: '0 0 auto' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, background: '#f4f3f0', border: '1px solid #ece9e3', borderRadius: 10, padding: '8px 11px' }}>
+            {/* Search, then Upcoming/Released toggle + an "All" switch */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 22px 2px', flex: '0 0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: '#f4f3f0', border: '1px solid #ece9e3', borderRadius: 10, padding: '8px 11px', boxSizing: 'border-box' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a8a69b" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
                 <input
                   value={newsQuery}
@@ -760,19 +768,48 @@ export function PlanPage() {
                   <button onClick={() => setNewsQuery('')} style={{ flex: '0 0 auto', width: 17, height: 17, borderRadius: '50%', border: 'none', background: '#e2dfd8', color: '#6b6457', cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 10, lineHeight: 1, padding: 0 }}>×</button>
                 )}
               </div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', background: '#efece6', border: '1px solid #e7e3da', borderRadius: 10, padding: 3, gap: 3, flex: '0 0 auto' }}>
-                {(['upcoming', 'released'] as const).map((t) => {
-                  const active = newsTab === t;
-                  return (
-                    <button key={t} onClick={() => setNewsTab(t)} style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', background: active ? '#fff' : 'transparent', color: active ? '#1a1813' : '#8c8a81', boxShadow: active ? '0 1px 2px rgba(20,20,12,0.08)' : 'none', transition: 'all .18s' }}>
-                      {t === 'upcoming' ? 'Upcoming' : 'Released'}
-                    </button>
-                  );
-                })}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', background: '#efece6', border: '1px solid #e7e3da', borderRadius: 10, padding: 3, gap: 3, flex: '0 0 auto', opacity: showAll ? 0.4 : 1, pointerEvents: showAll ? 'none' : 'auto', transition: 'opacity .18s' }}>
+                  {(['upcoming', 'released'] as const).map((t) => {
+                    const active = newsTab === t;
+                    return (
+                      <button key={t} onClick={() => setNewsTab(t)} style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', background: active ? '#fff' : 'transparent', color: active ? '#1a1813' : '#8c8a81', boxShadow: active ? '0 1px 2px rgba(20,20,12,0.08)' : 'none', transition: 'all .18s' }}>
+                        {t === 'upcoming' ? 'Upcoming' : 'Released'}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span style={{ flex: 1 }} />
+                {/* All-time switch — every released event, any week, newest-first */}
+                <button onClick={() => setShowAll((v) => !v)} title="Show every released event across all weeks" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 11px 6px 8px', borderRadius: 9, border: '1px solid ' + (showAll ? '#c9b6ff' : '#e7e3da'), background: showAll ? '#7c5cff' : '#fff', cursor: 'pointer', fontFamily: 'inherit', flex: '0 0 auto', transition: 'all .18s' }}>
+                  <span style={{ position: 'relative', width: 26, height: 15, borderRadius: 99, background: showAll ? 'rgba(255,255,255,0.4)' : '#dcd9d1', transition: 'background .18s', flex: '0 0 auto' }}>
+                    <span style={{ position: 'absolute', top: 2, left: showAll ? 13 : 2, width: 11, height: 11, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.25)', transition: 'left .18s' }} />
+                  </span>
+                  <span style={{ fontWeight: 700, fontSize: 11, color: showAll ? '#fff' : '#8c8a81' }}>All</span>
+                </button>
               </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 18px', display: 'flex', flexDirection: 'column', gap: 22 }}>
-              {newsTab === 'released' ? (
+              {showAll ? (
+                archiveCards.length === 0 ? (
+                  q ? <NewsEmpty query={newsQuery.trim()} /> : (
+                    <NewsZero
+                      title="No archived events yet"
+                      sub="Every released high-impact event is kept here across all weeks."
+                      icon={<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#b3b0a6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" /></svg>}
+                    />
+                  )
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a8a69b' }}>All released · newest first</span>
+                      <span style={{ flex: 1, height: 1, background: '#efedea' }} />
+                      <span style={{ fontWeight: 700, fontSize: 9.5, color: '#bba074' }}>{archiveCards.length}</span>
+                    </div>
+                    {archiveCards.map(({ e, info }, i) => <ReleasedCard key={i} e={e} info={info} />)}
+                  </div>
+                )
+              ) : newsTab === 'released' ? (
                 releasedFiltered.length === 0 ? (
                   q ? <NewsEmpty query={newsQuery.trim()} /> : (
                     <NewsZero

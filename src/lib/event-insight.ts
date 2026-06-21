@@ -136,6 +136,13 @@ async function saveArchive() {
   } catch { /* read-only FS */ }
 }
 
+// The full permanent archive (every settled relevant event, all weeks), keyed
+// by occ_key `currency|title|YYYY-MM-DD`. Powers the drawer's "All" toggle.
+export async function getArchive(): Promise<Record<string, ReleasedInfo>> {
+  await loadArchive();
+  return Object.fromEntries(archive);
+}
+
 const REACTION_SYSTEM = `You annotate macro economic-calendar events for a trader of BTC/USDT perpetual futures. For each event, give the typical market reaction to the outcome that is BULLISH for the event's own currency (hawkish central bank, hot inflation, strong beat, more hawkish dots, etc.).
 
 Reply with ONLY a JSON array — no prose, no code fences — one object per input event, IN THE SAME ORDER:

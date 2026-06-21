@@ -76,3 +76,13 @@ export function useCalendarReleased() {
     revalidateOnFocus: false,
   });
 }
+
+// Full archive of every settled relevant event (all weeks), newest-first.
+// Powers the drawer's "All" toggle (not bounded to the current feed week).
+export interface ArchiveEntry { country: string; title: string; date: string; info: ReleasedInfo }
+export function useCalendarArchive() {
+  return useSWR<ArchiveEntry[]>('/api/calendar/archive', fetcher, {
+    refreshInterval: 1_800_000,
+    revalidateOnFocus: false,
+  });
+}
