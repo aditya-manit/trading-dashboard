@@ -42,15 +42,16 @@ function useTick() {
   useEffect(() => { const id = setInterval(() => set((t) => t + 1), 1000); return () => clearInterval(id); }, []);
 }
 
-// Header countdown: "7h 16m 42s" (hours optional), ticking each second.
+// Header countdown: "3d 22h 56m 43s" (days/hours roll in as needed), ticking
+// each second. Past a day it shows days + hours so it never reads e.g. "94h".
 function CountdownFull({ date, style }: { date: string; style?: CSSProperties }) {
   useTick();
   const ms = new Date(date).getTime() - Date.now();
   const base = { color: '#c9821f', fontVariantNumeric: 'tabular-nums' as const, ...style };
   if (ms <= 0) return <span style={base}>live now</span>;
-  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
+  const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
   const p = (n: number) => String(n).padStart(2, '0');
-  return <span style={base}>{(h > 0 ? `${h}h ` : '') + `${p(m)}m ${p(s)}s`}</span>;
+  return <span style={base}>{(d > 0 ? `${d}d ` : '') + (d > 0 || h > 0 ? `${h}h ` : '') + `${p(m)}m ${p(s)}s`}</span>;
 }
 
 // Per-card countdown: "in 2d 4h" / "in 5h 23m" / "in 5m 12s" (seconds under 1h).
