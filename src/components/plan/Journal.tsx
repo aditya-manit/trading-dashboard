@@ -145,18 +145,60 @@ function Kpis({ s }: { s: JStats }) {
 }
 
 // ── filter chips ───────────────────────────────────────────────────────────────
+const Eyebrow = ({ t, dot }: { t: string; dot?: string }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2 }}>
+    {dot ? <span style={{ width: 5, height: 5, borderRadius: '50%', background: dot, flex: '0 0 auto' }} /> : null}
+    <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#aaa79c', whiteSpace: 'nowrap' }}>{t}</span>
+  </div>
+);
+const FlowArrow = () => (
+  <div style={{ flex: '0 0 auto', color: '#cfcbc1', display: 'flex', alignItems: 'center', padding: '0 2px' }}>
+    <svg width={7} height={13} viewBox="0 0 7 13"><path d="M1 1 L6 6.5 L1 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" /></svg>
+  </div>
+);
+
+// Journal filter bar — a connected spec-table flow: All Trades › Planned[…] /
+// Unplanned[…] › Queue › Reviewed[A/B/C/D], joined by chevrons, no outer box.
 function Filters({ s, cur, onSet }: { s: JStats; cur: JFilter; onSet: (k: JFilter) => void }) {
-  const defs: [JFilter, string, number][] = [['all', 'All', s.total], ['planned', 'Planned', s.plannedN], ['off', 'Off-plan', s.offN], ['unplanned', 'Unplanned', s.unplannedN], ['review', 'To review', s.toReview]];
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-      {defs.map(([k, label, n]) => {
+  // standalone rounded pill (All / To review)
+  const chip = (k: JFilter, label: string, n: number, dot: string) => {
+    const active = k === cur;
+    return (
+      <button onClick={() => onSet(k)} className="jfpill" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: FONT, fontWeight: 600, fontSize: 12, padding: '6px 12px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (active ? '#23211b' : '#eceae4'), background: active ? '#23211b' : '#fff', color: active ? '#fff' : '#4a443b', whiteSpace: 'nowrap', boxShadow: active ? '0 2px 8px rgba(35,33,27,0.18)' : 'none' }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flex: '0 0 auto' }} />{label}
+        <span style={{ fontWeight: 800, fontSize: 10, fontVariantNumeric: 'tabular-nums', color: active ? 'rgba(255,255,255,0.85)' : '#a8a69b', background: active ? 'rgba(255,255,255,0.16)' : '#f3f1ec', borderRadius: 99, padding: '1px 6px', minWidth: 8, textAlign: 'center' }}>{n}</span>
+      </button>
+    );
+  };
+  // connected segmented control
+  const seg = (defs: [JFilter, string, string, number][]) => (
+    <div style={{ display: 'inline-flex', alignItems: 'stretch', border: '1px solid #e6e4dd', borderRadius: 999, background: '#fff', overflow: 'hidden', alignSelf: 'flex-start' }}>
+      {defs.map(([k, label, dot, n], i) => {
         const active = k === cur;
         return (
-          <button key={k} onClick={() => onSet(k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: FONT, fontWeight: 700, fontSize: 12.5, padding: '7px 13px', borderRadius: 99, cursor: 'pointer', border: '1px solid ' + (active ? '#23211b' : '#e7e5df'), background: active ? '#23211b' : '#fff', color: active ? '#fff' : '#6b6357', transition: 'all .14s' }}>
-            {label}<span style={{ fontWeight: 800, fontSize: 10.5, color: active ? '#fff' : '#a8a69b', background: active ? 'rgba(255,255,255,0.18)' : '#f1f0ed', borderRadius: 99, padding: '1px 6px' }}>{n}</span>
+          <button key={k} onClick={() => onSet(k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: FONT, fontWeight: active ? 700 : 600, fontSize: 11.5, padding: '6px 11px', cursor: 'pointer', border: 'none', borderLeft: i > 0 ? '1px solid #efeee9' : 'none', background: active ? '#23211b' : 'transparent', color: active ? '#fff' : '#4a443b', whiteSpace: 'nowrap' }}>
+            {dot ? <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flex: '0 0 auto' }} /> : null}{label}
+            <span style={{ fontWeight: 800, fontSize: 9.5, fontVariantNumeric: 'tabular-nums', color: active ? 'rgba(255,255,255,0.8)' : '#a8a69b' }}>{n}</span>
           </button>
         );
       })}
+    </div>
+  );
+  const Col = ({ eb, children }: { eb: React.ReactNode; children: React.ReactNode }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>{eb}{children}</div>
+  );
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '4px 2px 8px', overflowX: 'auto' }}>
+      <Col eb={<Eyebrow t="All Trades" />}>{chip('all', 'All', s.total, '#c2bfb4')}</Col>
+      <FlowArrow />
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 14 }}>
+        <Col eb={<Eyebrow t="Planned" dot="#7c5cff" />}>{seg([['planned', 'All', '#c2bfb4', s.plannedN], ['followed', 'Followed', '#1f9d55', s.followedN], ['off', 'Off-plan', '#d98a1f', s.offN], ['wrong', 'Wrong dir', '#df5338', s.wrongN]])}</Col>
+        <Col eb={<Eyebrow t="Unplanned" dot="#b4b1a6" />}>{seg([['unplanned', 'No plan', '#b4b1a6', s.unplannedN]])}</Col>
+      </div>
+      <FlowArrow />
+      <Col eb={<Eyebrow t="Queue" />}>{chip('review', 'To review', s.toReview, '#7c5cff')}</Col>
+      <FlowArrow />
+      <Col eb={<Eyebrow t="Reviewed" />}>{seg([['graded', 'All', '#c2bfb4', s.gradeA + s.gradeB + s.gradeC + s.gradeD], ['gA', 'A', '#1f9d55', s.gradeA], ['gB', 'B', '#7c9c3a', s.gradeB], ['gC', 'C', '#d98a1f', s.gradeC], ['gD', 'D', '#df5338', s.gradeD]])}</Col>
     </div>
   );
 }
@@ -167,7 +209,7 @@ function Entries({ list, onOpen }: { list: JEntry[]; onOpen: (e: JEntry) => void
   return (
     <div style={{ background: '#fff', border: '1px solid #ece9e3', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
       <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '11px 18px', borderBottom: '1px solid #efeee9', background: '#faf9f7' }}>
-        {['Trade', 'Side', 'Result', 'Plan', 'Adherence', 'Review', ''].map((t, i) => (
+        {['Trade', 'Side', 'Result', 'Plan', 'Adherence', 'Reviewed', ''].map((t, i) => (
           <span key={i} style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#a8a69b' }}>{t}</span>
         ))}
       </div>
@@ -341,6 +383,9 @@ function DrawerBody({ e, onClose }: { e: JEntry; onClose: () => void }) {
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#7c5cff', flex: '0 0 auto' }} />
                 <span className="jplan-name" style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', borderBottom: '1px solid rgba(124,92,255,0.32)', paddingBottom: 1 }}>{tpPlanName(plan)}</span>
                 <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><path d="M7 17 17 7M8 7h9v9" /></svg>
+                <button onClick={(ev) => { ev.stopPropagation(); planActions.linkClear(t.pid); }} title="Unlink plan" style={{ marginLeft: 'auto', flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 19, height: 19, borderRadius: 99, border: '1px solid #e7dffa', background: '#fff', cursor: 'pointer', color: '#9b86e6', padding: 0 }}>
+                  <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round"><path d="M5 12h14" /></svg>
+                </button>
               </div>
             ) : (
               <div style={{ padding: '9px 14px', borderRight: '1px solid #f1f0ed', display: 'flex', alignItems: 'center', gap: 7 }}>

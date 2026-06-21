@@ -177,9 +177,17 @@ export const planActions = {
 
   linkSet(pid: string, planId: string) {
     const links = { ...state.links, [pid]: planId };
-    set({ links });
-    if (state.remote) void fetch('/api/links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pid, planId }) }).catch(() => {});
-    else write(PLAN_KEYS.links, links);
+    // linking a plan to an executed trade means it triggered — move it to Triggered
+    const plans = state.plans.map((p) => (p.id === planId && p.status !== 'triggered') ? { ...p, status: 'triggered' as Status } : p);
+    const moved = plans.some((p, i) => p !== state.plans[i]);
+    set({ links, ...(moved ? { plans } : {}) });
+    if (state.remote) {
+      void fetch('/api/links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pid, planId }) }).catch(() => {});
+      if (moved) { const np = plans.find((p) => p.id === planId); if (np) void apiPostPlan(np); }
+    } else {
+      write(PLAN_KEYS.links, links);
+      if (moved) write(PLAN_KEYS.board, plans);
+    }
   },
   linkClear(pid: string) {
     const links = { ...state.links }; delete links[pid];

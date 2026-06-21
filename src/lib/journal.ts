@@ -73,6 +73,7 @@ export interface JStats {
   plannedN: number;
   unplannedN: number;
   offN: number;
+  wrongN: number;
   followedN: number;
   adherence: number;
   coverage: number;
@@ -82,6 +83,10 @@ export interface JStats {
   pnlUnplanned: number;
   reviewedN: number;
   toReview: number;
+  gradeA: number;
+  gradeB: number;
+  gradeC: number;
+  gradeD: number;
 }
 
 // ── trade mapping ───────────────────────────────────────────────────────────
@@ -289,18 +294,33 @@ export function journalBuild(
   const followed = planned.filter((e) => e.adh.followed);
   const wins = (arr: JEntry[]) => arr.filter((e) => e.t.up).length;
   const sum = (arr: JEntry[]) => arr.reduce((a, e) => a + jPnlNum(e.t.pnl), 0);
+  const grade = (g: string) => entries.filter((e) => e.rec.grade === g).length;
   const stats: JStats = {
     total: entries.length, plannedN: planned.length, unplannedN: unplanned.length, offN: planned.length - followed.length,
+    wrongN: planned.filter((e) => !e.adh.dirMatch).length,
     followedN: followed.length, adherence: planned.length ? Math.round(followed.length / planned.length * 100) : 0,
     coverage: entries.length ? Math.round(planned.length / entries.length * 100) : 0,
     winPlanned: planned.length ? Math.round(wins(planned) / planned.length * 100) : 0,
     winUnplanned: unplanned.length ? Math.round(wins(unplanned) / unplanned.length * 100) : 0,
     pnlPlanned: sum(planned), pnlUnplanned: sum(unplanned), reviewedN: entries.filter((e) => e.reviewed).length, toReview: entries.filter((e) => !e.reviewed).length,
+    gradeA: grade('A'), gradeB: grade('B'), gradeC: grade('C'), gradeD: grade('D'),
   };
   return { entries, stats };
 }
 
-export type JFilter = 'all' | 'planned' | 'off' | 'unplanned' | 'review';
+export type JFilter = 'all' | 'planned' | 'followed' | 'off' | 'wrong' | 'unplanned' | 'review' | 'graded' | 'gA' | 'gB' | 'gC' | 'gD';
 export function filterEntries(entries: JEntry[], cur: JFilter): JEntry[] {
-  return entries.filter((e) => cur === 'all' ? true : cur === 'planned' ? e.planned : cur === 'off' ? (e.planned && !e.adh.followed) : cur === 'unplanned' ? !e.planned : !e.reviewed);
+  return entries.filter((e) => {
+    switch (cur) {
+      case 'planned': return e.planned;
+      case 'followed': return e.planned && e.adh.followed;
+      case 'off': return e.planned && !e.adh.followed;
+      case 'wrong': return e.planned && !e.adh.dirMatch;
+      case 'unplanned': return !e.planned;
+      case 'review': return !e.reviewed;
+      case 'graded': return e.rec.grade != null;
+      case 'gA': case 'gB': case 'gC': case 'gD': return e.rec.grade === cur.slice(1);
+      default: return true;
+    }
+  });
 }
