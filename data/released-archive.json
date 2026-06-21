@@ -1,232 +1,232 @@
 {
   "GBP|MPC Official Bank Rate Votes|2026-06-18": {
+    "note": "2 of 9 dissented for a hike vs 1 expected — hawkish split.",
     "actual": "2-0-7",
+    "reaction": [
+      {
+        "dir": "down",
+        "sym": "BTC"
+      },
+      {
+        "dir": "up",
+        "sym": "stocks"
+      }
+    ],
     "surprise": "Hot",
-    "bearishForBtc": true,
     "condition": "hawkish",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "down"
+        "dir": "down",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "down"
-      },
-      {
-        "sym": "stocks",
-        "dir": "up"
-      }
-    ],
-    "note": "2 of 9 dissented for a hike vs 1 expected — hawkish split."
+    "bearishForBtc": true
   },
   "GBP|Monetary Policy Summary|2026-06-18": {
+    "note": "Held at 3.75% but more members voted to hike than expected — hawkish lean.",
     "actual": "Hawkish hold",
+    "reaction": [
+      {
+        "dir": "down",
+        "sym": "BTC"
+      },
+      {
+        "dir": "up",
+        "sym": "stocks"
+      }
+    ],
     "surprise": "Hot",
-    "bearishForBtc": true,
     "condition": "hawkish",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "down"
+        "dir": "down",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "down"
-      },
-      {
-        "sym": "stocks",
-        "dir": "up"
-      }
-    ],
-    "note": "Held at 3.75% but more members voted to hike than expected — hawkish lean."
+    "bearishForBtc": true
   },
   "GBP|Official Bank Rate|2026-06-18": {
+    "note": "BoE held at 3.75% as universally expected; no surprise. Broader market relief on Iran peace deal.",
     "actual": "3.75%",
+    "reaction": [
+      {
+        "dir": "flat",
+        "sym": "BTC"
+      },
+      {
+        "dir": "up",
+        "sym": "stocks"
+      }
+    ],
     "surprise": "In line",
-    "bearishForBtc": false,
     "condition": "neutral",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "flat"
+        "dir": "flat",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "flat"
-      },
-      {
-        "sym": "stocks",
-        "dir": "up"
-      }
-    ],
-    "note": "BoE held at 3.75% as universally expected; no surprise. Broader market relief on Iran peace deal."
+    "bearishForBtc": false
   },
   "JPY|BOJ Policy Rate|2026-06-15": {
+    "note": "Raised to 1.0% as expected (7-1 vote); dovish bond-purchase pause offset hawkish rate hike, BTC initially rallied despite typical carry-trade unwind risks.",
     "actual": "1.0%",
+    "reaction": [
+      {
+        "dir": "up",
+        "sym": "BTC"
+      },
+      {
+        "dir": "down",
+        "sym": "stocks"
+      }
+    ],
     "surprise": "In line",
-    "bearishForBtc": true,
     "condition": "hawkish",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "down"
+        "dir": "down",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "down"
-      },
-      {
-        "sym": "stocks",
-        "dir": "up"
-      }
-    ],
-    "note": "Raised to 1.0% as expected; 7-1 vote. Hawkish tone on continued hikes, but BTC fell post-announcement while stocks rallied on Iran peace deal."
+    "bearishForBtc": true
   },
   "JPY|BOJ Press Conference|2026-06-16": {
-    "actual": "1.0%",
-    "surprise": "In line",
-    "bearishForBtc": true,
+    "note": "Himino's warning on inflation overshoot risk was sharpest language yet; Nikkei +1% but BTC declined ~$72 vs prior day.",
+    "actual": "Hawkish",
+    "reaction": [
+      {
+        "dir": "up",
+        "sym": "BTC"
+      },
+      {
+        "dir": "down",
+        "sym": "stocks"
+      }
+    ],
+    "surprise": "Hot",
     "condition": "hawkish",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "down"
+        "dir": "down",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "up"
-      },
-      {
-        "sym": "stocks",
-        "dir": "down"
-      }
-    ],
-    "note": "Rate hiked to 1.0% as expected—hawkish tone on inflation, but BTC rallied on US-Iran deal; stocks fell on tech weakness."
+    "bearishForBtc": true
   },
   "JPY|Monetary Policy Statement|2026-06-15": {
-    "actual": "1.0%",
+    "note": "BoJ hiked 25bp to 1.0% as expected (7-1 vote); statement hawkish on inflation risks. BTC rallied on June 15 Iran peace deal news, not BOJ reaction.",
+    "actual": "Hawkish hold",
+    "reaction": [
+      {
+        "dir": "up",
+        "sym": "BTC"
+      },
+      {
+        "dir": "down",
+        "sym": "stocks"
+      }
+    ],
     "surprise": "In line",
-    "bearishForBtc": true,
     "condition": "hawkish",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "flat"
+        "dir": "down",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "flat"
-      },
-      {
-        "sym": "stocks",
-        "dir": "flat"
-      }
-    ],
-    "note": "Rate hiked 25bp to 1.0% as expected; JGB taper paused (dovish offset). BTC held $66K, stocks mixed."
+    "bearishForBtc": true
   },
   "USD|FOMC Economic Projections|2026-06-17": {
+    "note": "Median 2026 dot raised to 3.8% from 3.4%; 9 of 18 now project hikes — hawkish pivot from prior cut expectations.",
     "actual": "3.8%",
+    "reaction": [
+      {
+        "dir": "down",
+        "sym": "BTC"
+      },
+      {
+        "dir": "down",
+        "sym": "stocks"
+      }
+    ],
     "surprise": "Hot",
-    "bearishForBtc": true,
     "condition": "hawkish",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "down"
+        "dir": "down",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "down"
-      },
-      {
-        "sym": "stocks",
-        "dir": "down"
-      }
-    ],
-    "note": "Median 2026 dot raised to 3.8% from 3.4%; 9 of 18 now project hikes — hawkish pivot from prior cut expectations."
+    "bearishForBtc": true
   },
   "USD|FOMC Press Conference|2026-06-17": {
+    "note": "Warsh eliminated forward guidance, dot plot showed 9 officials backing 2026 hikes; BTC fell from $66.4K to $64K post-conference.",
     "actual": "Hawkish hold",
+    "reaction": [
+      {
+        "dir": "down",
+        "sym": "BTC"
+      },
+      {
+        "dir": "down",
+        "sym": "stocks"
+      }
+    ],
     "surprise": "Hot",
-    "bearishForBtc": true,
     "condition": "hawkish",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "down"
+        "dir": "down",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "down"
-      },
-      {
-        "sym": "stocks",
-        "dir": "down"
-      }
-    ],
-    "note": "Warsh eliminated forward guidance, dot plot showed 9 officials backing 2026 hikes; BTC fell from $66.4K to $64K post-conference."
+    "bearishForBtc": true
   },
   "USD|FOMC Statement|2026-06-17": {
+    "note": "Rate held at 3.5%-3.75% as expected, but dot plot raised to 3.8% (from 3.4%), with 9 of 18 officials projecting hikes — hawkish surprise drove equities down 0.98%-1.34%.",
     "actual": "Hawkish hold",
+    "reaction": [
+      {
+        "dir": "down",
+        "sym": "BTC"
+      },
+      {
+        "dir": "down",
+        "sym": "stocks"
+      }
+    ],
     "surprise": "Hot",
-    "bearishForBtc": true,
     "condition": "hawkish",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "down"
+        "dir": "down",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "down"
-      },
-      {
-        "sym": "stocks",
-        "dir": "down"
-      }
-    ],
-    "note": "Rate held at 3.5%-3.75% as expected, but dot plot raised to 3.8% (from 3.4%), with 9 of 18 officials projecting hikes — hawkish surprise drove equities down 0.98%-1.34%."
+    "bearishForBtc": true
   },
   "USD|Federal Funds Rate|2026-06-17": {
+    "note": "Held at 3.75% as expected; dot plot raised to 3.8% from 3.4%, signaling potential hikes. BTC fell to $64K post-Warsh speech.",
     "actual": "3.75%",
+    "reaction": [
+      {
+        "dir": "down",
+        "sym": "BTC"
+      },
+      {
+        "dir": "down",
+        "sym": "stocks"
+      }
+    ],
     "surprise": "In line",
-    "bearishForBtc": true,
     "condition": "hawkish",
     "ifReaction": [
       {
-        "sym": "crypto",
-        "dir": "down"
+        "dir": "down",
+        "sym": "crypto"
       }
     ],
-    "reaction": [
-      {
-        "sym": "BTC",
-        "dir": "down"
-      },
-      {
-        "sym": "stocks",
-        "dir": "down"
-      }
-    ],
-    "note": "Held at 3.75% as expected; dot plot raised to 3.8% from 3.4%, signaling potential hikes. BTC fell to $64K post-Warsh speech."
+    "bearishForBtc": true
   }
 }

@@ -364,6 +364,46 @@ export async function enrichReleased(
     await saveCache();
   }
 
+  // A meeting reacted ONCE: unify the market reaction across same-day, same-
+  // currency events (rate decision + statement + summary + press conf + minutes).
+  // The rate-decision event is canonical (it's what moved markets); its
+  // commentary siblings inherit the SAME reaction / condition / if-scenario —
+  // never a contradictory or "flat" one. actual/surprise/note stay per-event.
+  // Only fresh (cache) entries are rewritten; frozen archive rows are read-only.
+  const isRateDecision = (t: string) =>
+    /\b(policy rate|bank rate|cash rate|funds rate|refinancing rate|rate decision|rate statement)\b/i.test(t) || /\brate$/i.test(t.trim());
+  const MEETING_GAP = 36 * 3_600_000; // events within 36h = one meeting (minutes days later stay separate)
+  const unifyCluster = (cluster: { occ: string; title: string }[]) => {
+    if (cluster.length < 2) return;
+    const canon = cluster.find((g) => isRateDecision(g.title)) ?? cluster[0];
+    const ci = archive.get(canon.occ) ?? releasedCache.get(canon.occ);
+    if (!ci) return;
+    for (const g of cluster) {
+      const gi = releasedCache.get(g.occ); // never mutate frozen archive rows
+      if (!gi || gi === ci) continue;
+      gi.reaction = ci.reaction;
+      gi.ifReaction = ci.ifReaction;
+      gi.condition = ci.condition;
+      gi.bearishForBtc = ci.bearishForBtc;
+    }
+  };
+  // cluster same-currency events by release time (single-linkage, 36h gap)
+  const byCcy = new Map<string, { occ: string; title: string; t: number }[]>();
+  for (const [occ, e] of uniq) {
+    const arr = byCcy.get(e.country) ?? [];
+    if (!byCcy.has(e.country)) byCcy.set(e.country, arr);
+    arr.push({ occ, title: e.title, t: new Date(e.date).getTime() });
+  }
+  for (const list of byCcy.values()) {
+    list.sort((a, b) => a.t - b.t);
+    let cluster: { occ: string; title: string; t: number }[] = [];
+    for (const ev of list) {
+      if (cluster.length && ev.t - cluster[cluster.length - 1].t > MEETING_GAP) { unifyCluster(cluster); cluster = []; }
+      cluster.push(ev);
+    }
+    unifyCluster(cluster);
+  }
+
   // Promote settled occurrences (≥4h after release) from the transient cache
   // into the permanent committed archive — written once, kept forever.
   let promoted = false;
