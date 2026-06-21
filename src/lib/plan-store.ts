@@ -23,6 +23,7 @@ interface PlanState {
   links: Record<string, string>;
   journal: Record<string, JournalRecord>;
   ready: boolean; // hydrated from localStorage (client only)
+  remote: boolean; // Supabase is the source of truth (else localStorage)
 }
 
 const SEED_LINKS: Record<string, string> = {
@@ -38,6 +39,7 @@ let state: PlanState = {
   links: {},
   journal: {},
   ready: false,
+  remote: false,
 };
 
 const listeners = new Set<() => void>();
@@ -63,7 +65,42 @@ function hydrate() {
   const journal = read<Record<string, JournalRecord>>(PLAN_KEYS.journal, {});
   state = { ...state, view, draft, plans, editingId, links, journal, ready: true };
   emit();
+  void syncRemote(); // if Supabase is configured, it becomes the source of truth
 }
+
+// Pull plans/links/journal from Supabase. A 501 means the backend isn't
+// configured → stay in localStorage mode (local dev). Server data replaces the
+// local view (no seed injection — a real account starts as it is).
+async function syncRemote() {
+  try {
+    const [pr, lr, jr] = await Promise.all([
+      fetch('/api/plans'), fetch('/api/links'), fetch('/api/journal'),
+    ]);
+    if (pr.status === 501) return; // not configured → localStorage mode
+    if (!pr.ok) return;
+    const patch: Partial<PlanState> = { remote: true };
+    const pj = await pr.json(); patch.plans = (pj.plans as Plan[]) || [];
+    if (lr.ok) { const lj = await lr.json(); patch.links = (lj.links as Record<string, string>) || {}; }
+    if (jr.ok) { const jj = await jr.json(); patch.journal = (jj.journal as Record<string, JournalRecord>) || {}; }
+    set(patch);
+  } catch { /* offline / not configured → localStorage mode */ }
+}
+
+// Upload a base64 chart to Storage and swap it for the returned URL (top-level
+// and the draft snapshot), then upsert the plan. Returns the URL-resolved plan.
+async function persistPlanRemote(plan: Plan): Promise<Plan> {
+  let p = plan;
+  if (typeof p.chart === 'string' && p.chart.startsWith('data:')) {
+    try {
+      const r = await fetch('/api/plans/chart', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataUrl: p.chart, planId: p.id }) });
+      if (r.ok) { const { url } = await r.json(); p = { ...p, chart: url, draft: p.draft ? { ...p.draft, chart: url } : p.draft }; }
+    } catch { /* keep base64 if upload fails */ }
+  }
+  await fetch('/api/plans', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) }).catch(() => {});
+  return p;
+}
+const apiDeletePlan = (id: string) => fetch('/api/plans?id=' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
+const apiPostPlan = (p: Plan) => fetch('/api/plans', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) }).catch(() => {});
 
 const subscribe = (cb: () => void) => { hydrate(); listeners.add(cb); return () => { listeners.delete(cb); }; };
 const getSnapshot = () => state;
@@ -93,20 +130,23 @@ export const planActions = {
     const plans = state.editingId
       ? state.plans.map((p) => (p.id === state.editingId ? plan : p))
       : [plan, ...state.plans];
-    write(PLAN_KEYS.board, plans);
     try { localStorage.removeItem(PLAN_KEYS.draft); localStorage.removeItem(PLAN_KEYS.editing); } catch {}
     set({ plans, draft: TP_BLANK(), editingId: null, view: 'board' });
     writeRaw(PLAN_KEYS.view, 'board');
+    if (state.remote) void persistPlanRemote(plan).then((p) => set({ plans: state.plans.map((x) => (x.id === p.id ? p : x)) }));
+    else write(PLAN_KEYS.board, plans);
   },
   deletePlan(id: string) {
     const plans = state.plans.filter((p) => p.id !== id);
-    write(PLAN_KEYS.board, plans);
     set({ plans });
+    if (state.remote) void apiDeletePlan(id);
+    else write(PLAN_KEYS.board, plans);
   },
   movePlan(id: string, status: Status) {
     const plans = state.plans.map((p) => (p.id === id ? { ...p, status } : p));
-    write(PLAN_KEYS.board, plans);
     set({ plans });
+    if (state.remote) { const np = plans.find((p) => p.id === id); if (np) void apiPostPlan(np); }
+    else write(PLAN_KEYS.board, plans);
   },
   startEdit(id: string, draft: PlanDraft) {
     write(PLAN_KEYS.draft, draft); writeRaw(PLAN_KEYS.editing, id); writeRaw(PLAN_KEYS.view, 'editor');
@@ -119,25 +159,39 @@ export const planActions = {
     if (!src) return;
     const copy: Plan = { ...src, id: 'tp_' + Date.now().toString(36), status: 'idea', createdAt: Date.now(), name: (src.name || '') + (src.name ? ' copy' : '') };
     const plans = [copy, ...state.plans];
-    write(PLAN_KEYS.board, plans);
     set({ plans, openPlanId: copy.id });
+    if (state.remote) void apiPostPlan(copy);
+    else write(PLAN_KEYS.board, plans);
   },
   cancelEdit() { try { localStorage.removeItem(PLAN_KEYS.draft); localStorage.removeItem(PLAN_KEYS.editing); } catch {} writeRaw(PLAN_KEYS.view, 'board'); set({ draft: TP_BLANK(), editingId: null, view: 'board' }); },
   updateThesis(id: string, field: keyof PlanDraft, value: string) {
     const plans = state.plans.map((p) => p.id === id
       ? { ...p, [field]: value, draft: { ...(p.draft || ({} as PlanDraft)), [field]: value } }
       : p);
-    write(PLAN_KEYS.board, plans);
     set({ plans });
+    if (state.remote) { const np = plans.find((p) => p.id === id); if (np) void apiPostPlan(np); }
+    else write(PLAN_KEYS.board, plans);
   },
 
-  linkSet(pid: string, planId: string) { const links = { ...state.links, [pid]: planId }; write(PLAN_KEYS.links, links); set({ links }); },
-  linkClear(pid: string) { const links = { ...state.links }; delete links[pid]; write(PLAN_KEYS.links, links); set({ links }); },
+  linkSet(pid: string, planId: string) {
+    const links = { ...state.links, [pid]: planId };
+    set({ links });
+    if (state.remote) void fetch('/api/links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pid, planId }) }).catch(() => {});
+    else write(PLAN_KEYS.links, links);
+  },
+  linkClear(pid: string) {
+    const links = { ...state.links }; delete links[pid];
+    set({ links });
+    if (state.remote) void fetch('/api/links?pid=' + encodeURIComponent(pid), { method: 'DELETE' }).catch(() => {});
+    else write(PLAN_KEYS.links, links);
+  },
 
   setJournalField(pid: string, patch: JournalRecord) {
-    const journal = { ...state.journal, [pid]: { ...(state.journal[pid] || {}), ...patch, reviewed: true } };
-    write(PLAN_KEYS.journal, journal);
+    const rec = { ...(state.journal[pid] || {}), ...patch, reviewed: true };
+    const journal = { ...state.journal, [pid]: rec };
     set({ journal });
+    if (state.remote) void fetch('/api/journal', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tradeKey: pid, ...rec }) }).catch(() => {});
+    else write(PLAN_KEYS.journal, journal);
   },
 };
 
