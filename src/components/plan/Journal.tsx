@@ -280,7 +280,7 @@ function JournalDrawer({ e, onClose }: { e: JEntry; onClose: () => void }) {
         </div>
         {/* body */}
         <div style={{ padding: '22px 24px 30px', overflowY: 'auto' }}>
-          <DrawerBody e={e} />
+          <DrawerBody e={e} onClose={onClose} />
         </div>
       </div>
     </>
@@ -308,7 +308,7 @@ function SpecRow({ label, vPlan, vAct, pc, ac }: { label: string; vPlan: string;
   );
 }
 
-function DrawerBody({ e }: { e: JEntry }) {
+function DrawerBody({ e, onClose }: { e: JEntry; onClose: () => void }) {
   const { journal } = usePlanStore();
   const { data: account } = useAccount();
   const equity = parseFloat(account?.total || '') || TP_EQUITY;
@@ -337,7 +337,7 @@ function DrawerBody({ e }: { e: JEntry }) {
         <div style={{ border: '1px solid #ece9e3', borderRadius: 13, overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#faf9f7' }}>
             {plan ? (
-              <div className="jplan-link" onClick={() => planActions.openPlan(plan.id)} title="Open this plan" style={{ padding: '9px 14px', borderRight: '1px solid #f1f0ed', display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', color: '#7c5cff', minWidth: 0 }}>
+              <div className="jplan-link" onClick={() => { onClose(); planActions.openPlan(plan.id); }} title="Open this plan" style={{ padding: '9px 14px', borderRight: '1px solid #f1f0ed', display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', color: '#7c5cff', minWidth: 0 }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#7c5cff', flex: '0 0 auto' }} />
                 <span className="jplan-name" style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', borderBottom: '1px solid rgba(124,92,255,0.32)', paddingBottom: 1 }}>{tpPlanName(plan)}</span>
                 <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><path d="M7 17 17 7M8 7h9v9" /></svg>
