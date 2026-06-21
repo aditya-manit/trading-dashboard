@@ -112,20 +112,19 @@ function PrintBar({ p }: { p: { date: string; pct: number; reactPct?: number } }
       <div style={{ flex: 1, height: 5, borderRadius: 3, background: '#f4f3f0', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${width}%`, background: color, borderRadius: 3 }} />
       </div>
-      {/* 4h reaction → full-day close (story: reacted X, settled at Y) */}
-      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, flex: '0 0 auto', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-        <span title="BTC's reaction in the 4h after the release" style={{ fontWeight: 700, fontSize: 10, color }}>
-          {up ? '+' : '−'}{Math.abs(primary).toFixed(1)}%
+      {/* 4h reaction → full-day close — both numbers same style/color (reaction
+          colour); project HoverTip (dashed underline + dark popup) explains it. */}
+      <HoverTip tip={hasReact ? 'BTC reaction in the 4h after the release → where it settled by end of day' : "BTC's full-day move"} width={228}>
+        <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, flex: '0 0 auto', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', borderBottom: '1px dashed #d4d2c9', cursor: 'help' }}>
+          <span style={{ fontWeight: 700, fontSize: 10, color }}>{up ? '+' : '−'}{Math.abs(primary).toFixed(1)}%</span>
+          {hasReact ? (
+            <>
+              <span style={{ color: '#cfccc3', fontSize: 10, fontWeight: 700 }}>→</span>
+              <span style={{ fontWeight: 700, fontSize: 10, color }}>{dayUp ? '+' : '−'}{Math.abs(p.pct).toFixed(1)}%</span>
+            </>
+          ) : null}
         </span>
-        {hasReact ? (
-          <>
-            <span style={{ color: '#cfccc3', fontSize: 10, fontWeight: 700 }}>→</span>
-            <span title="…where it settled by end of day" style={{ fontWeight: 600, fontSize: 9.5, color: dayUp ? '#86bda1' : '#d4a99e' }}>
-              {dayUp ? '+' : '−'}{Math.abs(p.pct).toFixed(1)}%
-            </span>
-          </>
-        ) : null}
-      </span>
+      </HoverTip>
     </div>
   );
 }
