@@ -276,18 +276,9 @@ function EntryRow({ e, last, onOpen }: { e: JEntry; last: boolean; onOpen: (e: J
         <span style={{ fontWeight: 800, fontSize: 13.5, letterSpacing: '-0.02em', color: up ? '#1f9d55' : '#df5338' }}>{t.pnl}</span>
         <span style={{ fontWeight: 600, fontSize: 11, color: '#a8a69b' }}>{t.ret}</span>
       </div>
-      {/* plan */}
-      <div style={{ minWidth: 0 }}>
-        {e.plan ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, maxWidth: '100%', background: '#f3f0ff', border: '1px solid #e7dffa', borderRadius: 99, padding: '4px 10px 4px 8px' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: e.plan.dir === 'long' ? '#1f9d55' : '#df5338', flex: '0 0 auto' }} />
-            <span style={{ fontWeight: 700, fontSize: 11.5, color: '#5b46c9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpPlanName(e.plan)}</span>
-          </span>
-        ) : (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 11.5, color: '#b0aea3' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', border: '1.5px dashed #c8c5bb', flex: '0 0 auto' }} />Unplanned
-          </span>
-        )}
+      {/* plan — inline link/unlink picker (portaled, so the table won't clip it) */}
+      <div style={{ minWidth: 0 }} onClick={(ev) => ev.stopPropagation()}>
+        <PlanLinkCell pid={t.pid} />
       </div>
       {/* adherence verdict */}
       <div>
