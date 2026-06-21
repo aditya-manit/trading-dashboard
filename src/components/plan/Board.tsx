@@ -38,6 +38,7 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
   const rewardUSD = tp1 ? tp1.rewardUSD : NaN, rewardPct = isFinite(rewardUSD) ? (rewardUSD / c.Q) * 100 : NaN;
   const riskW = isFinite(rr) && rr > 0 ? Math.max(8, Math.min(60, 100 / (1 + rr))) : 25;
   const mp = Math.max(0, Math.min(100, c.marginPct || 0));
+  const cvn = ({ high: { n: 3, label: 'High', col: '#7c5cff' }, med: { n: 2, label: 'Med', col: '#9d86f5' }, low: { n: 1, label: 'Low', col: '#c3b6f2' } } as const)[p.conv || 'med'] || { n: 2, label: 'Med', col: '#9d86f5' };
 
   return (
     <div draggable
@@ -77,6 +78,13 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
               </span>
               <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#d6d4cc' }} />
               <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}><span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.02em', color: '#1a1813' }}>{p.lev}×</span><span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#b3b0a6' }}>lev</span></span>
+              <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#d6d4cc' }} />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2.5 }}>
+                  {[0, 1, 2].map((i) => <span key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i < cvn.n ? cvn.col : 'transparent', border: i < cvn.n ? 'none' : '1px solid #d2cfc6', boxSizing: 'border-box' }} />)}
+                </span>
+                <span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#b3b0a6' }}>{cvn.label}</span>
+              </span>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: '1px solid #f1f0ed', paddingTop: 3 }}>
