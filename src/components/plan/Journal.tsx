@@ -522,7 +522,7 @@ function Review({ e, rec }: { e: JEntry; rec: { grade?: string; note?: string } 
         {grades.map(([g, lbl, col, band]) => {
           const on = rec.grade === g;
           return (
-            <button key={g} onClick={() => planActions.setJournalField(t.pid, { grade: g, reviewed: true })} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '9px 6px', borderRadius: 11, cursor: 'pointer', border: '1.5px solid ' + (on ? col : '#eceae4'), background: on ? col : '#fff', transition: 'all .14s' }}>
+            <button key={g} onClick={() => on ? planActions.clearJournal(t.pid) : planActions.setJournalField(t.pid, { grade: g, reviewed: true })} title={on ? 'Click again to remove this review' : undefined} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '9px 6px', borderRadius: 11, cursor: 'pointer', border: '1.5px solid ' + (on ? col : '#eceae4'), background: on ? col : '#fff', transition: 'all .14s' }}>
               <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em', color: on ? '#fff' : '#1a1813' }}>{g}</span>
               <span style={{ fontWeight: 700, fontSize: 10, color: on ? 'rgba(255,255,255,0.85)' : '#a8a69b' }}>{lbl}</span>
               <span style={{ fontWeight: 700, fontSize: 9, fontVariantNumeric: 'tabular-nums', color: on ? 'rgba(255,255,255,0.7)' : '#c2bfb4' }}>{band}</span>

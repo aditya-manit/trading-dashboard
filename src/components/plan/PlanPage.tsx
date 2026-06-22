@@ -901,14 +901,17 @@ export function PlanPage() {
       </div>
 
       {/* step card */}
-      <div style={{ background: '#ffffff', border: '1px solid #efedf3', borderRadius: 22, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden' }}>
+      <div style={{ background: '#ffffff', border: '1px solid #efedf3', borderRadius: 22, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden', marginTop: -12 }}>
         {/* header: editorial — watermark numeral, eyebrow, serif headline, lead */}
         <div style={{ padding: '34px 40px 6px', position: 'relative' }}>
           <span style={{ position: 'absolute', top: -34, right: 26, fontFamily: NEWS, fontWeight: 600, fontSize: 200, lineHeight: 1, color: '#f6f4ee', letterSpacing: '-0.04em', pointerEvents: 'none' }}>{pad2(meta.n)}</span>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
             <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#a7a399' }}>The workbook</span>
             <span style={{ flex: 1, height: 1, background: '#eeece6' }} />
-            <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c2bfb4', whiteSpace: 'nowrap' }}>Step {meta.n} of 5</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <StepSeg cur={step} />
+              <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c2bfb4', whiteSpace: 'nowrap' }}>Step {meta.n} of 5</span>
+            </div>
             <button onClick={reset} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', border: 'none', padding: '0 0 0 10px', fontWeight: 700, fontSize: 10.5, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#c2bfb4' }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>Reset
             </button>
@@ -917,33 +920,35 @@ export function PlanPage() {
           <p style={{ position: 'relative', margin: '15px 0 0', fontSize: 15.5, fontWeight: 500, lineHeight: 1.55, color: '#6b6760', maxWidth: 600 }}>{meta.lead}</p>
         </div>
 
-        {/* body: diagram (wider) | checklist */}
-        <div style={{ display: 'flex', alignItems: 'stretch', gap: 30, padding: '16px 40px 6px' }}>
+        {/* body: diagram (wider) | rule + checklist */}
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 30, padding: '16px 40px 24px' }}>
           <div style={{ flex: 1.55, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
             <StepDiagram key={step} step={step} />
             <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70', lineHeight: 1.5, padding: '0 2px' }}>{meta.caption}</span>
           </div>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 4px' }}>
-              <span style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#9a958a', whiteSpace: 'nowrap' }}>Your checklist</span>
-              <span style={{ flex: 1, height: 1, background: '#e7e3d9' }} />
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
-                <CheckRing done={doneCount} total={meta.ask.length} />
-                <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 12, color: '#56524b' }}>{doneCount} / {meta.ask.length}</span>
-              </span>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 22 }}>
+            {/* the rule — serif, highlight-underlined */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+                <span style={{ width: 20, height: 2, background: '#7c5cff', borderRadius: 2 }} />
+                <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#9b8fd6' }}>The rule</span>
+              </div>
+              <div style={{ fontFamily: NEWS, fontSize: 22, fontWeight: 500, color: '#1c1626', lineHeight: 1.36 }}>
+                <span style={{ background: 'linear-gradient(180deg,transparent 56%,#e7daff 56%,#e7daff 93%,transparent 93%)', padding: '0 3px', WebkitBoxDecorationBreak: 'clone', boxDecorationBreak: 'clone' }}>{meta.rule}</span>
+              </div>
             </div>
-            <Checklist step={step} ask={meta.ask} checks={checks} toggle={toggleCheck} />
-          </div>
-        </div>
-
-        {/* the rule — serif, highlight-underlined */}
-        <div style={{ margin: '20px 40px 4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 11 }}>
-            <span style={{ width: 20, height: 2, background: '#7c5cff', borderRadius: 2 }} />
-            <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#9b8fd6' }}>The rule</span>
-          </div>
-          <div style={{ fontFamily: NEWS, fontSize: 24, fontWeight: 500, color: '#1c1626', lineHeight: 1.34, maxWidth: 680 }}>
-            <span style={{ background: 'linear-gradient(180deg,transparent 56%,#e7daff 56%,#e7daff 93%,transparent 93%)', padding: '0 3px', WebkitBoxDecorationBreak: 'clone', boxDecorationBreak: 'clone' }}>{meta.rule}</span>
+            {/* checklist */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 4px' }}>
+                <span style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#9a958a', whiteSpace: 'nowrap' }}>Your checklist</span>
+                <span style={{ flex: 1, height: 1, background: '#e7e3d9' }} />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                  <CheckRing done={doneCount} total={meta.ask.length} />
+                  <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 12, color: '#56524b' }}>{doneCount} / {meta.ask.length}</span>
+                </span>
+              </div>
+              <Checklist step={step} ask={meta.ask} checks={checks} toggle={toggleCheck} />
+            </div>
           </div>
         </div>
 
@@ -959,10 +964,6 @@ export function PlanPage() {
                 </span>
               </span>
             )}
-          </div>
-          <div style={{ flex: 1, minWidth: 0, maxWidth: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9 }}>
-            <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a7a399' }}>Step {meta.n} of 5</span>
-            <StepSeg cur={step} />
           </div>
           <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
           {step < 4 ? (

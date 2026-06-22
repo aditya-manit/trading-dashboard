@@ -135,7 +135,11 @@ The whole Plan funnel is ported and live. Files under `components/plan/`:
   diagram** (All Trades › Planned[All·Followed·Off-plan·Wrong dir] / Unplanned[No plan]
   › Queue › Reviewed[All·A·B·C·D], chevron-joined, no box). Drawer has an **unlink**
   (minus) button + adherence recomputes live. Opening a plan from the drawer closes
-  the journal drawer first (so the plan comes to front).
+  the journal drawer first (so the plan comes to front). **Re-clicking the active grade
+  removes the review entirely** (no separate "clear" button): the grade button calls
+  `planActions.clearJournal(pid)` when already selected → deletes the `journal_entries`
+  row (`DELETE /api/journal?pid=…`) and sends the trade back to the Queue. NB this also
+  drops any note on that row — it's a full un-review, by design (handoff-30 request).
 - `PlanDrawer.tsx` — plan detail (desktop stage ≥900px: R/R map + chart; body spec/
   risk/position/thesis). Real equity + mark threaded in. Chart = the plan's Storage URL.
 - `PlanLinkCell.tsx` — trade↔plan link picker. `linkSet` auto-moves the linked plan to
@@ -153,23 +157,25 @@ The whole Plan funnel is ported and live. Files under `components/plan/`:
 - Released same-meeting reaction unified; non-numeric events show TONE not the rate (see
   the released-archive notes below).
 
-### Workbook — editorial redesign (handoff 29)
+### Workbook — editorial redesign (handoff 29, refined in handoff 30)
 The step card is now an **editorial layout** (`plan/PlanPage.tsx`), replacing the
-old left-numeral header + chevron `ChecksStrip` + body `LeadText`:
+old left-numeral header + chevron `ChecksStrip` + body `LeadText`. Card has
+`margin-top:-12px` to tighten the gap to the top stepper (handoff 30):
 - **Header**: a giant **watermark step numeral** (`pad2(n)`, Newsreader 200px
   `#f6f4ee`, top-right, `pointer-events:none`); eyebrow row "THE WORKBOOK" · hairline
-  · "Step N of 5" · **Reset** button; **serif headline** (`meta.title`, Newsreader
+  · **`StepSeg` segment bar + "Step N of 5"** (grouped, moved here from the footer in
+  handoff 30) · **Reset** button; **serif headline** (`meta.title`, Newsreader
   500/38px); muted lead `<p>` (`meta.lead`, 15.5px — no more big highlighted lead).
-- **Body** (`flex gap:30`): diagram `flex:1.55` | **checklist** `flex:1` (moved here
-  from full-width). Checklist = `Checklist` (vertical dotted-border rows, number→green
-  tick on tinted card) under a "YOUR CHECKLIST" header with a **`CheckRing`** progress
-  ring (18×18, purple→green when all clear) + mono `N / M` count.
-- **The rule** block sits **below the body**: purple bar + "THE RULE" eyebrow + the
-  rule in **Newsreader 24px** with a `linear-gradient` highlight-underline.
-- **Footer**: left **Back** pill (steps 2-5, `meta.rail` of prev); center column =
-  "STEP N OF 5" + **`StepSeg`** (5 segments, active = wide purple pill, done = `#b9a8ff`
-  dash); right = gradient **Next step** pill + arrow-chip (or "Plan this trade" on step 5,
-  or a disabled "clear all checks" state until `allClear`).
+- **Body** (`flex gap:30`, bottom-pad 24px): diagram `flex:1.55` | **right column**
+  `flex:1` with `gap:22` holding **THE RULE then the checklist** (handoff 30 moved the
+  rule up here from a full-width band below the body). Rule = purple bar + "THE RULE"
+  eyebrow + the rule in **Newsreader 22px** with a `linear-gradient` highlight-underline.
+  Checklist = `Checklist` (vertical dotted-border rows, number→green tick on tinted card)
+  under a "YOUR CHECKLIST" header with a **`CheckRing`** progress ring (18×18,
+  purple→green when all clear) + mono `N / M` count.
+- **Footer** (handoff 30 simplified to just two pills, no center column): left **Back**
+  pill (steps 2-5, `meta.rail` of prev); right = gradient **Next step** pill + arrow-chip
+  (or "Plan this trade" on step 5, or a disabled "clear all checks" state until `allClear`).
 - **Diagrams** (`planDiagrams.ts`) fully **redrawn** (handoff 29): gridded backgrounds
   (`<pattern>`), per-step `viewBox` + `preserveAspectRatio="xMinYMid meet"` +
   `max-height:380px`, animated via **`vFade`/`vDraw`/`vPulse`/`vPop`** keyframes (defined

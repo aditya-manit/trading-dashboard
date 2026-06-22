@@ -203,6 +203,15 @@ export const planActions = {
     if (state.remote) void fetch('/api/journal', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tradeKey: pid, ...rec }) }).catch(() => {});
     else write(PLAN_KEYS.journal, journal);
   },
+
+  // Remove a review entirely (re-clicking the active grade un-reviews the trade,
+  // sending it back to the queue). Deletes the row — no "clear" button needed.
+  clearJournal(pid: string) {
+    const journal = { ...state.journal }; delete journal[pid];
+    set({ journal });
+    if (state.remote) void fetch('/api/journal?pid=' + encodeURIComponent(pid), { method: 'DELETE' }).catch(() => {});
+    else write(PLAN_KEYS.journal, journal);
+  },
 };
 
 export function usePlanStore(): PlanState {

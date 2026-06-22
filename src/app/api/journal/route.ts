@@ -31,3 +31,16 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
+
+// Remove a review entirely (re-clicking the active grade un-reviews the trade).
+export async function DELETE(req: Request) {
+  const denied = await requireOwner();
+  if (denied) return denied;
+  const sb = supabaseAdmin();
+  if (!sb) return NextResponse.json({ configured: false }, { status: 501 });
+  const pid = new URL(req.url).searchParams.get('pid');
+  if (!pid) return NextResponse.json({ error: 'missing pid' }, { status: 400 });
+  const { error } = await sb.from('journal_entries').delete().eq('trade_key', pid);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
