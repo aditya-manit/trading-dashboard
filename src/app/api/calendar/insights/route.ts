@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enrichReactions, enrichPrints, insightKey, btcDailyMoves, btcWindowMove } from '@/lib/event-insight';
+import { enrichReactions, enrichPrints, insightKey } from '@/lib/event-insight';
 import { isBtcRelevant } from '@/lib/calendar-filter';
 import type { CalendarEvent, EventInsight } from '@/hooks/useCalendar';
 
@@ -25,29 +25,18 @@ export async function GET() {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const strip = relevant.slice(0, 4); // only these get the web-searched prints
 
-    const [reactions, printsMap, moves] = await Promise.all([
+    // Prints are computed + FROZEN once inside enrichPrints (write-once per
+    // event), so we just merge the stored set in — no live recompute here.
+    const [reactions, printsMap] = await Promise.all([
       enrichReactions(relevant.map((e) => ({ country: e.country, title: e.title }))),
-      enrichPrints(strip.map((e) => ({ country: e.country, title: e.title }))),
-      btcDailyMoves(),
+      enrichPrints(strip.map((e) => ({ country: e.country, title: e.title, date: e.date }))),
     ]);
 
-    const today = new Date().toISOString().slice(0, 10);
     const out: Record<string, EventInsight> = {};
     for (const e of relevant) {
       const r = reactions[insightKey(e.country, e.title)];
       if (!r) continue;
-      // The print fires at the SAME ET time as the upcoming event — reuse its
-      // time-of-day (incl. offset) so each print date gets the right release ts.
-      const timeSuffix = e.date.length > 10 ? e.date.slice(10) : 'T12:00:00Z';
-      const raw = (printsMap[insightKey(e.country, e.title)] ?? [])
-        .filter((p) => p.date < today) // completed past occurrences only
-        .slice(0, 2);
-      const prints = (await Promise.all(raw.map(async (p) => {
-        const pct = moves.get(p.date); // whole-day move
-        if (typeof pct !== 'number') return null;
-        const reactPct = await btcWindowMove(new Date(p.date + timeSuffix).getTime(), 4); // 4h reaction
-        return { date: p.date, pct, reactPct };
-      }))).filter((p): p is { date: string; pct: number; reactPct: number | undefined } => p !== null);
+      const prints = printsMap[insightKey(e.country, e.title)] ?? [];
       out[insightKey(e.country, e.title)] = { condition: r.condition, assets: r.assets, prints };
     }
     return NextResponse.json(out);

@@ -18,8 +18,12 @@ const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const authHeaders = (apiKey: string) => ({ 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' });
 
 type Reaction = { condition: string; assets: { sym: string; dir: AssetDir }[] };
+// A "2 prints" entry is FROZEN once computed: the web-searched occurrence date +
+// the Gate-measured moves (pct = whole-day, reactPct = 4h post-release reaction).
+// Stored whole so the card is stable history, not recomputed live each request.
+export type Print = { date: string; pct: number; reactPct?: number };
 const reactionCache = new Map<string, Reaction>();
-const printsCache = new Map<string, { date: string }[]>();
+const printsCache = new Map<string, Print[]>();
 const releasedCache = new Map<string, ReleasedInfo>();
 const asset = (a: unknown): { sym: string; dir: AssetDir } => {
   const o = a as { sym?: unknown; dir?: unknown };
@@ -47,7 +51,7 @@ async function loadCache() {
       const { data } = await sb.from('event_insight').select('key, reaction, prints');
       for (const r of data || []) {
         if (r.reaction) reactionCache.set(r.key as string, r.reaction as Reaction);
-        if (r.prints) printsCache.set(r.key as string, r.prints as { date: string }[]);
+        if (r.prints) printsCache.set(r.key as string, r.prints as Print[]);
       }
     } catch { /* unreachable → empty caches, will re-enrich */ }
     return;
@@ -55,7 +59,7 @@ async function loadCache() {
   try {
     const raw = JSON.parse(readFileSync(CACHE_FILE, 'utf8')) as {
       reactions?: Record<string, Reaction>;
-      prints?: Record<string, { date: string }[]>;
+      prints?: Record<string, Print[]>;
       released?: Record<string, ReleasedInfo>;
     };
     for (const [k, v] of Object.entries(raw.reactions ?? {})) reactionCache.set(k, v);
@@ -227,29 +231,71 @@ export async function enrichReactions(
   return result;
 }
 
-// Tier 2 — verified "2 prints" dates, per-event web search, only for the strip.
+// Tier 2 — verified "2 prints", WRITE-ONCE per event. The occurrence dates come
+// from a one-time web search; the moves are measured from Gate and FROZEN onto
+// the row. Once an event has a frozen print set it is never re-derived — that's
+// what keeps the card stable (the dates were drifting day-to-day across
+// re-enrichments, and the percentages were recomputed live each request).
+// Legacy date-only rows (pre-freeze) keep their stored DATES (no re-search) and
+// just get their moves measured + frozen on first read.
 export async function enrichPrints(
-  events: { country: string; title: string }[],
-): Promise<Record<string, { date: string }[]>> {
+  events: { country: string; title: string; date: string }[],
+): Promise<Record<string, Print[]>> {
   await loadCache();
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  const result: Record<string, { date: string }[]> = {};
-  const uniq = new Map<string, { country: string; title: string }>();
+  const result: Record<string, Print[]> = {};
+  const uniq = new Map<string, { country: string; title: string; date: string }>();
   for (const e of events) uniq.set(insightKey(e.country, e.title), e);
-  const missing = [...uniq.entries()].filter(([k]) => !printsCache.has(k)).map(([, e]) => e);
 
-  if (apiKey && missing.length) {
-    await pool(missing, 5, async (e) => {
-      try {
-        printsCache.set(insightKey(e.country, e.title), await fetchPrints(apiKey, e));
-      } catch (err) {
-        console.error(`[event-insight] prints ${e.country} ${e.title}:`, err);
-      }
-    });
-    await saveCache();
+  // Read-through: the DB is the AUTHORITY for prints (write-once). Refresh the
+  // requested keys straight from Supabase each call so a cold / hot-reloaded /
+  // serverless instance whose in-memory cache is empty can't web-search a fresh
+  // (drifting) date and overwrite an already-stored set. Without this the
+  // `cacheLoaded` guard alone let a stale process clobber the DB.
+  const sb = supabaseAdmin();
+  if (sb && uniq.size) {
+    try {
+      const { data } = await sb.from('event_insight').select('key, prints').in('key', [...uniq.keys()]);
+      for (const r of data || []) if (r.prints) printsCache.set(r.key as string, r.prints as Print[]);
+    } catch { /* fall back to loadCache's snapshot */ }
   }
 
-  for (const k of uniq.keys()) { const v = printsCache.get(k); if (v) result[k] = v; }
+  const today = new Date().toISOString().slice(0, 10);
+  const isFrozen = (ps?: Print[]) => !!ps && ps.length > 0 && ps.every((p) => typeof p.pct === 'number');
+  let moves: Map<string, number> | null = null; // lazily fetched only when needed
+  let dirty = false;
+
+  for (const [k, e] of uniq) {
+    const stored = printsCache.get(k);
+    if (isFrozen(stored)) { result[k] = stored!; continue; } // already frozen → serve as-is
+
+    // Dates: keep a legacy date-only row's dates (write-once), else web-search once.
+    let dates: string[] | null = null;
+    if (stored && stored.length) dates = stored.map((p) => p.date);
+    else if (apiKey) {
+      try { dates = (await fetchPrints(apiKey, e)).map((p) => p.date); }
+      catch (err) { console.error(`[event-insight] prints ${e.country} ${e.title}:`, err); }
+    }
+    if (!dates || !dates.length) continue;
+
+    // Measure + freeze the moves. The print fires at the SAME ET time-of-day as
+    // the upcoming event, so reuse its offset for the 4h reaction window. Drop a
+    // date with no Gate daily candle (can't measure it).
+    if (!moves) moves = await btcDailyMoves();
+    const timeSuffix = e.date.length > 10 ? e.date.slice(10) : 'T12:00:00Z';
+    const frozen: Print[] = [];
+    for (const d of dates) {
+      if (d >= today) continue; // completed past occurrences only
+      const pct = moves.get(d);
+      if (typeof pct !== 'number') continue;
+      const reactPct = await btcWindowMove(new Date(d + timeSuffix).getTime(), 4);
+      frozen.push({ date: d, pct, reactPct });
+    }
+    const final = frozen.slice(0, 2);
+    if (final.length) { printsCache.set(k, final); result[k] = final; dirty = true; }
+  }
+
+  if (dirty) await saveCache();
   return result;
 }
 
