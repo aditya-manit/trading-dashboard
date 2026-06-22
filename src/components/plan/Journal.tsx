@@ -195,7 +195,7 @@ function Filters({ s, cur, onSet }: { s: JStats; cur: JFilter; onSet: (k: JFilte
   const chip = (k: JFilter, label: string, n: number, dot: string) => {
     const active = k === cur;
     return (
-      <button onClick={() => onSet(k)} className="jfpill" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: FONT, fontWeight: 600, fontSize: 12, padding: '6px 12px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (active ? '#23211b' : '#eceae4'), background: active ? '#23211b' : '#fff', color: active ? '#fff' : '#4a443b', whiteSpace: 'nowrap', boxShadow: active ? '0 2px 8px rgba(35,33,27,0.18)' : 'none' }}>
+      <button onClick={() => onSet(k)} className="jfpill" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: FONT, fontWeight: 600, fontSize: 12, padding: '6px 12px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (active ? '#23211b' : '#eceae4'), background: active ? '#23211b' : '#fff', color: active ? '#fff' : '#4a443b', whiteSpace: 'nowrap', boxShadow: 'none' }}>
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flex: '0 0 auto' }} />{label}
         <span style={{ fontWeight: 800, fontSize: 10, fontVariantNumeric: 'tabular-nums', color: active ? 'rgba(255,255,255,0.85)' : '#a8a69b', background: active ? 'rgba(255,255,255,0.16)' : '#f3f1ec', borderRadius: 99, padding: '1px 6px', minWidth: 8, textAlign: 'center' }}>{n}</span>
       </button>
