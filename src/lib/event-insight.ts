@@ -255,8 +255,14 @@ export async function enrichPrints(
   const sb = supabaseAdmin();
   if (sb && uniq.size) {
     try {
-      const { data } = await sb.from('event_insight').select('key, prints').in('key', [...uniq.keys()]);
-      for (const r of data || []) if (r.prints) printsCache.set(r.key as string, r.prints as Print[]);
+      const keys = [...uniq.keys()];
+      const { data } = await sb.from('event_insight').select('key, prints').in('key', keys);
+      const withPrints = new Set<string>();
+      for (const r of data || []) if (r.prints) { printsCache.set(r.key as string, r.prints as Print[]); withPrints.add(r.key as string); }
+      // A requested key the DB has no prints for (never set, or cleared by a
+      // manual refresh) → drop the stale in-memory copy so it re-pulls instead
+      // of serving a frozen value a warm process is still holding.
+      for (const k of keys) if (!withPrints.has(k)) printsCache.delete(k);
     } catch { /* fall back to loadCache's snapshot */ }
   }
 
@@ -297,6 +303,23 @@ export async function enrichPrints(
 
   if (dirty) await saveCache();
   return result;
+}
+
+// Force a re-pull of one event's "2 prints": clear the frozen set (in-memory +
+// DB) so the next enrichPrints web-searches + re-freezes fresh. The re-search is
+// non-deterministic, so this is a "try again", not a guaranteed-correct fix.
+export async function clearPrints(country: string, title: string) {
+  const key = insightKey(country, title);
+  printsCache.delete(key);
+  const sb = supabaseAdmin();
+  if (sb) {
+    try { await sb.from('event_insight').update({ prints: null, updated_at: new Date().toISOString() }).eq('key', key); }
+    catch { /* best-effort */ }
+  } else {
+    await loadCache();
+    printsCache.delete(key);
+    await saveCache();
+  }
 }
 
 async function fetchPrints(

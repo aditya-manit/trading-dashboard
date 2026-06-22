@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useSWRConfig } from 'swr';
 import { createPortal } from 'react-dom';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, useCalendarArchive, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
@@ -187,6 +188,22 @@ function Skel({ w, h = 9 }: { w: number | string; h?: number }) {
   return <span style={{ display: 'block', width: w, height: h, borderRadius: 4, background: '#edece8', animation: 'plPulse 1.2s ease-in-out infinite' }} />;
 }
 
+// Subtle ⟳ to force a re-pull of a card's "2 prints" (faint, brightens on hover).
+function RefreshBtn({ onClick }: { onClick: () => void }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      title="Re-pull these prints (re-runs the web search; the date may change)"
+      style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, padding: 0, borderRadius: 6, border: 'none', cursor: 'pointer', background: hov ? '#f1ecff' : 'transparent', color: hov ? '#7c5cff' : '#c4c2b8', opacity: hov ? 1 : 0.65, transition: 'all .15s' }}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>
+    </button>
+  );
+}
+
 // Inline colored asset arrows: "BTC ↓ · USD ↑ · stocks ↓".
 function AssetArrows({ assets }: { assets: { sym: string; dir: AssetDir }[] }) {
   return (
@@ -277,11 +294,26 @@ function ReleasedCard({ e, info, loading }: { e: CalendarEvent; info?: ReleasedI
 // Rich strip card: header (currency/title + time + live countdown) over a
 // Forecast / If-<condition> / BTC-2-prints table.
 function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def?: string }) {
+  const { mutate } = useSWRConfig();
+  const [refreshing, setRefreshing] = useState(false);
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
   const v = valueParts(e);
   const ins = e.insight;
   const hasReaction = !!ins && ins.assets.length > 0;
   const prints = ins?.prints ?? [];
+
+  // Force a re-pull of just this card's prints: clear the frozen set server-side,
+  // then revalidate the insights map so it web-searches + re-freezes. The skeleton
+  // shows for the whole re-pull (mutate resolves once the refetch completes).
+  const refreshPrints = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await fetch('/api/calendar/insights/refresh', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ country: e.country, title: e.title }) });
+      await mutate('/api/calendar/insights');
+    } catch { /* leave the existing values */ }
+    finally { setRefreshing(false); }
+  };
   return (
     <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 13, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderBottom: '1px solid #f0efec' }}>
@@ -315,14 +347,17 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
             <div style={{ ...valueCellBase, ...topBorder }}><Skel w={150} /></div>
           </>
         ) : null}
-        {prints.length > 0 ? (
+        {prints.length > 0 && !refreshing ? (
           <>
-            <div style={{ ...labelCellBase, ...topBorder, alignItems: 'flex-start' }}><span style={{ ...cellLabel, lineHeight: 1.3 }}>BTC<br />{prints.length} prints</span></div>
+            <div style={{ ...labelCellBase, ...topBorder, alignItems: 'flex-start', justifyContent: 'space-between', gap: 4 }}>
+              <span style={{ ...cellLabel, lineHeight: 1.3 }}>BTC<br />{prints.length} prints</span>
+              <RefreshBtn onClick={refreshPrints} />
+            </div>
             <div style={{ ...valueCellBase, ...topBorder, flexDirection: 'column', alignItems: 'stretch', gap: 5 }}>
               {prints.map((p, i) => <PrintBar key={i} p={p} />)}
             </div>
           </>
-        ) : loading ? (
+        ) : (loading || refreshing) ? (
           <>
             <div style={{ ...labelCellBase, ...topBorder, alignItems: 'flex-start' }}><span style={{ ...cellLabel, lineHeight: 1.3 }}>BTC<br />prints</span></div>
             <div style={{ ...valueCellBase, ...topBorder, flexDirection: 'column', alignItems: 'stretch', gap: 7 }}>
