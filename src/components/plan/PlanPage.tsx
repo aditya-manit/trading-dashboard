@@ -200,9 +200,9 @@ function RefreshBtn({ onClick, visible, spinning }: { onClick: () => void; visib
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       title="Re-pull these prints (re-runs the web search; the date may change)"
-      style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, padding: 0, borderRadius: 6, border: 'none', background: hov ? '#f1ecff' : 'transparent', color: hov ? '#7c5cff' : '#a8a69b', cursor: show ? 'pointer' : 'default', opacity: show ? (hov ? 1 : 0.7) : 0, pointerEvents: show ? 'auto' : 'none', transition: 'opacity .18s, background .15s, color .15s' }}
+      style={{ flex: '0 0 auto', alignSelf: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, padding: 0, borderRadius: 7, border: 'none', background: hov ? '#f1ecff' : 'transparent', color: hov ? '#7c5cff' : '#a8a69b', cursor: show ? 'pointer' : 'default', opacity: show ? (hov ? 1 : 0.75) : 0, pointerEvents: show ? 'auto' : 'none', transition: 'opacity .18s, background .15s, color .15s' }}
     >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={spinning ? { animation: 'tdSpin .8s linear infinite' } : undefined}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={spinning ? { animation: 'tdSpin .8s linear infinite' } : undefined}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>
     </button>
   );
 }
