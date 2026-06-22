@@ -87,6 +87,7 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#f6f5f2', border: '1px solid #eeede9', borderRadius: 11, padding: 3 }}>
           {([['Dashboard', false], ['Plan', true]] as const).map(([label, planMode]) => {
             const active = planMode === onPlan;
+            const accent = planMode ? '#7c5cff' : '#23211b';
             return (
               <button
                 key={label}
@@ -95,11 +96,14 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
                   fontFamily: 'inherit', cursor: 'pointer', border: 'none', borderRadius: 8,
                   padding: '6px 14px', fontWeight: active ? 800 : 700, fontSize: 12,
                   letterSpacing: '0.04em', textTransform: 'uppercase',
-                  color: active ? '#fff' : '#8c8a81',
-                  background: active ? (planMode ? '#7c5cff' : '#23211b') : 'transparent',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  color: active ? accent : '#8c8a81',
+                  background: active ? '#fff' : 'transparent',
+                  boxShadow: active ? '0 1px 2px rgba(20,20,12,0.14)' : 'none',
                   transition: 'all .15s',
                 }}
               >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: active ? accent : 'transparent', flex: '0 0 auto' }} />
                 {label}
               </button>
             );
@@ -117,22 +121,23 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
                   key={label}
                   onClick={() => planActions.setView(v)}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 7,
-                    fontWeight: isActive ? 700 : 600,
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    fontWeight: isActive ? 800 : 600,
                     fontSize: 13.5,
                     color: isActive ? '#6a45d8' : '#8c8a81',
-                    background: isActive ? 'linear-gradient(135deg,#f1ecff,#e1d6ff)' : 'transparent',
-                    padding: '8px 16px',
+                    background: isActive ? '#fff' : 'transparent',
+                    padding: '6px 14px',
                     borderRadius: 9,
-                    boxShadow: 'none',
+                    boxShadow: isActive ? '0 1px 2px rgba(110,70,210,0.14)' : 'none',
                     border: 'none',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     transition: 'all .15s ease',
                   }}
                 >
+                  {isActive ? <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c5cff', flex: '0 0 auto' }} /> : null}
                   {label}
-                  {(() => { const n = label === 'Plans' ? plans.length : label === 'Journal' ? tradeCount : 0; return n ? <span style={{ fontWeight: 800, fontSize: 10.5, color: isActive ? '#7c5cff' : '#b3b0a6', background: isActive ? '#fff' : '#efeee9', borderRadius: 99, padding: '1px 7px', fontVariantNumeric: 'tabular-nums' }}>{n}</span> : null; })()}
+                  {(() => { const n = label === 'Plans' ? plans.length : label === 'Journal' ? tradeCount : 0; return n ? <span style={{ fontWeight: 800, fontSize: 10, color: isActive ? '#6a45d8' : '#a8a69b', background: isActive ? '#f1ecff' : '#ececea', borderRadius: 99, padding: '1px 6px', fontVariantNumeric: 'tabular-nums' }}>{n}</span> : null; })()}
                 </button>
               );
             })
@@ -143,19 +148,21 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
                   key={tab.id}
                   onClick={() => handleTabClick(tab.id)}
                   style={{
-                    fontWeight: isActive ? 700 : 600,
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    fontWeight: isActive ? 800 : 600,
                     fontSize: 13.5,
                     color: isActive ? '#6a45d8' : '#8c8a81',
-                    background: isActive ? 'linear-gradient(135deg,#f1ecff,#e1d6ff)' : 'transparent',
-                    padding: '8px 16px',
+                    background: isActive ? '#fff' : 'transparent',
+                    padding: '6px 14px',
                     borderRadius: 9,
-                    boxShadow: 'none',
+                    boxShadow: isActive ? '0 1px 2px rgba(110,70,210,0.14)' : 'none',
                     border: 'none',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     transition: 'all .15s ease',
                   }}
                 >
+                  {isActive ? <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c5cff', flex: '0 0 auto' }} /> : null}
                   {tab.label}
                 </button>
               );

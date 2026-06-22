@@ -372,9 +372,12 @@ export function Editor() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {c.valid ? (
-              <span onClick={save} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 11, cursor: 'pointer', background: '#7c5cff', borderRadius: 12, padding: '12px 13px 12px 18px', boxShadow: '0 1px 2px rgba(20,20,12,0.05)' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}><span style={{ fontWeight: 800, fontSize: 14.5, color: '#fff', letterSpacing: '-0.01em' }}>{editing ? 'Update plan' : 'Save to Plans'}</span><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#fff', background: 'rgba(255,255,255,0.18)', padding: '3px 8px', borderRadius: 99 }}>{editing ? editing.status : 'Ideas'}</span></span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 99, background: 'rgba(255,255,255,0.18)', flex: '0 0 auto' }}><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span>
+              <span onClick={save}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(124,92,255,0.4)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(124,92,255,0.08)'; }}
+                style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 11, cursor: 'pointer', background: 'linear-gradient(180deg,#f7f3ff,#efe7ff)', border: '1px solid #e3d8fb', borderRadius: 12, padding: '11px 12px 11px 18px', boxShadow: '0 1px 2px rgba(124,92,255,0.08)', transition: 'box-shadow .2s ease' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}><span style={{ fontWeight: 800, fontSize: 14.5, color: '#5a3ff0', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>{editing ? 'Update plan' : 'Save to Plans'}</span><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#5a3ff0', background: '#fff', border: '1px solid #e3d8fb', padding: '3px 8px', borderRadius: 99 }}>{editing ? editing.status : 'Ideas'}</span></span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 27, height: 27, borderRadius: 99, background: 'linear-gradient(150deg,#9d82ff,#7c5cff)', boxShadow: '0 3px 9px -2px rgba(124,92,255,0.6)', flex: '0 0 auto' }}><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span>
               </span>
             ) : (
               <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#f4f3f0', borderRadius: 12, padding: 14 }}>
@@ -382,7 +385,12 @@ export function Editor() {
                 <span style={{ fontWeight: 800, fontSize: 13.5, color: '#b3b0a6' }}>{c.levBlocked ? 'Leverage above 10× — bring it down to save' : c.sizeBlocked ? 'Size above 70% — bring it down to save' : 'Set entry, stop, a target & size to save'}</span>
               </span>
             )}
-            <button onClick={() => planActions.clearDraft()} style={{ flex: '0 0 auto', padding: '13px 18px', borderRadius: 12, border: '1px solid #ededea', background: '#fff', color: '#9b988d', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Clear</button>
+            <button onClick={() => planActions.clearDraft()}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#df5338'; e.currentTarget.style.borderColor = '#f2ddd6'; e.currentTarget.style.background = '#fdfbfa'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#9b988d'; e.currentTarget.style.borderColor = '#ededea'; e.currentTarget.style.background = '#fff'; }}
+              style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 18px 13px 15px', borderRadius: 12, border: '1px solid #ededea', background: '#fff', color: '#9b988d', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', transition: 'color .15s, border-color .15s, background .15s' }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" /><path d="M22 21H7" /><path d="m5 11 9 9" /></svg>Clear
+            </button>
           </div>
         </div>
       </div>

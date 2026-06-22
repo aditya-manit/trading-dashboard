@@ -151,11 +151,11 @@ export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
           <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>Ideas you’ve mapped, armed setups waiting on a trigger, and the ones now live. Execute on TradingView — this stays your record.</span>
         </div>
         <button onClick={() => { planActions.clearDraft(); planActions.setView('editor'); }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#e9e1ff'; e.currentTarget.style.borderColor = '#c9b6ff'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = '#f1ecff'; e.currentTarget.style.borderColor = '#d9ccff'; }}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: '#f1ecff', border: '1px solid #d9ccff', borderRadius: 11, padding: '8px 8px 8px 15px', fontFamily: 'inherit', cursor: 'pointer', flex: '0 0 auto', transition: 'border-color .15s, background .15s' }}>
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(124,92,255,0.4)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(124,92,255,0.08)'; }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'linear-gradient(180deg,#f7f3ff,#efe7ff)', border: '1px solid #e3d8fb', borderRadius: 12, padding: '8px 9px 8px 16px', fontFamily: 'inherit', cursor: 'pointer', flex: '0 0 auto', boxShadow: '0 1px 2px rgba(124,92,255,0.08)', transition: 'box-shadow .2s ease' }}>
           <span style={{ fontWeight: 700, fontSize: 13.5, color: '#5a3ff0', letterSpacing: '-0.01em' }}>New plan</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 7, background: '#7c5cff', boxShadow: '0 2px 6px rgba(124,92,255,0.35)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 25, height: 25, borderRadius: 8, background: 'linear-gradient(150deg,#9d82ff,#7c5cff)', boxShadow: '0 3px 9px -2px rgba(124,92,255,0.6)' }}>
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
           </span>
         </button>

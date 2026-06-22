@@ -805,7 +805,8 @@ export function PlanPage() {
                   // Released keeps All on; only Upcoming turns it off.
                   const active = newsTab === t;
                   return (
-                    <button key={t} onClick={() => { setNewsTab(t); if (t === 'upcoming') setShowAll(false); }} style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', background: active ? '#fff' : 'transparent', color: active ? '#1a1813' : '#8c8a81', boxShadow: active ? '0 1px 2px rgba(20,20,12,0.08)' : 'none', transition: 'all .18s' }}>
+                    <button key={t} onClick={() => { setNewsTab(t); if (t === 'upcoming') setShowAll(false); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', background: active ? '#fff' : 'transparent', color: active ? '#1a1813' : '#8c8a81', boxShadow: active ? '0 1px 2px rgba(20,20,12,0.08)' : 'none', transition: 'all .18s' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: active ? '#1a1813' : 'transparent', flex: '0 0 auto' }} />
                       {t === 'upcoming' ? 'Upcoming' : 'Released'}
                     </button>
                   );
@@ -972,12 +973,17 @@ export function PlanPage() {
           </div>
           {step < 4 ? (
             allClear ? (
-              <span onClick={() => goStep(step + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 14, cursor: 'pointer', background: '#f3f0ff', border: '1px solid #e6ddfb', borderRadius: 12, padding: '8px 9px 8px 18px' }}>
+              <span onClick={() => goStep(step + 1)}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(124,92,255,0.4)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(124,92,255,0.08)'; }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 14, cursor: 'pointer', background: 'linear-gradient(180deg,#f7f3ff,#efe7ff)', border: '1px solid #e3d8fb', borderRadius: 12, padding: '7px 8px 7px 18px', boxShadow: '0 1px 2px rgba(124,92,255,0.08)', transition: 'box-shadow .2s ease' }}>
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1 }}>
                   <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#a99cd0' }}>Next step</span>
-                  <span style={{ fontWeight: 800, fontSize: 13, color: '#1a1813', letterSpacing: '-0.01em' }}>{PLAN_META[step + 1].rail}</span>
+                  <span style={{ fontWeight: 800, fontSize: 13, color: '#5a3ff0', letterSpacing: '-0.01em' }}>{PLAN_META[step + 1].rail}</span>
                 </span>
-                <span style={{ width: 30, height: 30, borderRadius: 9, background: '#fff', border: '1px solid #e6ddfb', display: 'grid', placeItems: 'center', color: '#7c5cff', fontSize: 15 }}>→</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(150deg,#9d82ff,#7c5cff)', boxShadow: '0 3px 9px -2px rgba(124,92,255,0.6)', color: '#fff' }}>
+                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+                </span>
               </span>
             ) : (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 11, cursor: 'not-allowed', background: '#f7f6f3', border: '1px solid #efedea', borderRadius: 12, padding: '6px 6px 6px 16px' }}>
@@ -989,12 +995,17 @@ export function PlanPage() {
               </span>
             )
           ) : allClear ? (
-            <span onClick={() => { persistPlan(step, true); setFinished(true); planActions.setView('editor'); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 13, cursor: 'pointer', background: '#7c5cff', border: 'none', borderRadius: 12, padding: '8px 9px 8px 18px', boxShadow: '0 4px 14px -4px rgba(124,92,255,0.5)' }}>
+            <span onClick={() => { persistPlan(step, true); setFinished(true); planActions.setView('editor'); }}
+              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(124,92,255,0.4)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(124,92,255,0.08)'; }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 14, cursor: 'pointer', background: 'linear-gradient(180deg,#f7f3ff,#efe7ff)', border: '1px solid #e3d8fb', borderRadius: 12, padding: '7px 8px 7px 18px', boxShadow: '0 1px 2px rgba(124,92,255,0.08)', transition: 'box-shadow .2s ease' }}>
               <span style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1 }}>
-                <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.72)' }}>Done exploring?</span>
-                <span style={{ fontWeight: 800, fontSize: 13, color: '#fff', letterSpacing: '-0.01em' }}>Plan this trade</span>
+                <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#a99cd0' }}>Done exploring?</span>
+                <span style={{ fontWeight: 800, fontSize: 13, color: '#5a3ff0', letterSpacing: '-0.01em' }}>Plan this trade</span>
               </span>
-              <span style={{ width: 30, height: 30, borderRadius: 9, background: 'rgba(255,255,255,0.18)', display: 'grid', placeItems: 'center', color: '#fff', fontSize: 15 }}>→</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(150deg,#9d82ff,#7c5cff)', boxShadow: '0 3px 9px -2px rgba(124,92,255,0.6)', color: '#fff' }}>
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+              </span>
             </span>
           ) : (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 11, cursor: 'not-allowed', background: '#f7f6f3', border: '1px solid #efedea', borderRadius: 12, padding: '6px 6px 6px 16px' }}>
