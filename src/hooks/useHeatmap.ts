@@ -18,12 +18,22 @@ export type HeatInterval = '12h' | '24h' | '48h' | '3d' | '1w' | '2w' | '1mo' | 
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-// Liquidation heatmap for the chosen symbol/model/interval. The Actor run is
-// slow-ish (CoinGlass scrape), so keep a generous dedupe + manual revalidate.
+// Liquidation heatmap for the chosen symbol/model/interval. CACHE-FIRST: the
+// Actor run costs Apify compute units, so we fetch a given symbol/model/interval
+// ONCE (first mount with no cached data) and never auto-revalidate after that —
+// reopening the tab serves the cached chart. Fresh data is on-demand only:
+// changing a control (new cache key → one fetch) or the manual Refresh button
+// (`mutate()`). `revalidateIfStale:false` is what suppresses the on-mount/on-
+// remount refetch; focus/reconnect revalidation is off too.
 export function useHeatmap(symbol: HeatSymbol, model: HeatModel, interval: HeatInterval) {
   return useSWR<HeatmapData>(
     `/api/heatmap?symbol=${symbol}&model=${model}&interval=${interval}`,
     fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60_000, keepPreviousData: true },
+    {
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      keepPreviousData: true,
+    },
   );
 }

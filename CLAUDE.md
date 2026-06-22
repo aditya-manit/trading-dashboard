@@ -168,7 +168,10 @@ tabs + scroll-spy are suppressed on this page (it has its own in-page controls).
   token → `501 {configured:false}` → the page shows an "Apify not connected" overlay
   (set `APIFY_TOKEN` in `.env.local` + Vercel to enable). Hook: `useHeatmap(symbol,model,interval)`.
 - **Controls** (`Seg`): Symbol BTC/ETH/SOL · Model model1/2/3 · Interval 12h/24h/48h/3d/1w/2w/1mo/3mo
-  (state in `HeatmapPage`; each change refetches). Manual **Refresh** re-runs the Actor (`mutate()`).
+  (state in `HeatmapPage`). **Cache-first** (`useHeatmap`: `revalidateIfStale:false` +
+  focus/reconnect off): a given symbol/model/interval runs the Actor ONCE then serves cached —
+  reopening the tab does NOT refetch (Actor runs cost Apify units). Fresh data is on-demand only:
+  changing a control (new key → one fetch) or the manual **Refresh** button (`mutate()`).
 - **Canvas render is ported verbatim** from the dc.html (the `magma` colormap + draw loop):
   cells colored by `val/max` magma; green/red candlesticks; faint price gridlines; dashed
   last-price line. X = candlestick count, Y = `y_axis.length`, `max` = peak liquidation value
