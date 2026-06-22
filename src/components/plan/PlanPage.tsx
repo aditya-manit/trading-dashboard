@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useSWRConfig } from 'swr';
-import { createPortal } from 'react-dom';
+import { HoverTip } from './HoverTip';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, useCalendarArchive, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
 import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
@@ -138,33 +138,6 @@ const labelCellBase: CSSProperties = { padding: '8px 12px', borderRight: '1px so
 const valueCellBase: CSSProperties = { padding: '8px 13px', display: 'flex', alignItems: 'center' };
 const topBorder: CSSProperties = { borderTop: '1px solid #f4f3f0' };
 
-// Hover tooltip portaled to document.body so it escapes card overflow:hidden
-// AND the drawer panel's transform (which would otherwise contain/clip a fixed
-// child). Anchors to the wrapped content's rect, opening above it.
-function HoverTip({ tip, width = 240, children }: { tip: React.ReactNode; width?: number; children: React.ReactNode }) {
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  return (
-    <span
-      style={{ display: 'inline-block', minWidth: 0, cursor: 'help' }}
-      onMouseEnter={(ev) => setRect(ev.currentTarget.getBoundingClientRect())}
-      onMouseLeave={() => setRect(null)}
-    >
-      {children}
-      {rect && typeof document !== 'undefined' && createPortal(
-        // Open above the anchor, flip below when there isn't room (drawer header
-        // near the top); clamp left so it never spills off the right/left edge.
-        <span style={{ position: 'fixed', left: Math.round(Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))), zIndex: 300, width, maxWidth: '92vw', background: '#1a1813', color: '#f1efe9', fontSize: 11, fontWeight: 500, lineHeight: 1.5, padding: '9px 12px', borderRadius: 10, boxShadow: '0 10px 30px rgba(20,18,12,0.3)', pointerEvents: 'none', fontFamily: FONT,
-          ...(rect.top > 130
-            ? { top: Math.round(rect.top - 8), transform: 'translateY(-100%)' }
-            : { top: Math.round(rect.bottom + 8) }) }}>
-          {tip}
-        </span>,
-        document.body,
-      )}
-    </span>
-  );
-}
-
 // Plain-English explanation of the calendar filter (isBtcRelevant), as 3 points.
 const FILTER_TIP = (
   <span style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -188,22 +161,21 @@ function Skel({ w, h = 9 }: { w: number | string; h?: number }) {
   return <span style={{ display: 'block', width: w, height: h, borderRadius: 4, background: '#edece8', animation: 'plPulse 1.2s ease-in-out infinite' }} />;
 }
 
-// Subtle ⟳ to force a re-pull of a card's "2 prints". Hidden at rest; fades in
-// on card hover (`visible`), brightens on its own hover. Always in the DOM so it
-// doesn't shift the header layout when it appears.
-function RefreshBtn({ onClick, visible, spinning }: { onClick: () => void; visible: boolean; spinning?: boolean }) {
+// Subtle ⟳ to force a re-pull of a card's "2 prints". Always visible (faint),
+// brightens on its own hover; spins while re-pulling. Tooltip = project HoverTip.
+function RefreshBtn({ onClick, spinning }: { onClick: () => void; spinning?: boolean }) {
   const [hov, setHov] = useState(false);
-  const show = visible || spinning;
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      title="Re-pull these prints (re-runs the web search; the date may change)"
-      style={{ flex: '0 0 auto', alignSelf: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, padding: 0, borderRadius: 7, border: 'none', background: hov ? '#f1ecff' : 'transparent', color: hov ? '#7c5cff' : '#a8a69b', cursor: show ? 'pointer' : 'default', opacity: show ? (hov ? 1 : 0.75) : 0, pointerEvents: show ? 'auto' : 'none', transition: 'opacity .18s, background .15s, color .15s' }}
-    >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={spinning ? { animation: 'tdSpin .8s linear infinite' } : undefined}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>
-    </button>
+    <HoverTip tip="Re-pull these prints (re-runs the web search; the date may change)" width={210} style={{ display: 'inline-flex', alignSelf: 'center', marginTop: 2 }}>
+      <button
+        onClick={onClick}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, padding: 0, borderRadius: 7, border: 'none', background: hov ? '#f1ecff' : 'transparent', color: hov ? '#7c5cff' : '#b3b0a6', cursor: 'pointer', opacity: hov ? 1 : 0.85, transition: 'background .15s, color .15s, opacity .15s' }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={spinning ? { animation: 'tdSpin .8s linear infinite' } : undefined}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>
+      </button>
+    </HoverTip>
   );
 }
 
@@ -299,7 +271,6 @@ function ReleasedCard({ e, info, loading }: { e: CalendarEvent; info?: ReleasedI
 function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def?: string }) {
   const { mutate } = useSWRConfig();
   const [refreshing, setRefreshing] = useState(false);
-  const [cardHover, setCardHover] = useState(false);
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
   const v = valueParts(e);
   const ins = e.insight;
@@ -319,7 +290,7 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
     finally { setRefreshing(false); }
   };
   return (
-    <div onMouseEnter={() => setCardHover(true)} onMouseLeave={() => setCardHover(false)} style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 13, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
+    <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 13, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderBottom: '1px solid #f0efec' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -329,8 +300,8 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
             <EventName title={e.title} def={def} />
-            {/* re-pull prints — fades in on card hover, only when there are prints */}
-            {prints.length > 0 && <RefreshBtn onClick={refreshPrints} visible={cardHover && !refreshing} spinning={refreshing} />}
+            {/* re-pull prints — always shown when there are prints to re-pull */}
+            {prints.length > 0 && <RefreshBtn onClick={refreshPrints} spinning={refreshing} />}
           </div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
