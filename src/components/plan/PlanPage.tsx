@@ -171,7 +171,7 @@ function RefreshBtn({ onClick, spinning }: { onClick: () => void; spinning?: boo
         onClick={onClick}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
-        style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, padding: 0, borderRadius: 7, border: 'none', background: hov ? '#f1ecff' : 'transparent', color: hov ? '#7c5cff' : '#b3b0a6', cursor: 'pointer', opacity: hov ? 1 : 0.85, transition: 'background .15s, color .15s, opacity .15s' }}
+        style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, padding: 0, border: 'none', background: 'transparent', color: hov ? '#7c5cff' : '#b3b0a6', cursor: 'pointer', opacity: hov ? 1 : 0.85, transition: 'color .15s, opacity .15s' }}
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={spinning ? { animation: 'tdSpin .8s linear infinite' } : undefined}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>
       </button>
