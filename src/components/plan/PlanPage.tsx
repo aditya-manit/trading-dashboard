@@ -327,15 +327,15 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
             <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1a1813' }}>{e.country}</span>
             <Tag e={e} />
           </div>
-          <EventName title={e.title} def={def} />
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-            <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b', whiteSpace: 'nowrap' }}>{fmtWhen(e.date)}</span>
-            <CountdownLabel date={e.date} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+            <EventName title={e.title} def={def} />
+            {/* re-pull prints — fades in on card hover, only when there are prints */}
+            {prints.length > 0 && <RefreshBtn onClick={refreshPrints} visible={cardHover && !refreshing} spinning={refreshing} />}
           </div>
-          {/* re-pull prints — fades in on card hover, only when there are prints */}
-          {prints.length > 0 && <RefreshBtn onClick={refreshPrints} visible={cardHover && !refreshing} spinning={refreshing} />}
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
+          <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b', whiteSpace: 'nowrap' }}>{fmtWhen(e.date)}</span>
+          <CountdownLabel date={e.date} />
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr' }}>
