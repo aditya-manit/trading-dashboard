@@ -9,6 +9,7 @@ Next.js 15 App Router · TypeScript · Tailwind CSS v4 · shadcn/ui · SWR
 - All Gate.io API calls MUST go through `/api/gate/*` server-side routes
 - Never import or reference `process.env.GATE_API_KEY` / `GATE_API_SECRET` in any client component or hook
 - `ANTHROPIC_API_KEY` (used by `lib/event-insight.ts` for calendar reaction lines) is likewise server-only — never reference it in a client component or hook
+- `APIFY_TOKEN` (used by `/api/heatmap` for the liquidation heatmap Actor) is likewise server-only — never `NEXT_PUBLIC_`, never in a client component/hook
 
 ## Gate.io API constraints
 - `position_close` and `account_book`: `from` cannot be more than 180 days before NOW (absolute, not relative to `to`)
@@ -34,6 +35,7 @@ src/
       account-book/route.ts           # 6×30d windows
       trades/route.ts
       btc-candles/route.ts            # Gate spot 1d candles (also used for "2 prints" %)
+    api/heatmap/route.ts              # Apify coinglass-liquidation-heatmap Actor proxy (server-only APIFY_TOKEN)
     api/calendar/route.ts             # ForexFactory feed proxy + insight/prints enrichment
   components/
     layout/Topbar.tsx                 # Sticky nav; Dashboard/Plan toggle; scroll-tab (dashboard only)
@@ -52,9 +54,11 @@ src/
     plan/
       PlanPage.tsx                    # Pre-trade workbook (Plan page) + economic-calendar news strip/drawer
       planDiagrams.ts                 # 5 step SVGs, verbatim from handoff 15
+    heatmap/
+      HeatmapPage.tsx                 # Liquidation heatmap (canvas magma + candles), handoff 31
   hooks/
     useAccount.ts · usePositions.ts · usePositionHistory.ts
-    useAccountBook.ts · useTrades.ts · useCalendar.ts
+    useAccountBook.ts · useTrades.ts · useCalendar.ts · useHeatmap.ts
   lib/
     gate-client.ts                    # HMAC signing + fetch wrapper
     trade-stats.ts                    # computeTradeStats, buildEquityData
@@ -90,9 +94,11 @@ src/
   Each row: `padding:13px 16px; border-bottom:1px solid #f5f4f1`
 
 ## Pages & tab sections
-Top-level `page` state in `page.tsx` toggles between **Plan (default)** and **Dashboard**
-via the Topbar's Dashboard/Plan segmented control. Plan → `<PlanFunnel/>`; Dashboard →
-the scroll-nav sections below (scroll-spy active only on Dashboard).
+Top-level `page` state in `page.tsx` toggles between **Plan (default)**, **Dashboard**,
+and **Heatmap** via the Topbar's segmented control (`PAGES` array in `Topbar.tsx`).
+Plan → `<PlanFunnel/>`; Dashboard → the scroll-nav sections below (scroll-spy active
+only on Dashboard); Heatmap → `<HeatmapPage/>` (full-bleed, no `padding:30` wrapper,
+its own internal controls so the center nav tabs are hidden).
 ```
 Plan (default) → PlanFunnel  (Topbar tabs: Workbook / Plans / Journal — ALL live)
    view switcher (lib/plan-store `view`): workbook → PlanPage · editor → Editor ·
@@ -103,6 +109,7 @@ Dashboard:
   #positions  → PositionsTable
   #reports    → KeyMetricsRow
   #history    → PositionHistoryTable
+Heatmap → HeatmapPage  (no center nav tabs; symbol/model/interval segs live in-page)
 ```
 
 ---
@@ -147,6 +154,31 @@ The whole Plan funnel is ported and live. Files under `components/plan/`:
   **Triggered**. Plan **delete cascades** → its links + chart Storage folder removed.
 - Math/model in `lib/plan-model.ts` (`tpCompute`, `planToDraft`); store in
   `lib/plan-store.ts`; journal logic in `lib/journal.ts`.
+
+### Liquidation Heatmap page (handoff 31)
+A third top-level page (`Topbar` PAGES toggle → `page==='heatmap'` in `page.tsx` →
+`<HeatmapPage/>`), ported from `project/Liquidation Heatmap.dc.html`. Full-bleed dark
+panel (`#0b0518`, `height:calc(100vh - 64px)`) under the white Topbar; the center nav
+tabs + scroll-spy are suppressed on this page (it has its own in-page controls).
+- **Data = Apify Actor `api_merge/coinglass-liquidation-heatmap`** via `/api/heatmap`
+  (`requireOwner`-gated server route; `APIFY_TOKEN` server-only). It POSTs
+  `run-sync-get-dataset-items?token=…` with `{symbol,model,interval}` and returns the
+  single dataset item: `y_axis:number[]` (price levels), `liquidation_leverage_data:[xi,yi,val][]`,
+  `price_candlesticks:[tsSec,o,h,l,c,v][]` (strings), `updateTime`. **Graceful**: no
+  token → `501 {configured:false}` → the page shows an "Apify not connected" overlay
+  (set `APIFY_TOKEN` in `.env.local` + Vercel to enable). Hook: `useHeatmap(symbol,model,interval)`.
+- **Controls** (`Seg`): Symbol BTC/ETH/SOL · Model model1/2/3 · Interval 12h/24h/48h/3d/1w/2w/1mo/3mo
+  (state in `HeatmapPage`; each change refetches). Manual **Refresh** re-runs the Actor (`mutate()`).
+- **Canvas render is ported verbatim** from the dc.html (the `magma` colormap + draw loop):
+  cells colored by `val/max` magma; green/red candlesticks; faint price gridlines; dashed
+  last-price line. X = candlestick count, Y = `y_axis.length`, `max` = peak liquidation value
+  (also the colorbar top label). Redraws on data change + container resize (`ResizeObserver`),
+  DPR-aware. Axes are derived from the data (not hardcoded like the sample): price ticks via
+  `niceStep`, time ticks from candlestick timestamps (viewer-local), right-axis last-price pill.
+  Hover maps mouse → price/time-slot, looks up the liquidation value in a `Map` keyed
+  `xi*100000+yi`, and shows the light tooltip (date · Price · Liquidation Leverage).
+- The dc.html's `sampleData()`/`rngFn` are **only the design's mock generator** — NOT ported;
+  real CoinGlass data has the identical shape, so `prepare()` consumes it directly.
 
 ### News/calendar additions (handoff 24+)
 - News drawer **"All" toggle** (after Upcoming/Released): reads the full `released_archive`
