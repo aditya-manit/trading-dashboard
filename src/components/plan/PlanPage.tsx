@@ -8,6 +8,9 @@ import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
 import { planActions } from '@/lib/plan-store';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
+// Editorial serif (workbook headline / rule) + mono (checklist count / diagram ticks).
+const NEWS = "var(--font-news), 'Newsreader', serif";
+const MONO = "var(--font-mono), 'JetBrains Mono', monospace";
 
 // ─── Economic-calendar helpers (real ForexFactory feed) ───────────────────────
 const IMPACT_COLOR: Record<string, string> = { High: '#df5338', Medium: '#d98a1f', Low: '#1f9d55', Holiday: '#8c8a81' };
@@ -564,57 +567,49 @@ const STEPPER_ICONS = [
 
 const pad2 = (n: number) => ('0' + n).slice(-2);
 
-// Big lead paragraph with purple-highlighted keywords (planLeadEl / _leadRich).
-function LeadText({ lead, hl }: { lead: string; hl: string[] }) {
-  const base: CSSProperties = { margin: 0, fontWeight: 700, fontSize: 27, lineHeight: 1.3, letterSpacing: '-0.025em', color: '#1a1813' };
-  if (!hl.length) return <p style={base}>{lead}</p>;
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp('(' + hl.map(esc).join('|') + ')', 'gi');
-  const parts: ReactNode[] = [];
-  let last = 0, m: RegExpExecArray | null;
-  re.lastIndex = 0;
-  while ((m = re.exec(lead))) {
-    if (m.index > last) parts.push(lead.slice(last, m.index));
-    parts.push(<span key={m.index} style={{ color: '#7c5cff', fontWeight: 800, fontSize: '1.34em', letterSpacing: '-0.015em' }}>{m[0]}</span>);
-    last = m.index + m[0].length;
-  }
-  if (last < lead.length) parts.push(lead.slice(last));
-  return <p style={base}>{parts}</p>;
+// Checklist progress ring (planCheckRingEl): 18×18 SVG, purple while filling,
+// green once every box on the step is cleared.
+function CheckRing({ done, total }: { done: number; total: number }) {
+  const tot = total || 1;
+  const C = 43.98; // 2π·7
+  const off = (C * (1 - done / tot)).toFixed(2);
+  const all = done >= tot;
+  return (
+    <svg width={18} height={18} viewBox="0 0 18 18" style={{ display: 'block', flex: '0 0 auto' }}>
+      <circle cx={9} cy={9} r={7} fill="none" stroke="#e7e3d9" strokeWidth={2} />
+      <circle cx={9} cy={9} r={7} fill="none" stroke={all ? '#1f9d55' : '#7c5cff'} strokeWidth={2} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off} transform="rotate(-90 9 9)" style={{ transition: 'stroke-dashoffset .35s ease, stroke .2s' }} />
+    </svg>
+  );
 }
 
-// Pre-flight checks as a full-width chevron/arrow connected strip (planChecksVEl):
-// arrow-shaped cells with a green connector gradient that fills as checks confirm.
-function ChecksStrip({ step, ask, checks, toggle }: { step: number; ask: string[]; checks: Record<string, boolean>; toggle: (k: string) => void }) {
-  const n = ask.length, aw = 20, gap = 5, bw = 24, N0 = '#e7e5dd', G0 = '#2fa862';
-  const done = ask.map((_, i) => !!checks[`${step}-${i}`]);
-  const doneCount = done.filter(Boolean).length;
-  const cw = `(100% - ${(n - 1) * gap}px)/${n}`;
-  let stops = `${N0} 0px`;
-  for (let gi = 0; gi < n - 1; gi++) {
-    const gc = done[gi] ? G0 : N0;
-    const goff = gi * gap + gap / 2;
-    const ga = `calc(${gi + 1}*${cw} + ${goff - bw}px)`;
-    const gb = `calc(${gi + 1}*${cw} + ${goff + bw}px)`;
-    stops += `, ${N0} ${ga}, ${gc} ${ga}, ${gc} ${gb}, ${N0} ${gb}`;
-  }
-  stops += `, ${N0} 100%`;
-  const ratio = n ? doneCount / n : 0;
-  const border = doneCount === 0 ? '#e6e4dc' : `oklch(${0.92 - ratio * 0.22} ${0.02 + ratio * 0.13} 150)`;
+// Pre-flight checks as a vertical stack of dotted-border rows (planChecksCEl):
+// numbered until cleared, then a green tick on a tinted card.
+function Checklist({ step, ask, checks, toggle }: { step: number; ask: string[]; checks: Record<string, boolean>; toggle: (k: string) => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'stretch', gap, borderRadius: 16, overflow: 'hidden', border: `1px solid ${border}`, background: `linear-gradient(90deg, ${stops})`, transition: 'border-color .25s ease' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '14px 0 0' }}>
       {ask.map((text, i) => {
-        const f = i === 0, l = i === n - 1, dn = done[i];
-        const clip = f
-          ? `polygon(0 0, calc(100% - ${aw}px) 0, 100% 50%, calc(100% - ${aw}px) 100%, 0 100%)`
-          : l
-            ? `polygon(0 0, 100% 0, 100% 100%, 0 100%, ${aw}px 50%)`
-            : `polygon(0 0, calc(100% - ${aw}px) 0, 100% 50%, calc(100% - ${aw}px) 100%, 0 100%, ${aw}px 50%)`;
+        const dn = !!checks[`${step}-${i}`];
         return (
-          <div key={i} onClick={() => toggle(`${step}-${i}`)} style={{ flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: `calc((100% - ${(n - 1) * gap}px)/${n})`, minWidth: 0, boxSizing: 'border-box', cursor: 'pointer', paddingTop: 17, paddingBottom: 17, paddingLeft: f ? 20 : aw + 18, paddingRight: l ? 20 : aw + 14, clipPath: clip, background: '#fff', display: 'flex', flexDirection: 'column', gap: 10, transition: 'background .2s ease' }}>
-            <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: dn ? '#1c8f4d' : '#fff', border: dn ? 'none' : '1.5px solid #d6d4cc', boxShadow: dn ? '0 2px 6px -1px rgba(28,143,77,0.45)' : 'none', fontWeight: 800, fontSize: 11, color: dn ? '#fff' : '#a8a69b', transition: 'all .2s ease' }}>{dn ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : i + 1}</span>
-            <span style={{ fontWeight: 600, fontSize: 13, color: dn ? '#16703c' : '#56544b', lineHeight: 1.4 }}>{text}</span>
+          <div key={i} onClick={() => toggle(`${step}-${i}`)} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 13, cursor: 'pointer', padding: '13px 14px', borderRadius: 13, overflow: 'hidden', background: dn ? '#f4fbf7' : '#fff', border: '1.5px dotted ' + (dn ? '#a3d4ba' : '#d2cfc6') }}>
+            <span style={{ width: 26, height: 26, borderRadius: '50%', flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: dn ? '#1f9d55' : '#fff', border: dn ? 'none' : '2px solid #ddd9d0', boxShadow: dn ? '0 2px 6px rgba(31,157,85,0.28)' : 'none', transition: 'all .16s cubic-bezier(.22,.8,.3,1)' }}>
+              {dn ? <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: 11, color: '#bdbbb1' }}>{i + 1}</span>}
+            </span>
+            <span style={{ fontWeight: 600, fontSize: 13, color: dn ? '#16432b' : '#3a382f', lineHeight: 1.4 }}>{text}</span>
           </div>
         );
+      })}
+    </div>
+  );
+}
+
+// Footer progress segments (planStepSegEl): active step is a wide pill, cleared
+// steps a muted dash, the rest faint.
+function StepSeg({ cur }: { cur: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      {[0, 1, 2, 3, 4].map((i) => {
+        const done = i < cur, active = i === cur;
+        return <span key={i} style={{ flex: active ? '0 0 24px' : '0 0 7px', height: 6, borderRadius: 99, background: active ? '#7c5cff' : done ? '#b9a8ff' : '#e9e7e1', transition: 'all .35s cubic-bezier(.4,0,.2,1)' }} />;
       })}
     </div>
   );
@@ -735,6 +730,10 @@ export function PlanPage() {
         @keyframes pkFade{from{opacity:0;}to{opacity:1;}}
         @keyframes pkSlideIn{from{transform:translateX(100%);}to{transform:translateX(0);}}
         @keyframes plPulse{0%,100%{opacity:1;}50%{opacity:.45;}}
+        @keyframes vFade{from{opacity:0;}to{opacity:1;}}
+        @keyframes vDraw{to{stroke-dashoffset:0;}}
+        @keyframes vPulse{0%{transform:scale(.6);opacity:.5;}70%{opacity:0;}100%{transform:scale(2.1);opacity:0;}}
+        @keyframes vPop{from{opacity:0;transform:scale(.3);}to{opacity:1;transform:scale(1);}}
       `}</style>
 
       {/* header */}
@@ -903,61 +902,49 @@ export function PlanPage() {
 
       {/* step card */}
       <div style={{ background: '#ffffff', border: '1px solid #efedf3', borderRadius: 22, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden' }}>
-        {/* header block */}
-        <div style={{ borderBottom: '1px solid #f4f3f0' }}>
-          <div style={{ display: 'flex', alignItems: 'stretch' }}>
-            <div style={{ flex: '0 0 auto', width: 86, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 0' }}>
-              <span style={{ fontWeight: 800, fontSize: 44, letterSpacing: '-0.03em', color: '#7c5cff', lineHeight: 1 }}>{meta.n}</span>
-            </div>
-            <div style={{ flex: '0 0 auto', width: 1, background: '#eceae5' }} />
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, padding: '18px 30px', minWidth: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#a8a69b' }}>Step {meta.n} · {meta.rail}</span>
-                <span style={{ fontWeight: 800, fontSize: 23, letterSpacing: '-0.015em', color: '#1a1813', lineHeight: 1.05 }}>{meta.title}</span>
-              </div>
-              <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 9 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                    <span style={{ fontWeight: 800, fontSize: 15, color: '#1a1813', letterSpacing: '-0.01em' }}>{pad2(meta.n)}</span>
-                    <span style={{ fontWeight: 700, fontSize: 11, color: '#c4c2b8' }}>/ 05</span>
-                  </div>
-                  <div style={{ width: 84, height: 5, borderRadius: 99, background: '#eceae5', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${(meta.n / 5) * 100}%`, background: '#7c5cff', borderRadius: 99, transition: 'width .3s ease' }} />
-                  </div>
-                </div>
-                <button onClick={reset} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', border: 'none', padding: '0 1px', fontWeight: 700, fontSize: 11.5, color: '#b0aea3' }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>Reset
-                </button>
-              </div>
-            </div>
+        {/* header: editorial — watermark numeral, eyebrow, serif headline, lead */}
+        <div style={{ padding: '34px 40px 6px', position: 'relative' }}>
+          <span style={{ position: 'absolute', top: -34, right: 26, fontFamily: NEWS, fontWeight: 600, fontSize: 200, lineHeight: 1, color: '#f6f4ee', letterSpacing: '-0.04em', pointerEvents: 'none' }}>{pad2(meta.n)}</span>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+            <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#a7a399' }}>The workbook</span>
+            <span style={{ flex: 1, height: 1, background: '#eeece6' }} />
+            <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c2bfb4', whiteSpace: 'nowrap' }}>Step {meta.n} of 5</span>
+            <button onClick={reset} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontFamily: 'inherit', background: 'transparent', border: 'none', padding: '0 0 0 10px', fontWeight: 700, fontSize: 10.5, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#c2bfb4' }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>Reset
+            </button>
           </div>
-          <div style={{ height: 1, background: '#f4f3f0' }} />
-          <div style={{ display: 'flex', alignItems: 'stretch', background: '#faf8ff' }}>
-            <div style={{ flex: '0 0 auto', width: 86, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 0' }}>
-              <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#7c5cff' }}>The rule</span>
-            </div>
-            <div style={{ flex: '0 0 auto', width: 1, background: '#eceae5' }} />
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9, padding: '12px 30px', minWidth: 0 }}>
-              <span style={{ flex: '0 0 auto', width: 5, height: 5, borderRadius: '50%', background: '#7c5cff' }} />
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#2a2342', letterSpacing: '-0.005em' }}>{meta.rule}</span>
-            </div>
-          </div>
+          <h2 style={{ position: 'relative', margin: 0, fontFamily: NEWS, fontSize: 38, fontWeight: 500, letterSpacing: '-0.018em', color: '#161318', lineHeight: 1.06, maxWidth: 680 }}>{meta.title}</h2>
+          <p style={{ position: 'relative', margin: '15px 0 0', fontSize: 15.5, fontWeight: 500, lineHeight: 1.55, color: '#6b6760', maxWidth: 600 }}>{meta.lead}</p>
         </div>
 
-        {/* body: diagram (wider) | big lead */}
-        <div style={{ display: 'flex', alignItems: 'stretch' }}>
-          <div style={{ flex: 1.4, minWidth: 0, padding: '4px 14px', display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
+        {/* body: diagram (wider) | checklist */}
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 30, padding: '16px 40px 6px' }}>
+          <div style={{ flex: 1.55, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
             <StepDiagram key={step} step={step} />
             <span style={{ fontWeight: 600, fontSize: 13, color: '#897f70', lineHeight: 1.5, padding: '0 2px' }}>{meta.caption}</span>
           </div>
-          <div style={{ flex: '0 0 auto', width: 1, background: '#f4f3f0' }} />
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '24px 30px' }}>
-            <LeadText lead={meta.lead} hl={meta.hl} />
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 4px 4px' }}>
+              <span style={{ fontWeight: 800, fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#9a958a', whiteSpace: 'nowrap' }}>Your checklist</span>
+              <span style={{ flex: 1, height: 1, background: '#e7e3d9' }} />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                <CheckRing done={doneCount} total={meta.ask.length} />
+                <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 12, color: '#56524b' }}>{doneCount} / {meta.ask.length}</span>
+              </span>
+            </div>
+            <Checklist step={step} ask={meta.ask} checks={checks} toggle={toggleCheck} />
           </div>
         </div>
-        {/* pre-flight checks — full-width chevron strip */}
-        <div style={{ padding: '6px 30px 20px' }}>
-          <ChecksStrip step={step} ask={meta.ask} checks={checks} toggle={toggleCheck} />
+
+        {/* the rule — serif, highlight-underlined */}
+        <div style={{ margin: '20px 40px 4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 11 }}>
+            <span style={{ width: 20, height: 2, background: '#7c5cff', borderRadius: 2 }} />
+            <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#9b8fd6' }}>The rule</span>
+          </div>
+          <div style={{ fontFamily: NEWS, fontSize: 24, fontWeight: 500, color: '#1c1626', lineHeight: 1.34, maxWidth: 680 }}>
+            <span style={{ background: 'linear-gradient(180deg,transparent 56%,#e7daff 56%,#e7daff 93%,transparent 93%)', padding: '0 3px', WebkitBoxDecorationBreak: 'clone', boxDecorationBreak: 'clone' }}>{meta.rule}</span>
+          </div>
         </div>
 
         {/* footer nav */}
@@ -973,6 +960,11 @@ export function PlanPage() {
               </span>
             )}
           </div>
+          <div style={{ flex: 1, minWidth: 0, maxWidth: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9 }}>
+            <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a7a399' }}>Step {meta.n} of 5</span>
+            <StepSeg cur={step} />
+          </div>
+          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
           {step < 4 ? (
             allClear ? (
               <span onClick={() => goStep(step + 1)}
@@ -1015,6 +1007,7 @@ export function PlanPage() {
               <span style={{ width: 30, height: 30, borderRadius: 9, background: '#eceae5', display: 'grid', placeItems: 'center', color: '#c4c2b8', fontSize: 15 }}>✓</span>
             </span>
           )}
+          </div>
         </div>
       </div>
     </div>

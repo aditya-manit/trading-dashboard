@@ -153,10 +153,32 @@ The whole Plan funnel is ported and live. Files under `components/plan/`:
 - Released same-meeting reaction unified; non-numeric events show TONE not the rate (see
   the released-archive notes below).
 
-### Workbook
-- Step diagram: column `flex:1.4`, minimal vertical padding, and the SVGs in
-  `planDiagrams.ts` carry **`max-height:340px;margin:0 auto`** so the diagram fills the
-  left section (~capped 340px tall, centered) without letterboxing or ballooning.
+### Workbook — editorial redesign (handoff 29)
+The step card is now an **editorial layout** (`plan/PlanPage.tsx`), replacing the
+old left-numeral header + chevron `ChecksStrip` + body `LeadText`:
+- **Header**: a giant **watermark step numeral** (`pad2(n)`, Newsreader 200px
+  `#f6f4ee`, top-right, `pointer-events:none`); eyebrow row "THE WORKBOOK" · hairline
+  · "Step N of 5" · **Reset** button; **serif headline** (`meta.title`, Newsreader
+  500/38px); muted lead `<p>` (`meta.lead`, 15.5px — no more big highlighted lead).
+- **Body** (`flex gap:30`): diagram `flex:1.55` | **checklist** `flex:1` (moved here
+  from full-width). Checklist = `Checklist` (vertical dotted-border rows, number→green
+  tick on tinted card) under a "YOUR CHECKLIST" header with a **`CheckRing`** progress
+  ring (18×18, purple→green when all clear) + mono `N / M` count.
+- **The rule** block sits **below the body**: purple bar + "THE RULE" eyebrow + the
+  rule in **Newsreader 24px** with a `linear-gradient` highlight-underline.
+- **Footer**: left **Back** pill (steps 2-5, `meta.rail` of prev); center column =
+  "STEP N OF 5" + **`StepSeg`** (5 segments, active = wide purple pill, done = `#b9a8ff`
+  dash); right = gradient **Next step** pill + arrow-chip (or "Plan this trade" on step 5,
+  or a disabled "clear all checks" state until `allClear`).
+- **Diagrams** (`planDiagrams.ts`) fully **redrawn** (handoff 29): gridded backgrounds
+  (`<pattern>`), per-step `viewBox` + `preserveAspectRatio="xMinYMid meet"` +
+  `max-height:380px`, animated via **`vFade`/`vDraw`/`vPulse`/`vPop`** keyframes (defined
+  in PlanPage's `<style>`). JetBrains-Mono tick labels resolve through `var(--font-mono)`.
+- **Fonts**: `layout.tsx` adds **Newsreader** (`--font-news`) + **JetBrains Mono**
+  (`--font-mono`) via `next/font/google` (self-hosted → no CSP change). Workbook uses
+  `NEWS`/`MONO` constants in `PlanPage.tsx`.
+- Persistence (`tdplan_step`/`tdplan_fin`/`tdplan_checks_v2` in localStorage) + the top
+  `STEPPER_ICONS` mini-icons are unchanged.
 
 ### Top-level pages: Dashboard ↔ Plan (`app/page.tsx`, `layout/Topbar.tsx`)
 - `page.tsx` holds `page: 'dashboard' | 'plan'` state and renders either the dashboard sections or `<PlanPage/>`. The Topbar's **Dashboard/Plan segmented toggle** (left, after the Gate.io pill) drives it — active = white text on `#23211b` (Dashboard) / `#7c5cff` (Plan).
