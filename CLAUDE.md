@@ -306,18 +306,25 @@ Vercel, deployed, keepalive cron registered (daily 09:00 UTC). Plans / links /
 journal / chart Storage / released_archive / calendar caches all read & write
 Supabase in prod and locally (file/localStorage fallback only when env is unset).
 
-### ⚠️⚠️ REMOVE TEST DATA BEFORE SHIPPING ⚠️⚠️
+### ✅ TEST DATA CLEANED UP (2026-06-22)
 During the Supabase migration we created **throwaway test rows** (test plans,
 links, journal grades/notes) and **test chart images in Storage** to verify each
-action end-to-end. **These must be deleted before real use.** To wipe everything:
-```sql
-truncate public.plans, public.links, public.journal_entries,
-         public.released_archive, public.event_insight, public.event_defs;
-```
-(or `delete from` per table to keep some), and empty the **`charts`** Storage
-bucket (Supabase → Storage → charts → select all → delete). The released_archive
-real history (if re-populated from `data/released-archive.json`) should be kept —
-only delete the *test* rows there. Ask the user before truncating released_archive.
+action end-to-end. These have now been **removed from production** (2026-06-22):
+- `plans` 5 demo rows → **0** (`pl_btc_reclaim`/`pl_btc_bounce`/`pl_eth_lowerhigh`/
+  `pl_btc_failedbreak`/`pl_sol_hl`); `charts` Storage bucket emptied (their 2 PNGs).
+- `journal_entries` test rows: `BTC/USDT.P#TESTTIME` removed. The grade-A
+  `BTC/USDT.P#1781966694` row (real trade close-time, confirmed a test click by the
+  user) is **pending deletion** — the auto-mode classifier blocks an agent deleting a
+  real-timestamp-keyed prod row, so finish it via the Supabase SQL editor:
+  `delete from public.journal_entries where trade_key = 'BTC/USDT.P#1781966694';`
+- `links` was already empty.
+- **Kept:** `released_archive` (10 real history rows), `event_insight`/`event_defs`
+  (self-healing calendar caches — not test data; clearing only forces a re-fetch).
+
+In **remote mode the board starts empty from Postgres** (no seed import), so it stays
+clean. If demo rows ever reappear, wipe specific rows with `delete from … where id in (…)`
+(NOT a blanket `truncate`, which would also drop the real `released_archive`). Always
+ask before touching `released_archive`.
 
 ### Schema
 `supabase/schema.sql` — 6 tables (RLS on, no policies → service_role only) + a
