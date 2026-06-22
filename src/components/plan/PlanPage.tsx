@@ -796,7 +796,9 @@ export function PlanPage() {
                   style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#1a1813' }}
                 />
                 {newsQuery && (
-                  <button onClick={() => setNewsQuery('')} style={{ flex: '0 0 auto', width: 17, height: 17, borderRadius: '50%', border: 'none', background: '#e2dfd8', color: '#6b6457', cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 10, lineHeight: 1, padding: 0 }}>×</button>
+                  <button onClick={() => setNewsQuery('')} aria-label="Clear search" style={{ flex: '0 0 auto', width: 18, height: 18, borderRadius: '50%', border: 'none', background: '#e2dfd8', color: '#6b6457', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                  </button>
                 )}
               </div>
               <div style={{ display: 'inline-flex', alignItems: 'center', background: '#efece6', border: '1px solid #e7e3da', borderRadius: 10, padding: 3, gap: 3, flex: '0 0 auto' }}>
