@@ -188,18 +188,21 @@ function Skel({ w, h = 9 }: { w: number | string; h?: number }) {
   return <span style={{ display: 'block', width: w, height: h, borderRadius: 4, background: '#edece8', animation: 'plPulse 1.2s ease-in-out infinite' }} />;
 }
 
-// Subtle ⟳ to force a re-pull of a card's "2 prints" (faint, brightens on hover).
-function RefreshBtn({ onClick }: { onClick: () => void }) {
+// Subtle ⟳ to force a re-pull of a card's "2 prints". Hidden at rest; fades in
+// on card hover (`visible`), brightens on its own hover. Always in the DOM so it
+// doesn't shift the header layout when it appears.
+function RefreshBtn({ onClick, visible, spinning }: { onClick: () => void; visible: boolean; spinning?: boolean }) {
   const [hov, setHov] = useState(false);
+  const show = visible || spinning;
   return (
     <button
       onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       title="Re-pull these prints (re-runs the web search; the date may change)"
-      style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, padding: 0, borderRadius: 6, border: 'none', cursor: 'pointer', background: hov ? '#f1ecff' : 'transparent', color: hov ? '#7c5cff' : '#c4c2b8', opacity: hov ? 1 : 0.65, transition: 'all .15s' }}
+      style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, padding: 0, borderRadius: 6, border: 'none', background: hov ? '#f1ecff' : 'transparent', color: hov ? '#7c5cff' : '#a8a69b', cursor: show ? 'pointer' : 'default', opacity: show ? (hov ? 1 : 0.7) : 0, pointerEvents: show ? 'auto' : 'none', transition: 'opacity .18s, background .15s, color .15s' }}
     >
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={spinning ? { animation: 'tdSpin .8s linear infinite' } : undefined}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /></svg>
     </button>
   );
 }
@@ -296,6 +299,7 @@ function ReleasedCard({ e, info, loading }: { e: CalendarEvent; info?: ReleasedI
 function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def?: string }) {
   const { mutate } = useSWRConfig();
   const [refreshing, setRefreshing] = useState(false);
+  const [cardHover, setCardHover] = useState(false);
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
   const v = valueParts(e);
   const ins = e.insight;
@@ -315,7 +319,7 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
     finally { setRefreshing(false); }
   };
   return (
-    <div style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 13, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
+    <div onMouseEnter={() => setCardHover(true)} onMouseLeave={() => setCardHover(false)} style={{ background: '#fff', border: '1px solid #f0efec', borderRadius: 13, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderBottom: '1px solid #f0efec' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -325,9 +329,13 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
           </div>
           <EventName title={e.title} def={def} />
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flex: '0 0 auto' }}>
-          <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b', whiteSpace: 'nowrap' }}>{fmtWhen(e.date)}</span>
-          <CountdownLabel date={e.date} />
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+            <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b', whiteSpace: 'nowrap' }}>{fmtWhen(e.date)}</span>
+            <CountdownLabel date={e.date} />
+          </div>
+          {/* re-pull prints — fades in on card hover, only when there are prints */}
+          {prints.length > 0 && <RefreshBtn onClick={refreshPrints} visible={cardHover && !refreshing} spinning={refreshing} />}
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr' }}>
@@ -349,10 +357,7 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
         ) : null}
         {prints.length > 0 && !refreshing ? (
           <>
-            <div style={{ ...labelCellBase, ...topBorder, alignItems: 'flex-start', justifyContent: 'space-between', gap: 4 }}>
-              <span style={{ ...cellLabel, lineHeight: 1.3 }}>BTC<br />{prints.length} prints</span>
-              <RefreshBtn onClick={refreshPrints} />
-            </div>
+            <div style={{ ...labelCellBase, ...topBorder, alignItems: 'flex-start' }}><span style={{ ...cellLabel, lineHeight: 1.3 }}>BTC<br />{prints.length} prints</span></div>
             <div style={{ ...valueCellBase, ...topBorder, flexDirection: 'column', alignItems: 'stretch', gap: 5 }}>
               {prints.map((p, i) => <PrintBar key={i} p={p} />)}
             </div>
@@ -769,6 +774,7 @@ export function PlanPage() {
         @keyframes vDraw{to{stroke-dashoffset:0;}}
         @keyframes vPulse{0%{transform:scale(.6);opacity:.5;}70%{opacity:0;}100%{transform:scale(2.1);opacity:0;}}
         @keyframes vPop{from{opacity:0;transform:scale(.3);}to{opacity:1;transform:scale(1);}}
+        @keyframes tdSpin{to{transform:rotate(360deg);}}
       `}</style>
 
       {/* header */}
