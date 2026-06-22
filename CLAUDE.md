@@ -136,10 +136,11 @@ The whole Plan funnel is ported and live. Files under `components/plan/`:
   › Queue › Reviewed[All·A·B·C·D], chevron-joined, no box). Drawer has an **unlink**
   (minus) button + adherence recomputes live. Opening a plan from the drawer closes
   the journal drawer first (so the plan comes to front). **Re-clicking the active grade
-  removes the review entirely** (no separate "clear" button): the grade button calls
-  `planActions.clearJournal(pid)` when already selected → deletes the `journal_entries`
-  row (`DELETE /api/journal?pid=…`) and sends the trade back to the Queue. NB this also
-  drops any note on that row — it's a full un-review, by design (handoff-30 request).
+  clears it** (no separate "clear" button): if the row has a **note**, only the grade is
+  dropped (`setJournalField(pid,{grade:undefined})` → POST omits grade → DB sets it null,
+  note + reviewed kept); if there's **no note**, the whole row is removed
+  (`planActions.clearJournal(pid)` → `DELETE /api/journal?pid=…`) so no empty reviewed
+  entry is left, and the trade returns to the Queue.
 - `PlanDrawer.tsx` — plan detail (desktop stage ≥900px: R/R map + chart; body spec/
   risk/position/thesis). Real equity + mark threaded in. Chart = the plan's Storage URL.
 - `PlanLinkCell.tsx` — trade↔plan link picker. `linkSet` auto-moves the linked plan to
