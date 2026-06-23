@@ -195,6 +195,8 @@ the LIVE·SYMBOL/USDT eyebrow + title, **refresh** + **theme toggle**, and the *
 - **Liquidation-map profile panel** (right, 220px): the **standing book = the latest time column**
   (`computeProfile`), per-price bars + cumulative curves split shorts (above price, green) / longs
   (below, red), PEAK label, hover row highlight + crosshair, SHORTS/LONGS totals legend.
+  Hover shows a **price chip (left) + Liq-value chip (right)** at the crosshair; the title + readout
+  carry a strong triple-halo `text-shadow` so they stay legible over bright bars (handoff 37).
 - **5-cell stats strip** (Center of gravity / Nearest magnet ↑ / ↓ / Strongest wall / Leverage load·σ)
   keeps the day-over-day Δ + 14d sparkline on the CoG + Leverage-load cells (the daily store/cron from
   handoff 31 still feeds it). Crosshair tooltip shows the cell's liquidation-leverage value.

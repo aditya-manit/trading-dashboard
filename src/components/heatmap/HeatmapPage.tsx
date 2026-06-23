@@ -415,11 +415,13 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
               {profHover && (
                 <div style={{ pointerEvents: 'none' }}>
                   <div style={{ position: 'absolute', left: 0, right: 0, top: profHover.y, height: 1, background: 'var(--cross)' }} />
-                  <div style={{ position: 'absolute', right: 0, top: profHover.y, transform: 'translateY(-50%)', fontFamily: MONO, fontWeight: 700, fontSize: 9.5, color: 'var(--tagink)', background: 'var(--tagbg)', borderRadius: 3, padding: '1px 4px' }}>${fmtPrice(profHover.price)}</div>
+                  {/* price chip (left) + Liq value chip (right) at the crosshair */}
+                  <div style={{ position: 'absolute', left: 2, top: profHover.y, transform: 'translateY(-50%)', fontFamily: MONO, fontWeight: 700, fontSize: 9.5, color: 'var(--tagink)', background: 'var(--tagbg)', borderRadius: 3, padding: '1px 4px', whiteSpace: 'nowrap' }}>${fmtPrice(profHover.price)}</div>
+                  <div style={{ position: 'absolute', right: 0, top: profHover.y, transform: 'translateY(-50%)', fontFamily: MONO, fontWeight: 700, fontSize: 9.5, color: 'var(--tagink)', background: 'var(--tagbg)', borderRadius: 3, padding: '1px 4px', whiteSpace: 'nowrap' }}>{fmtUsd(prof.tot[profHover.j])}</div>
                 </div>
               )}
               <div style={{ position: 'absolute', left: 0, top: -2, pointerEvents: 'none' }}>
-                <span style={{ display: 'block', fontWeight: 800, fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', textShadow: '0 1px 4px var(--halo),0 0 3px var(--halo)' }}>Liquidation map · now</span>
+                <span style={{ display: 'block', fontWeight: 800, fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', textShadow: '0 0 4px var(--halo),0 0 4px var(--halo),0 1px 3px var(--halo)' }}>Liquidation map · now</span>
                 <ProfHead prof={prof} hover={profHover} />
               </div>
             </div>
@@ -562,7 +564,7 @@ function Crosshair({ hv }: { hv: HoverState }) {
 }
 
 function ProfHead({ prof, hover }: { prof: Profile; hover: ProfHover | null }) {
-  const wrap = (kids: React.ReactNode) => <div style={{ marginTop: 4, height: 34, display: 'flex', flexDirection: 'column', gap: 3, fontVariantNumeric: 'tabular-nums', textShadow: '0 1px 4px var(--halo),0 0 3px var(--halo)' }}>{kids}</div>;
+  const wrap = (kids: React.ReactNode) => <div style={{ marginTop: 4, height: 34, display: 'flex', flexDirection: 'column', gap: 3, fontVariantNumeric: 'tabular-nums', textShadow: '0 0 4px var(--halo),0 0 4px var(--halo),0 1px 3px var(--halo)' }}>{kids}</div>;
   if (hover) {
     const side = hover.j > prof.priceJ ? 'short' : hover.j < prof.priceJ ? 'long' : null;
     const sc = side === 'short' ? '#1f9d55' : side === 'long' ? '#df5338' : 'var(--muted)';
