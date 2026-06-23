@@ -291,7 +291,7 @@ export function Editor() {
                 </div>
               </Field>
               {/* check the stop/targets against the live liquidation clusters */}
-              <HeatmapLaunchCard symbol={d.sym as HeatSymbol} title="Check your stop against the real clusters" sub="Is it beyond the sweep, not inside it?" />
+              <HeatmapLaunchCard variant="row" symbol={d.sym as HeatSymbol} title="Check your stop against the real clusters" sub="Is it beyond the sweep, not inside it?" />
             </div>
           </div>
 

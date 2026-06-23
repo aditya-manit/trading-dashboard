@@ -39,7 +39,7 @@ src/
     api/heatmap/metrics/route.ts      # daily TLL/LCG snapshot store (Supabase) for the strip's trend
     api/calendar/route.ts             # ForexFactory feed proxy + insight/prints enrichment
   components/
-    layout/Topbar.tsx                 # Sticky nav; Dashboard/Plan toggle; scroll-tab (dashboard only)
+    layout/Topbar.tsx                 # Sticky nav; Dashboard/Plan toggle; scroll-tab; global Heatmap launcher button
     hero/
       Hero.tsx                        # Balance, uPnL badge, milestone progress button
       MilestoneDrawer.tsx             # Slide-out $10M roadmap drawer
@@ -58,7 +58,8 @@ src/
     heatmap/
       HeatmapPage.tsx                 # Liquidation heatmap: themed canvas + zoom/pan/crosshair + profile + strip (handoff 32)
       HeatmapOverlay.tsx              # full-screen launcher wrapper (reads heatmap-launch store)
-      HeatmapLaunchCard.tsx           # shorts/longs donut launch card (Step 5 + editor Levels)
+      HeatmapLaunchCard.tsx           # launch card — 'card' variant (Step 5) / 'row' variant (editor Levels)
+      HeatMatrixIcon.tsx              # unified green→red heat-matrix glyph (header btn + both launch cards)
   hooks/
     useAccount.ts · usePositions.ts · usePositionHistory.ts
     useAccountBook.ts · useTrades.ts · useCalendar.ts · useHeatmap.ts
@@ -172,8 +173,11 @@ The whole Plan funnel is ported and live. Files under `components/plan/`:
 ### Liquidation Heatmap (handoff 32 — redesign + full-screen launcher)
 `HeatmapPage` was rewritten from `project/Liquidation Heatmap (light).dc.html`. It is now a
 **full-screen overlay** (`HeatmapOverlay`, `height:100vh`, `z-index:120`), launched from the
-workbook Step 5 card and the plan editor Levels card (`heatmapLaunch.open(symbol)`), NOT a
-top-level page. Its own header carries a **Back** button (`onClose` → `heatmapLaunch.close()`),
+workbook Step 5 card, the plan editor Levels card, AND a **global Topbar "Heatmap" button**
+(handoff 34, slim pill left of the Read-only/Synced pill — access from any view), all via
+`heatmapLaunch.open(symbol)`. NOT a top-level page. **All three entry points share the
+`HeatMatrixIcon`** (green→red 4×4 grid). Launch-card variants: `card` (Step 5, "Shorts vs longs"
+eyebrow) · `row` (editor Levels, borderless top-divider row, "Liquidation heatmap" eyebrow). Its own header carries a **Back** button (`onClose` → `heatmapLaunch.close()`),
 the LIVE·SYMBOL/USDT eyebrow + title, **refresh** + **theme toggle**, and the **spec-table nav**
 (Symbol/Model/Interval bordered cell group). New vs the old version:
 - **Light/dark theme toggle** (persisted to `localStorage` `lh_theme`). Themed via CSS vars on a

@@ -5,6 +5,8 @@ import { useSWRConfig } from 'swr';
 import { ProfileMenu } from './ProfileMenu';
 import { usePlanStore, planActions, type PlanView } from '@/lib/plan-store';
 import { usePositionHistory } from '@/hooks/usePositionHistory';
+import { heatmapLaunch } from '@/lib/heatmap-launch';
+import { HeatMatrixIcon } from '@/components/heatmap/HeatMatrixIcon';
 
 const TABS = [
   { id: 'overview',   label: 'Overview' },
@@ -174,6 +176,8 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {/* Heatmap launcher — global access to the liquidation heatmap from any view */}
+        <HeatmapButton />
         {/* Segmented sync pill: lock·Read-only | hairline | live-pulse·Synced */}
         <button onClick={handleRefresh} title="Refresh" style={{ display: 'inline-flex', alignItems: 'stretch', background: '#fff', border: '1px solid #e9e6df', borderRadius: 999, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.05)', fontSize: 12.5, padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
           <style>{'@keyframes tbPulse{0%{transform:scale(.5);opacity:.45;}70%{opacity:0;}100%{transform:scale(1.9);opacity:0;}}'}</style>
@@ -194,5 +198,30 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
         <ProfileMenu />
       </div>
     </div>
+  );
+}
+
+// Slim global launcher for the liquidation heatmap (handoff 34) — heat-matrix
+// icon + "Heatmap" + ↗. No hover-lift: shadow + border-color shift only.
+function HeatmapButton() {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={() => heatmapLaunch.open('BTC')}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      title="Liquidation heatmap"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontFamily: 'inherit',
+        background: '#fff', border: `1px solid ${hov ? '#e0d4fa' : '#e9e6df'}`, borderRadius: 999,
+        padding: '5px 12px 5px 7px',
+        boxShadow: hov ? '0 4px 12px -6px rgba(124,92,255,0.4)' : '0 1px 2px rgba(20,20,12,0.05)',
+        transition: 'box-shadow .2s ease, border-color .2s ease',
+      }}
+    >
+      <span style={{ flex: '0 0 auto', width: 19, height: 19 }}><HeatMatrixIcon size={19} /></span>
+      <span style={{ fontWeight: 700, fontSize: 12, color: '#5b46c9', letterSpacing: '-0.01em' }}>Heatmap</span>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#b9a9ee" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><path d="M7 17 17 7" /><path d="M7 7h10v10" /></svg>
+    </button>
   );
 }
