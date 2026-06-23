@@ -205,6 +205,9 @@ The data/route/metrics/daily-store from handoff 31 are unchanged (see below).
   leverage value (label hidden at the 0%/100% extremes). State `band {lo,hi}`, default **50–100%**.
   On load / refresh / handle-release, **`fitToBand` auto-zooms the PRICE axis** to exactly the levels
   still visible (full 0–100% fits back to the whole range); drag-while-holding just filters, fit on release.
+  **Whole-band drag (handoff 36):** the lit area between the handles is a grab region (`cbarBandDown`) —
+  drag it to slide the whole band (both handles together, width fixed, clamped 0/1), fit-to-band on release.
+  Cursor split: band-drag = grab/grabbing (`lh-dragging`), handle resize = ns-resize (`lh-dragging-ns`).
   Colorbar gradient is now **theme-aware** via the `--cbar` CSS var (light magenta→cream / dark cream→dark).
   The old footer (legend + Apify caption) was **removed** — chart + profile run full height.
 - **TODO (idea, deferred — needs accumulated daily history):** overlay the **CoG trajectory** on the

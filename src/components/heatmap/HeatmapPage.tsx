@@ -137,6 +137,7 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
   // band-pass on liquidation intensity (fraction of max): cells outside [lo,hi]
   // are hidden; price axis fits to the visible band. Defaults to 50–100%.
   const [band, setBand] = useState({ lo: 0.5, hi: 1 });
+  const bandRef = useRef(band); bandRef.current = band;
 
   const getView = useCallback((): View => {
     if (!viewRef.current && prep) viewRef.current = { x0: 0, x1: 1, p0: prep.ya[0], p1: prep.ya[prep.Y - 1] };
@@ -285,15 +286,31 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
 
   const toggleTheme = () => { const t = dark ? 'light' : 'dark'; try { localStorage.setItem('lh_theme', t); } catch {} setTheme(t); };
 
-  // drag a colorbar handle to set the band; fit the price scale on release
+  // drag a colorbar handle to resize the band (ns-resize cursor); fit on release
   const cbarDown = (which: 'lo' | 'hi') => (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     const el = cbarRef.current; if (!el) return;
-    document.body.classList.add('lh-dragging');
+    document.body.classList.add('lh-dragging-ns');
     const move = (ev: MouseEvent) => {
       const r = el.getBoundingClientRect();
       let frac = 1 - (ev.clientY - r.top) / r.height; frac = Math.max(0, Math.min(1, frac));
       setBand((b) => which === 'lo' ? { ...b, lo: Math.min(frac, b.hi - 0.05) } : { ...b, hi: Math.max(frac, b.lo + 0.05) });
+    };
+    const up = () => { document.body.classList.remove('lh-dragging-ns'); window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); fitRef.current(); };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  };
+  // drag the lit band region to slide the whole band (fixed width; grab cursor)
+  const cbarBandDown = (e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    const el = cbarRef.current; if (!el) return;
+    const r = el.getBoundingClientRect(), startY = e.clientY;
+    const startLo = bandRef.current.lo, startHi = bandRef.current.hi, size = startHi - startLo;
+    document.body.classList.add('lh-dragging');
+    const move = (ev: MouseEvent) => {
+      const dFrac = -(ev.clientY - startY) / r.height;
+      let lo = startLo + dFrac, hi = startHi + dFrac;
+      if (lo < 0) { lo = 0; hi = size; } if (hi > 1) { hi = 1; lo = 1 - size; }
+      setBand({ lo, hi });
     };
     const up = () => { document.body.classList.remove('lh-dragging'); window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); fitRef.current(); };
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
@@ -359,6 +376,8 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
                   {/* dim the excluded top (above hi) + bottom (below lo) */}
                   <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${((1 - band.hi) * 100).toFixed(1)}%`, background: 'var(--panel)', opacity: 0.74, borderRadius: '4px 4px 0 0' }} />
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${(band.lo * 100).toFixed(1)}%`, background: 'var(--panel)', opacity: 0.74, borderRadius: '0 0 4px 4px' }} />
+                  {/* lit band — drag to slide the whole band (grab cursor) */}
+                  <div onMouseDown={cbarBandDown} title="Drag the band" style={{ position: 'absolute', left: 0, right: 0, top: `${((1 - band.hi) * 100).toFixed(1)}%`, height: `${((band.hi - band.lo) * 100).toFixed(1)}%`, cursor: 'grab' }} />
                   {/* hi handle + label */}
                   <div onMouseDown={cbarDown('hi')} style={{ position: 'absolute', left: -4, width: 21, height: 10, top: `${((1 - band.hi) * 100).toFixed(1)}%`, transform: 'translateY(-50%)', background: 'var(--panel)', border: '1.5px solid #7c5cff', borderRadius: 3, cursor: 'ns-resize', boxShadow: '0 1px 3px rgba(20,20,12,0.28)' }} />
                   {band.hi < 0.99 && (
@@ -426,6 +445,7 @@ const LH_CSS = `
 @keyframes lhwave{0%,100%{opacity:.22;transform:scaleX(.86);}50%{opacity:1;transform:scaleX(1);}}
 @keyframes lhglow{0%,100%{opacity:.55;}50%{opacity:1;}}
 body.lh-dragging,body.lh-dragging *{cursor:grabbing !important;}
+body.lh-dragging-ns,body.lh-dragging-ns *{cursor:ns-resize !important;}
 .lh-rst .lh-rstlbl{max-width:0;overflow:hidden;opacity:0;white-space:nowrap;font-weight:700;font-size:10.5px;letter-spacing:0.04em;transition:max-width .22s ease,opacity .18s ease,margin-left .22s ease;}
 .lh-rst:hover .lh-rstlbl{max-width:90px;opacity:1;margin-left:5px;}
 `;
