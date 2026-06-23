@@ -195,13 +195,17 @@ the LIVE·SYMBOL/USDT eyebrow + title, **refresh** + **theme toggle**, and the *
   keeps the day-over-day Δ + 14d sparkline on the CoG + Leverage-load cells (the daily store/cron from
   handoff 31 still feeds it). Crosshair tooltip shows the cell's liquidation-leverage value.
 The data/route/metrics/daily-store from handoff 31 are unchanged (see below).
-- **TODO (idea, deferred — needs ~2 weeks of daily history):** overlay the **CoG trajectory**
-  on the heatmap instead of today's single flat line. The daily `lcg` history is already stored
-  (`heatmap_metrics_daily` / `useHeatmapHistory`); plot each day's CoG at its timestamp and connect
-  them to show the center of gravity **migrating over time**. Only fits the **multi-day intervals**
-  (1w/2w/1mo) where the chart x-axis spans days — the 24h view is intraday so a daily trail can't
-  align there. Use the series for the *matching* interval (CoG is window-dependent). Revisit once
-  the daily capture has accumulated enough points.
+- **TODO (idea, deferred — needs accumulated daily history):** overlay the **CoG trajectory** on the
+  heatmap instead of today's single flat line. Plan:
+  - **One canonical daily CoG series** (the 24h-window `lcg`, already captured into `heatmap_metrics_daily`
+    via cron + page-load; `useHeatmapHistory`). Do NOT capture per-interval — that'd be 5× the Actor runs/day.
+  - **Overlay = clip that series to the chart's visible x-window**, map each day's CoG to its x-fraction by
+    timestamp, connect as a line. This degrades gracefully across ALL intervals with ONE code path:
+    on **24h** only ~1 point falls in-window → renders as today's flat line (current behavior); on
+    **1w/2w/1mo/3mo** many points fall in → a trajectory showing the gravity migrating up/down over time.
+  - History retention raised to `DAYS=100` in `/api/heatmap/metrics` (covers the 3mo interval + buffer);
+    rows persist forever in Postgres regardless — this only caps the read.
+  - Revisit once the daily capture has enough points (started 2026-06-23, ~1/day).
 - **Resilience:** `fetchHeatmapData` retries transient upstream failures up to 3× (1.2s backoff) —
   the CoinGlass Actor intermittently returns 400 / 502 / run-failed / empty; a retry usually
   succeeds. Validation errors (bad symbol/model/interval) are NOT retried.

@@ -9,7 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 //   GET  ?symbol=&interval=  → { configured, history: [{day, price, tll, lcg, lcg_gap}] } (≤60d, asc)
 //   POST { symbol, interval, price, tll, lcg, lcgGap } → upsert today's row
 
-const DAYS = 60;
+const DAYS = 100; // ~3 months + buffer, so the planned CoG-trajectory overlay can span the 3mo interval
 
 export async function GET(req: Request) {
   const denied = await requireOwner();
