@@ -379,6 +379,8 @@ const LH_CSS = `
 .lhx{--bg:#e9e8e4;--panel:#ffffff;--ink:#1a1813;--muted:#9b988d;--faint:#a8a296;--border:#e7dffa;--divider:#f0ecfa;--navactive:#f1ecfb;--navink:#5b46c9;--dotidle:#d8d3ca;--tagbg:#1a1813;--tagink:#ffffff;--cross:rgba(40,36,28,0.32);--halo:#ffffff;}
 .lhx[data-theme=dark]{--bg:#0b0913;--panel:#13101c;--ink:#f3eeff;--muted:#8b8699;--faint:#615c75;--border:rgba(255,255,255,0.09);--divider:rgba(255,255,255,0.08);--navactive:rgba(255,255,255,0.10);--navink:#cbb8ff;--dotidle:rgba(255,255,255,0.22);--tagbg:#e7e3f0;--tagink:#0a0613;--cross:rgba(255,255,255,0.24);--halo:#0a0613;}
 @keyframes lhspin{to{transform:rotate(360deg);}}
+@keyframes lhwave{0%,100%{opacity:.22;transform:scaleX(.86);}50%{opacity:1;transform:scaleX(1);}}
+@keyframes lhglow{0%,100%{opacity:.55;}50%{opacity:1;}}
 body.lh-dragging,body.lh-dragging *{cursor:grabbing !important;}
 .lh-rst .lh-rstlbl{max-width:0;overflow:hidden;opacity:0;white-space:nowrap;font-weight:700;font-size:10.5px;letter-spacing:0.04em;transition:max-width .22s ease,opacity .18s ease,margin-left .22s ease;}
 .lh-rst:hover .lh-rstlbl{max-width:90px;opacity:1;margin-left:5px;}
@@ -525,9 +527,33 @@ function ProfLegendItem({ c, arrow, label, val }: { c: string; arrow: string; la
   );
 }
 
+// On-brand loader: an inferno-gradient bar stack (echoes the liquidation profile)
+// pulsing in a left→right wave while the Apify Actor run completes.
+function LoadingState() {
+  const INFERNO = 'linear-gradient(90deg,#78145a,#bc2856,#e4523c,#f68c30,#fac854,#fce8a0)';
+  const widths = [44, 72, 58, 88, 66, 50, 80, 94, 62, 46, 74, 54, 38];
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 26 }}>
+        <div style={{ position: 'relative', width: 268, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {widths.map((w, i) => (
+            <div key={i} style={{ height: 7, width: w + '%', borderRadius: 4, background: INFERNO, transformOrigin: 'left center', animation: `lhwave 1.5s ease-in-out ${(i * 0.085).toFixed(2)}s infinite` }} />
+          ))}
+          {/* soft halo behind the bars */}
+          <div style={{ position: 'absolute', inset: '-18px -28px', borderRadius: 24, background: 'radial-gradient(120% 90% at 30% 50%, rgba(244,140,48,0.16), transparent 70%)', filter: 'blur(8px)', pointerEvents: 'none', zIndex: -1, animation: 'lhglow 2.4s ease-in-out infinite' }} />
+        </div>
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <span style={{ fontWeight: 800, fontSize: 15.5, letterSpacing: '-0.01em', color: 'var(--ink)' }}>Reading the liquidation book…</span>
+          <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--muted)' }}>Running the CoinGlass heatmap Actor · usually a few seconds</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Overlay({ state, msg, onRetry }: { state: 'loading' | 'config' | 'error' | 'empty'; msg?: string; onRetry: () => void }) {
   const center: React.CSSProperties = { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 24 };
-  if (state === 'loading') return <div style={center}><div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.4} strokeLinecap="round" style={{ animation: 'lhspin .8s linear infinite' }}><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /></svg><span style={{ fontWeight: 700, fontSize: 13, color: 'var(--muted)' }}>Running CoinGlass heatmap Actor…</span></div></div>;
+  if (state === 'loading') return <LoadingState />;
   if (state === 'config') return <div style={center}><div style={{ maxWidth: 420, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}><span style={{ fontWeight: 800, fontSize: 16, color: 'var(--ink)' }}>Apify not connected</span><span style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6 }}>Set <code style={{ fontFamily: MONO }}>APIFY_TOKEN</code> in <code style={{ fontFamily: MONO }}>.env.local</code> (and Vercel) to enable the liquidation heatmap.</span></div></div>;
   return <div style={center}><div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}><span style={{ fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>{state === 'empty' ? 'No heatmap data returned' : 'Couldn’t load the heatmap'}</span>{msg && <span style={{ fontFamily: MONO, fontSize: 11, color: 'var(--muted)', maxWidth: 480, wordBreak: 'break-word' }}>{msg}</span>}<button onClick={onRetry} style={{ fontFamily: SANS, fontWeight: 700, fontSize: 12, color: '#fff', background: '#7c5cff', border: 'none', borderRadius: 8, padding: '7px 16px', cursor: 'pointer' }}>Retry</button></div></div>;
 }
