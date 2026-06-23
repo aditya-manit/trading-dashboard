@@ -340,7 +340,7 @@ function MetricsStrip({ m, trend }: { m: ReturnType<typeof computeHeatmapMetrics
           </span>
         ) : <span style={{ color: '#6f6885' }}>—</span>}
       </Cell>
-      <Cell label="Total fuel · σ" hint="Total surviving liquidation leverage (TLL). Δ = vs yesterday — rising (amber) = leverage building / cascade fuel; falling (green) = deleveraged. σ = realized vol = distance scale τ.">
+      <Cell label="Leverage load · σ" hint="Total surviving liquidation leverage (TLL) — how loaded the market is. Δ = vs yesterday — rising (amber) = leverage building / cascade fuel; falling (green) = deleveraged. σ = realized vol = distance scale τ.">
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: 14, color: '#f3eeff' }}>{fmtVal(m.totalFuel)}</span>
           <FuelDelta cur={m.totalFuel} prev={trend.tllPrev} />
