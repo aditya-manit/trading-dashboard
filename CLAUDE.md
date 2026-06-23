@@ -213,7 +213,8 @@ tabs + scroll-spy are suppressed on this page (it has its own in-page controls).
   stored per `day+symbol+interval` in Supabase `heatmap_metrics_daily` (`/api/heatmap/metrics`
   GET history / POST upsert, owner-gated). **Capture = on page-load upsert** (free — reuses the
   computed payload, no extra Actor run); `useHeatmapHistory(symbol,interval)` reads ≤60d oldest→newest.
-  The strip shows **Δ vs the latest prior day + a sparkline** on the TLL cell (rising = amber
+  The strip shows **Δ vs the latest prior day + a sparkline of the last 14d** (store keeps 60d for a
+  future expanded chart; 2 weeks is the readable/relevant window in the strip) on the TLL cell (rising = amber
   "leverage building", falling = green) and the center-of-gravity cell (gap-drift in pp, green=up).
   Magnets/strongest are point-in-time levels → NOT trended. Comparison is within ONE interval (TLL/LCG
   are window-dependent). Graceful: no table / no history → cells show "1st pt", no sparkline, no crash.

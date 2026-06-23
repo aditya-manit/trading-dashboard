@@ -154,12 +154,19 @@ export function HeatmapPage() {
   }, [metrics, symbol, interval, mutateHist]);
 
   // Day-over-day comparison: previous = latest stored row before today (UTC).
+  // Sparkline shows the last SPARK_DAYS (store keeps up to 60d for a future
+  // expanded chart, but 2 weeks is the readable/relevant window in the strip).
   const trend = useMemo(() => {
+    const SPARK_DAYS = 14;
     const rows = hist?.history || [];
     const today = new Date().toISOString().slice(0, 10);
     const prior = rows.filter((r) => r.day < today);
     const prev = prior.length ? prior[prior.length - 1] : null;
-    return { tllSeries: rows.map((r) => r.tll), gapSeries: rows.map((r) => r.lcg_gap), tllPrev: prev?.tll ?? null, gapPrev: prev?.lcg_gap ?? null };
+    return {
+      tllSeries: rows.map((r) => r.tll).slice(-SPARK_DAYS),
+      gapSeries: rows.map((r) => r.lcg_gap).slice(-SPARK_DAYS),
+      tllPrev: prev?.tll ?? null, gapPrev: prev?.lcg_gap ?? null,
+    };
   }, [hist]);
   const cvRef = useRef<HTMLCanvasElement | null>(null);
   const plotRef = useRef<HTMLDivElement | null>(null);
