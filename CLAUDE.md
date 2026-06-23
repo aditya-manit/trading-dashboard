@@ -55,13 +55,14 @@ src/
       PlanPage.tsx                    # Pre-trade workbook (Plan page) + economic-calendar news strip/drawer
       planDiagrams.ts                 # 5 step SVGs, verbatim from handoff 15
     heatmap/
-      HeatmapPage.tsx                 # Liquidation heatmap (canvas magma + candles), handoff 31
+      HeatmapPage.tsx                 # Liquidation heatmap (canvas magma + candles) + metrics strip, handoff 31
   hooks/
     useAccount.ts · usePositions.ts · usePositionHistory.ts
     useAccountBook.ts · useTrades.ts · useCalendar.ts · useHeatmap.ts
   lib/
     gate-client.ts                    # HMAC signing + fetch wrapper
     trade-stats.ts                    # computeTradeStats, buildEquityData
+    heatmap-metrics.ts                # liquidation magnets / strongest wall / center-of-gravity (absolute USD)
     event-insight.ts                  # Claude (web-search) event insights + Gate BTC "2 prints" %
     formatters.ts
   types/gate.ts
@@ -182,6 +183,33 @@ tabs + scroll-spy are suppressed on this page (it has its own in-page controls).
   `xi*100000+yi`, and shows the light tooltip (date · Price · Liquidation Leverage).
 - The dc.html's `sampleData()`/`rngFn` are **only the design's mock generator** — NOT ported;
   real CoinGlass data has the identical shape, so `prepare()` consumes it directly.
+- **Derived metrics strip** (`MetricsStrip` in `HeatmapPage`, math in `lib/heatmap-metrics.ts`,
+  `computeHeatmapMetrics`) — computed from the SAME payload (no extra Actor run). Shows 5 cells:
+  **Center of gravity** · **Nearest magnet ↑** · **Nearest magnet ↓** · **Strongest wall** · **Total fuel · σ**.
+  Cell labels use the shared `HoverTip` (NOT native `title`), dotted underline.
+  - **All metrics use ABSOLUTE USD `value`, never the color.** The heatmap color is normalized
+    (`val/max`) so there's always a brightest band even on a low-fuel day — brightness is a
+    within-view ranking, not a magnitude. The raw `liquidation_leverage_data` values ARE absolute
+    USD notional (model-estimated, and window-dependent: a level reads ~$60M on 24h but ~$190M on
+    1-week — so metrics are comparable only within one symbol+interval). The colorbar top label is
+    literally that max value.
+  - **Shared preprocessing:** surviving fuel per level `L(p)` = max over the last `max(3, 2% of cols)`
+    columns (the "now" edge); baseline `b` = median of nonzero `L(p)` (noise floor); clusters = adjacent
+    above-baseline levels merged within `0.25% × price`; `totalFuel` (TLL) = Σ`L(p)`; `share = mass/total`.
+  - **Distance scale τ = realized window volatility** (1σ of log-return moves, %), floored at 0.5% —
+    fully self-tuning across 12h/24h/1w (bigger window → bigger σ → distant magnets count more), NO
+    hardcoded proportion (we explicitly chose `τ = σ` over `τ = R/2` to drop the magic ÷2).
+  - **Metric 1 — Nearest magnet (per side):** `score = share · exp(−dist% / τ)`, top scorer above and
+    below. Chosen over ChatGPT's `liquidity/distance` because the latter diverges as distance→0 (a tiny
+    cluster on top of price wins), uses dollar (non-scale-free) distance, raw window-dependent size, and
+    has no horizon knob; `exp()` is bounded and τ is vol-calibrated.
+  - **Metric 2 — Strongest wall:** `argmax(mass)` over clusters (distance-agnostic). Same core as
+    ChatGPT but on grouped walls, not single bins.
+  - **Metric 3 — Liquidation center of gravity:** `Σ(p·max(0,L(p)−b)) / Σ max(0,L(p)−b)` — the
+    fuel-weighted price; baseline-subtracted so the diffuse background doesn't drag it to the y-range
+    midpoint (ChatGPT's raw `Σ(p·liq)/Σliq` degenerates on flat days). `lcgGap>0 ⇒ fuel above ⇒ upward pull`.
+- NB: the Apify Actor run occasionally fails upstream (`run-failed` → our route returns 502 with detail);
+  the page shows the Retry overlay. Transient CoinGlass-side issue, not our code.
 
 ### News/calendar additions (handoff 24+)
 - News drawer **"All" toggle** (after Upcoming/Released): reads the full `released_archive`

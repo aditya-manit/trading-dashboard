@@ -5,6 +5,8 @@ import {
   useHeatmap, type HeatmapData,
   type HeatSymbol, type HeatModel, type HeatInterval,
 } from '@/hooks/useHeatmap';
+import { computeHeatmapMetrics, type Cluster } from '@/lib/heatmap-metrics';
+import { HoverTip } from '@/components/plan/HoverTip';
 
 const MONO = "var(--font-mono), 'JetBrains Mono', monospace";
 
@@ -138,6 +140,7 @@ export function HeatmapPage() {
   const { data, isLoading, error, mutate, isValidating } = useHeatmap(symbol, model, interval);
 
   const prepared = useMemo(() => (data && !data.error && data.configured !== false ? prepare(data) : null), [data]);
+  const metrics = useMemo(() => (prepared ? computeHeatmapMetrics(data) : null), [prepared, data]);
   const cvRef = useRef<HTMLCanvasElement | null>(null);
   const plotRef = useRef<HTMLDivElement | null>(null);
   const [hover, setHover] = useState<Hover | null>(null);
@@ -215,6 +218,9 @@ export function HeatmapPage() {
         </div>
       </div>
 
+      {/* derived metrics strip */}
+      {metrics && <MetricsStrip m={metrics} />}
+
       {/* chart */}
       <div style={{ flex: 1, position: 'relative', background: '#0a0416', overflow: 'hidden' }}>
         {prepared ? (
@@ -265,6 +271,62 @@ export function HeatmapPage() {
           {data?.updateTime ? `CoinGlass · updated ${fmtFullTime(Math.round(data.updateTime / 1000))}` : 'CoinGlass via Apify liquidation-heatmap Actor'}
         </span>
       </div>
+    </div>
+  );
+}
+
+function MetricsStrip({ m }: { m: ReturnType<typeof computeHeatmapMetrics> }) {
+  if (!m) return null;
+  const up = m.lcgGap >= 0;
+  const sideTag = (c: Cluster | null) => (c ? (c.side === 'above' ? '#26d07c' : '#f04866') : '#9b93ad');
+  const magnet = (label: string, c: Cluster | null, dir: '↑' | '↓') => (
+    <Cell label={label}>
+      {c ? (
+        <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7 }}>
+          <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: 14, color: '#f3eeff' }}>{dir} {fmtPrice(c.peakPrice)}</span>
+          <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: '#8b5cf6' }}>{fmtVal(c.mass)}</span>
+          <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: dir === '↑' ? '#26d07c' : '#f04866' }}>{dir === '↑' ? '+' : '−'}{c.dist.toFixed(2)}%</span>
+        </span>
+      ) : <span style={{ color: '#6f6885', fontSize: 12 }}>—</span>}
+    </Cell>
+  );
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, padding: '0 6px', background: '#0e0720', borderBottom: '1px solid rgba(255,255,255,0.07)', flex: '0 0 auto', overflowX: 'auto' }}>
+      <Cell label="Center of gravity" hint="Fuel-weighted price — the magnet the whole book leans toward">
+        <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7 }}>
+          <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: 14, color: '#f3eeff' }}>{fmtPrice(m.lcg)}</span>
+          <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, color: up ? '#26d07c' : '#f04866' }}>{up ? '▲ +' : '▼ −'}{Math.abs(m.lcgGap).toFixed(2)}%</span>
+        </span>
+      </Cell>
+      {magnet('Nearest magnet ↑', m.nearestAbove, '↑')}
+      {magnet('Nearest magnet ↓', m.nearestBelow, '↓')}
+      <Cell label="Strongest wall" hint="Biggest cluster of stacked leverage, regardless of distance">
+        {m.strongest ? (
+          <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7 }}>
+            <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: 14, color: '#f3eeff' }}>{fmtPrice(m.strongest.peakPrice)}</span>
+            <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: '#8b5cf6' }}>{fmtVal(m.strongest.mass)}</span>
+            <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: sideTag(m.strongest) }}>{(m.strongest.share * 100).toFixed(0)}%</span>
+          </span>
+        ) : <span style={{ color: '#6f6885' }}>—</span>}
+      </Cell>
+      <Cell label="Total fuel · σ" hint="Total surviving liquidation leverage (TLL) · realized vol = the distance scale τ">
+        <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7 }}>
+          <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: 14, color: '#f3eeff' }}>{fmtVal(m.totalFuel)}</span>
+          <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: '#9b93ad' }}>σ {m.sigma.toFixed(1)}%</span>
+        </span>
+      </Cell>
+    </div>
+  );
+}
+
+function Cell({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  const labelEl = (
+    <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7c7390', borderBottom: hint ? '1px dotted #514a63' : undefined }}>{label}</span>
+  );
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 16px', borderRight: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap', justifyContent: 'center' }}>
+      {hint ? <HoverTip tip={hint} width={220} style={{ cursor: 'help' }}>{labelEl}</HoverTip> : labelEl}
+      {children}
     </div>
   );
 }
