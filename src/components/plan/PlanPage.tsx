@@ -3,6 +3,7 @@
 import { memo, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useSWRConfig } from 'swr';
 import { HoverTip } from './HoverTip';
+import { HeatmapLaunchCard } from '@/components/heatmap/HeatmapLaunchCard';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, useCalendarArchive, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
 import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
@@ -961,6 +962,8 @@ export function PlanPage() {
               </div>
               <Checklist step={step} ask={meta.ask} checks={checks} toggle={toggleCheck} />
             </div>
+            {/* Step 5 (Liquidity / traps) — launch the live liquidation heatmap */}
+            {meta.n === 5 && <HeatmapLaunchCard symbol="BTC" sub="Which side is offside, and where." />}
           </div>
         </div>
 

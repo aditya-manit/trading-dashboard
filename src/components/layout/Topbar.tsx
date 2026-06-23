@@ -19,12 +19,11 @@ const PLAN_TABS: { label: string; v: PlanView; active: PlanView[] }[] = [
   { label: 'Journal', v: 'journal', active: ['journal'] },
 ];
 
-type Page = 'dashboard' | 'plan' | 'heatmap';
+type Page = 'dashboard' | 'plan';
 
 const PAGES: { id: Page; label: string; accent: string }[] = [
   { id: 'dashboard', label: 'Dashboard', accent: '#23211b' },
   { id: 'plan', label: 'Plan', accent: '#7c5cff' },
-  { id: 'heatmap', label: 'Heatmap', accent: '#8b5cf6' },
 ];
 
 export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: Page) => void }) {
@@ -32,7 +31,6 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
   const [synced, setSynced] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const onPlan = page === 'plan';
-  const onHeatmap = page === 'heatmap';
   const { view: planView, plans } = usePlanStore();
   const { data: tradeData } = usePositionHistory();
   const tradeCount = (tradeData || []).filter((p) => Math.abs(parseFloat(p.max_size) || 0) > 0).length;
@@ -40,7 +38,7 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
   useEffect(() => { setSynced('just now'); }, []);
 
   useEffect(() => {
-    if (onPlan || onHeatmap) return;
+    if (onPlan) return;
     const handleScroll = () => {
       const topbarH = 70;
       const scrollY = window.scrollY + topbarH + 40;
@@ -56,7 +54,7 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [onPlan, onHeatmap]);
+  }, [onPlan]);
 
   const handleTabClick = useCallback((id: string) => {
     const el = document.getElementById(id);
@@ -90,7 +88,7 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
           <span style={{ color: '#b3b2aa', fontSize: 12 }}>▾</span>
         </div>
 
-        {/* Dashboard / Plan / Heatmap toggle */}
+        {/* Dashboard / Plan toggle */}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#f6f5f2', border: '1px solid #eeede9', borderRadius: 11, padding: 3 }}>
           {PAGES.map(({ id, label, accent }) => {
             const active = page === id;
@@ -117,8 +115,7 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
         </div>
       </div>
 
-      {/* Nav tabs (hidden on the heatmap page, which has its own controls) */}
-      {!onHeatmap && (
+      {/* Nav tabs */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f6f5f2', border: '1px solid #eeede9', borderRadius: 12, padding: 4 }}>
         {onPlan
           ? PLAN_TABS.map(({ label, v, active }) => {
@@ -175,7 +172,6 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
               );
             })}
       </div>
-      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         {/* Segmented sync pill: lock·Read-only | hairline | live-pulse·Synced */}

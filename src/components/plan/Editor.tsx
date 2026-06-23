@@ -9,6 +9,8 @@ import { planActions, usePlanStore } from '@/lib/plan-store';
 import { useAccount } from '@/hooks/useAccount';
 import { usePositions } from '@/hooks/usePositions';
 import { useBtcCandles } from '@/hooks/useBtcCandles';
+import { HeatmapLaunchCard } from '@/components/heatmap/HeatmapLaunchCard';
+import type { HeatSymbol } from '@/hooks/useHeatmap';
 import { LiveMath } from './LiveMath';
 import { RrDiagram } from './RrDiagram';
 
@@ -288,6 +290,8 @@ export function Editor() {
                   ))}
                 </div>
               </Field>
+              {/* check the stop/targets against the live liquidation clusters */}
+              <HeatmapLaunchCard symbol={d.sym as HeatSymbol} title="Check your stop against the real clusters" sub="Is it beyond the sweep, not inside it?" />
             </div>
           </div>
 

@@ -56,7 +56,9 @@ src/
       PlanPage.tsx                    # Pre-trade workbook (Plan page) + economic-calendar news strip/drawer
       planDiagrams.ts                 # 5 step SVGs, verbatim from handoff 15
     heatmap/
-      HeatmapPage.tsx                 # Liquidation heatmap (canvas magma + candles) + metrics strip, handoff 31
+      HeatmapPage.tsx                 # Liquidation heatmap: themed canvas + zoom/pan/crosshair + profile + strip (handoff 32)
+      HeatmapOverlay.tsx              # full-screen launcher wrapper (reads heatmap-launch store)
+      HeatmapLaunchCard.tsx           # shorts/longs donut launch card (Step 5 + editor Levels)
   hooks/
     useAccount.ts · usePositions.ts · usePositionHistory.ts
     useAccountBook.ts · useTrades.ts · useCalendar.ts · useHeatmap.ts
@@ -66,6 +68,7 @@ src/
     apify-heatmap.ts                  # shared Apify Actor fetch (used by /api/heatmap + daily capture)
     heatmap-metrics.ts                # liquidation magnets / strongest wall / center-of-gravity (absolute USD)
     heatmap-capture.ts                # captureDailyHeatmapMetrics() — pull+compute+upsert (cron + on-load)
+    heatmap-launch.ts                 # tiny store to open the heatmap overlay (from Step 5 / editor)
     event-insight.ts                  # Claude (web-search) event insights + Gate BTC "2 prints" %
     formatters.ts
   types/gate.ts
@@ -76,6 +79,11 @@ src/
   Pattern: `{n >= 0 ? '+$' : '-$'}${Math.abs(n).toLocaleString(...)}`
 - Positive with explicit sign: `+$85,347`
 - Leverage display: `parseFloat(lev) > 0 ? `${n}x` : 'Cross'`
+
+## Interaction conventions
+- **No hover-lift / `translateY` on cards or buttons.** Hover affordance is a subtle
+  shadow deepen + border-color shift ONLY (transition `box-shadow`/`border-color`, never
+  `transform`). Don't add `translateY(-1px)`-style lifts. (Standing rule, handoff 32.)
 
 ## Design tokens
 | Token | Value |
@@ -98,11 +106,13 @@ src/
   Each row: `padding:13px 16px; border-bottom:1px solid #f5f4f1`
 
 ## Pages & tab sections
-Top-level `page` state in `page.tsx` toggles between **Plan (default)**, **Dashboard**,
-and **Heatmap** via the Topbar's segmented control (`PAGES` array in `Topbar.tsx`).
-Plan → `<PlanFunnel/>`; Dashboard → the scroll-nav sections below (scroll-spy active
-only on Dashboard); Heatmap → `<HeatmapPage/>` (full-bleed, no `padding:30` wrapper,
-its own internal controls so the center nav tabs are hidden).
+Top-level `page` state in `page.tsx` toggles between **Plan (default)** and **Dashboard**
+(2-way `PAGES` toggle in `Topbar.tsx`). The **liquidation heatmap is NOT a top-level page** —
+it's a full-screen overlay (`<HeatmapOverlay/>`, always mounted in `page.tsx`) launched on
+demand from the workbook Step 5 card and the plan editor's Levels card via
+`heatmapLaunch.open(symbol)` (`lib/heatmap-launch.ts`). Closing it (back button) reveals the
+page underneath unchanged. (It used to be a 3rd toggle pill — removed; it's market context,
+not a workflow.)
 ```
 Plan (default) → PlanFunnel  (Topbar tabs: Workbook / Plans / Journal — ALL live)
    view switcher (lib/plan-store `view`): workbook → PlanPage · editor → Editor ·
@@ -113,7 +123,7 @@ Dashboard:
   #positions  → PositionsTable
   #reports    → KeyMetricsRow
   #history    → PositionHistoryTable
-Heatmap → HeatmapPage  (no center nav tabs; symbol/model/interval segs live in-page)
+Liquidation heatmap → full-screen overlay, launched from workbook Step 5 / editor Levels
 ```
 
 ---
@@ -159,11 +169,32 @@ The whole Plan funnel is ported and live. Files under `components/plan/`:
 - Math/model in `lib/plan-model.ts` (`tpCompute`, `planToDraft`); store in
   `lib/plan-store.ts`; journal logic in `lib/journal.ts`.
 
-### Liquidation Heatmap page (handoff 31)
-A third top-level page (`Topbar` PAGES toggle → `page==='heatmap'` in `page.tsx` →
-`<HeatmapPage/>`), ported from `project/Liquidation Heatmap.dc.html`. Full-bleed dark
-panel (`#0b0518`, `height:calc(100vh - 64px)`) under the white Topbar; the center nav
-tabs + scroll-spy are suppressed on this page (it has its own in-page controls).
+### Liquidation Heatmap (handoff 32 — redesign + full-screen launcher)
+`HeatmapPage` was rewritten from `project/Liquidation Heatmap (light).dc.html`. It is now a
+**full-screen overlay** (`HeatmapOverlay`, `height:100vh`, `z-index:120`), launched from the
+workbook Step 5 card and the plan editor Levels card (`heatmapLaunch.open(symbol)`), NOT a
+top-level page. Its own header carries a **Back** button (`onClose` → `heatmapLaunch.close()`),
+the LIVE·SYMBOL/USDT eyebrow + title, **refresh** + **theme toggle**, and the **spec-table nav**
+(Symbol/Model/Interval bordered cell group). New vs the old version:
+- **Light/dark theme toggle** (persisted to `localStorage` `lh_theme`). Themed via CSS vars on a
+  `.lhx` wrapper (`--bg/--panel/--ink/--border/...`), `[data-theme=dark]` override. Canvas
+  colors come from a per-theme `palette()` (plot gradient, candle up/down, magma `ramp`, etc.).
+- **TradingView-style zoom/pan/crosshair.** A `view` ref `{x0,x1 (0..1 time frac), p0,p1 (price)}`;
+  wheel = time zoom, **shift+wheel** or **price-axis wheel** = price zoom, **drag** = pan,
+  **double-click** = reset (+ a reset-zoom pill when zoomed). `clampView` bounds it.
+  ⚠️ The view is a mutable ref; zoom/pan handlers mutate it then call `drawRef.current()` directly
+  AND `bump()` (a `tick` state in the draw effect deps) — without the direct draw the canvas grid
+  wouldn't redraw (only the React-rendered axes would). Keep both.
+- **Marker lines come from REAL metrics** (`computeHeatmapMetrics`), not hardcoded: CoG=`lcg`,
+  MAG↑=`nearestAbove.peakPrice` (green), MAG↓=`nearestBelow.peakPrice` (theme-aware pink/magenta),
+  WALL=`strongest.peakPrice` (blue) — thick dashed lines + rounded pill labels; price-axis pills too.
+- **Liquidation-map profile panel** (right, 220px): the **standing book = the latest time column**
+  (`computeProfile`), per-price bars + cumulative curves split shorts (above price, green) / longs
+  (below, red), PEAK label, hover row highlight + crosshair, SHORTS/LONGS totals legend.
+- **5-cell stats strip** (Center of gravity / Nearest magnet ↑ / ↓ / Strongest wall / Leverage load·σ)
+  keeps the day-over-day Δ + 14d sparkline on the CoG + Leverage-load cells (the daily store/cron from
+  handoff 31 still feeds it). Crosshair tooltip shows the cell's liquidation-leverage value.
+The data/route/metrics/daily-store from handoff 31 are unchanged (see below).
 - **Data = Apify Actor `api_merge/coinglass-liquidation-heatmap`** via `/api/heatmap`
   (`requireOwner`-gated server route; `APIFY_TOKEN` server-only). It POSTs
   `run-sync-get-dataset-items?token=…` with `{symbol,model,interval}` and returns the
@@ -255,6 +286,9 @@ old left-numeral header + chevron `ChecksStrip` + body `LeadText`. Card has
   Checklist = `Checklist` (vertical dotted-border rows, number→green tick on tinted card)
   under a "YOUR CHECKLIST" header with a **`CheckRing`** progress ring (18×18,
   purple→green when all clear) + mono `N / M` count.
+  - **Step 5 only** (`meta.n === 5`, the Liquidity/Traps step): a `HeatmapLaunchCard`
+    (shorts/longs donut gauge) sits under the checklist in the right column → opens the
+    liquidation heatmap overlay. The editor's Levels card has the same card (different copy).
 - **Footer** (handoff 30 simplified to just two pills, no center column): left **Back**
   pill (steps 2-5, `meta.rail` of prev); right = gradient **Next step** pill + arrow-chip
   (or "Plan this trade" on step 5, or a disabled "clear all checks" state until `allClear`).
