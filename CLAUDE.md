@@ -36,6 +36,7 @@ src/
       trades/route.ts
       btc-candles/route.ts            # Gate spot 1d candles (also used for "2 prints" %)
     api/heatmap/route.ts              # Apify coinglass-liquidation-heatmap Actor proxy (server-only APIFY_TOKEN)
+    api/heatmap/metrics/route.ts      # daily TLL/LCG snapshot store (Supabase) for the strip's trend
     api/calendar/route.ts             # ForexFactory feed proxy + insight/prints enrichment
   components/
     layout/Topbar.tsx                 # Sticky nav; Dashboard/Plan toggle; scroll-tab (dashboard only)
@@ -208,6 +209,15 @@ tabs + scroll-spy are suppressed on this page (it has its own in-page controls).
   - **Metric 3 — Liquidation center of gravity:** `Σ(p·max(0,L(p)−b)) / Σ max(0,L(p)−b)` — the
     fuel-weighted price; baseline-subtracted so the diffuse background doesn't drag it to the y-range
     midpoint (ChatGPT's raw `Σ(p·liq)/Σliq` degenerates on flat days). `lcgGap>0 ⇒ fuel above ⇒ upward pull`.
+- **TLL + center-of-gravity are trended** (a bare number isn't actionable): a daily snapshot is
+  stored per `day+symbol+interval` in Supabase `heatmap_metrics_daily` (`/api/heatmap/metrics`
+  GET history / POST upsert, owner-gated). **Capture = on page-load upsert** (free — reuses the
+  computed payload, no extra Actor run); `useHeatmapHistory(symbol,interval)` reads ≤60d oldest→newest.
+  The strip shows **Δ vs the latest prior day + a sparkline** on the TLL cell (rising = amber
+  "leverage building", falling = green) and the center-of-gravity cell (gap-drift in pp, green=up).
+  Magnets/strongest are point-in-time levels → NOT trended. Comparison is within ONE interval (TLL/LCG
+  are window-dependent). Graceful: no table / no history → cells show "1st pt", no sparkline, no crash.
+  Requires the `heatmap_metrics_daily` table — re-run `supabase/schema.sql` (idempotent) in the SQL editor.
 - NB: the Apify Actor run occasionally fails upstream (`run-failed` → our route returns 502 with detail);
   the page shows the Retry overlay. Transient CoinGlass-side issue, not our code.
 

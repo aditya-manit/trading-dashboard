@@ -37,3 +37,14 @@ export function useHeatmap(symbol: HeatSymbol, model: HeatModel, interval: HeatI
     },
   );
 }
+
+// Daily metric history (TLL + center-of-gravity), per symbol+interval, oldest→newest.
+// Powers the strip's day-over-day Δ + sparklines. Cheap (Supabase read, no Actor run).
+export interface HeatmapDailyRow { day: string; price: number; tll: number; lcg: number; lcg_gap: number }
+export function useHeatmapHistory(symbol: HeatSymbol, interval: HeatInterval) {
+  return useSWR<{ configured: boolean; history: HeatmapDailyRow[] }>(
+    `/api/heatmap/metrics?symbol=${symbol}&interval=${interval}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+}

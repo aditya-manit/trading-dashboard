@@ -57,8 +57,25 @@ create table if not exists public.event_defs (
   updated_at  timestamptz not null default now()
 );
 
+-- ── liquidation-heatmap daily metrics (one row per day+symbol+interval) ───────
+-- Powers the trend on the heatmap metrics strip (TLL Δ + LCG drift + sparklines).
+-- TLL/LCG are only meaningful as a trend and are window-dependent, so we key by
+-- interval and compare within the same interval. Upserted on page load.
+create table if not exists public.heatmap_metrics_daily (
+  day         date        not null,
+  symbol      text        not null,
+  interval    text        not null,
+  price       numeric,
+  tll         numeric,    -- total surviving liquidation leverage (USD)
+  lcg         numeric,    -- liquidation center of gravity (price)
+  lcg_gap     numeric,    -- (lcg/price - 1) * 100
+  updated_at  timestamptz not null default now(),
+  primary key (day, symbol, interval)
+);
+
 -- ── lock everything down (RLS on, no policies → only service_role reaches it) ──
 alter table public.plans            enable row level security;
+alter table public.heatmap_metrics_daily enable row level security;
 alter table public.links            enable row level security;
 alter table public.journal_entries  enable row level security;
 alter table public.released_archive enable row level security;

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  useHeatmap, type HeatmapData,
+  useHeatmap, useHeatmapHistory, type HeatmapData,
   type HeatSymbol, type HeatModel, type HeatInterval,
 } from '@/hooks/useHeatmap';
 import { computeHeatmapMetrics, type Cluster } from '@/lib/heatmap-metrics';
@@ -141,6 +141,26 @@ export function HeatmapPage() {
 
   const prepared = useMemo(() => (data && !data.error && data.configured !== false ? prepare(data) : null), [data]);
   const metrics = useMemo(() => (prepared ? computeHeatmapMetrics(data) : null), [prepared, data]);
+  const { data: hist, mutate: mutateHist } = useHeatmapHistory(symbol, interval);
+
+  // Persist today's metrics (one row per day+symbol+interval) so the strip can
+  // show a trend, not a context-free number. Free — reuses the computed payload.
+  useEffect(() => {
+    if (!metrics) return;
+    fetch('/api/heatmap/metrics', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ symbol, interval, price: metrics.price, tll: metrics.totalFuel, lcg: metrics.lcg, lcgGap: metrics.lcgGap }),
+    }).then(() => mutateHist()).catch(() => {});
+  }, [metrics, symbol, interval, mutateHist]);
+
+  // Day-over-day comparison: previous = latest stored row before today (UTC).
+  const trend = useMemo(() => {
+    const rows = hist?.history || [];
+    const today = new Date().toISOString().slice(0, 10);
+    const prior = rows.filter((r) => r.day < today);
+    const prev = prior.length ? prior[prior.length - 1] : null;
+    return { tllSeries: rows.map((r) => r.tll), gapSeries: rows.map((r) => r.lcg_gap), tllPrev: prev?.tll ?? null, gapPrev: prev?.lcg_gap ?? null };
+  }, [hist]);
   const cvRef = useRef<HTMLCanvasElement | null>(null);
   const plotRef = useRef<HTMLDivElement | null>(null);
   const [hover, setHover] = useState<Hover | null>(null);
@@ -219,7 +239,7 @@ export function HeatmapPage() {
       </div>
 
       {/* derived metrics strip */}
-      {metrics && <MetricsStrip m={metrics} />}
+      {metrics && <MetricsStrip m={metrics} trend={trend} />}
 
       {/* chart */}
       <div style={{ flex: 1, position: 'relative', background: '#0a0416', overflow: 'hidden' }}>
@@ -275,7 +295,9 @@ export function HeatmapPage() {
   );
 }
 
-function MetricsStrip({ m }: { m: ReturnType<typeof computeHeatmapMetrics> }) {
+interface Trend { tllSeries: number[]; gapSeries: number[]; tllPrev: number | null; gapPrev: number | null }
+
+function MetricsStrip({ m, trend }: { m: ReturnType<typeof computeHeatmapMetrics>; trend: Trend }) {
   if (!m) return null;
   const up = m.lcgGap >= 0;
   const sideTag = (c: Cluster | null) => (c ? (c.side === 'above' ? '#26d07c' : '#f04866') : '#9b93ad');
@@ -292,10 +314,12 @@ function MetricsStrip({ m }: { m: ReturnType<typeof computeHeatmapMetrics> }) {
   );
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, padding: '0 6px', background: '#0e0720', borderBottom: '1px solid rgba(255,255,255,0.07)', flex: '0 0 auto', overflowX: 'auto' }}>
-      <Cell label="Center of gravity" hint="Fuel-weighted price — the magnet the whole book leans toward">
-        <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7 }}>
+      <Cell label="Center of gravity" hint="Fuel-weighted price — the magnet the whole book leans toward. Δ = drift vs yesterday (gap widening up = upward pull strengthening).">
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: 14, color: '#f3eeff' }}>{fmtPrice(m.lcg)}</span>
           <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, color: up ? '#26d07c' : '#f04866' }}>{up ? '▲ +' : '▼ −'}{Math.abs(m.lcgGap).toFixed(2)}%</span>
+          <GapDelta cur={m.lcgGap} prev={trend.gapPrev} />
+          <Spark data={trend.gapSeries} color="#8b5cf6" />
         </span>
       </Cell>
       {magnet('Nearest magnet ↑', m.nearestAbove, '↑')}
@@ -309,13 +333,42 @@ function MetricsStrip({ m }: { m: ReturnType<typeof computeHeatmapMetrics> }) {
           </span>
         ) : <span style={{ color: '#6f6885' }}>—</span>}
       </Cell>
-      <Cell label="Total fuel · σ" hint="Total surviving liquidation leverage (TLL) · realized vol = the distance scale τ">
-        <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7 }}>
+      <Cell label="Total fuel · σ" hint="Total surviving liquidation leverage (TLL). Δ = vs yesterday — rising (amber) = leverage building / cascade fuel; falling (green) = deleveraged. σ = realized vol = distance scale τ.">
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: 14, color: '#f3eeff' }}>{fmtVal(m.totalFuel)}</span>
-          <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: '#9b93ad' }}>σ {m.sigma.toFixed(1)}%</span>
+          <FuelDelta cur={m.totalFuel} prev={trend.tllPrev} />
+          <Spark data={trend.tllSeries} color="#ffa31a" />
+          <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10.5, color: '#7c7390' }}>σ {m.sigma.toFixed(1)}%</span>
         </span>
       </Cell>
     </div>
+  );
+}
+
+// Day-over-day deltas. Fuel: rising = amber (leverage building), falling = green.
+function FuelDelta({ cur, prev }: { cur: number; prev: number | null }) {
+  if (prev == null || prev === 0) return <span style={{ fontFamily: MONO, fontSize: 10, color: '#6f6885' }}>1st pt</span>;
+  const pct = (cur / prev - 1) * 100, up = pct >= 0;
+  return <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, color: up ? '#ffa31a' : '#26d07c' }}>{up ? '▲' : '▼'} {Math.abs(pct).toFixed(0)}%</span>;
+}
+// Gap drift (percentage points): more positive (fuel rising above) = green.
+function GapDelta({ cur, prev }: { cur: number; prev: number | null }) {
+  if (prev == null) return <span style={{ fontFamily: MONO, fontSize: 10, color: '#6f6885' }}>1st pt</span>;
+  const d = cur - prev, up = d >= 0;
+  return <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10.5, color: up ? '#26d07c' : '#f04866' }}>{up ? '▲' : '▼'}{Math.abs(d).toFixed(2)}pp</span>;
+}
+// Tiny trend sparkline over the daily series (oldest→newest).
+function Spark({ data, color }: { data: number[]; color: string }) {
+  if (!data || data.length < 2) return null;
+  const w = 50, h = 16, mn = Math.min(...data), mx = Math.max(...data), rng = mx - mn || 1;
+  const x = (i: number) => (i / (data.length - 1)) * w;
+  const y = (v: number) => h - 1 - ((v - mn) / rng) * (h - 2);
+  const pts = data.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  return (
+    <svg width={w} height={h} style={{ display: 'block', flex: '0 0 auto' }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={x(data.length - 1)} cy={y(data[data.length - 1])} r={1.8} fill={color} />
+    </svg>
   );
 }
 
