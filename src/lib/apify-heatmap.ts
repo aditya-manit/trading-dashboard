@@ -20,6 +20,9 @@ export class HeatmapFetchError extends Error {
   }
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const MAX_ATTEMPTS = 3; // the CoinGlass Actor is flaky (intermittent 400 / 502 / run-failed)
+
 export async function fetchHeatmapData(symbol: string, model: string, interval: string): Promise<HeatmapData> {
   const token = process.env.APIFY_TOKEN;
   if (!token) throw new HeatmapFetchError('not configured', 501);
@@ -27,16 +30,29 @@ export async function fetchHeatmapData(symbol: string, model: string, interval: 
   if (!HEAT_SYMBOLS.has(sym) || !HEAT_MODELS.has(model) || !HEAT_INTERVALS.has(interval)) {
     throw new HeatmapFetchError('bad symbol/model/interval', 400);
   }
-  const res = await fetch(
-    `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`,
-    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ symbol: sym, model, interval }), cache: 'no-store' },
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new HeatmapFetchError(`apify ${res.status}`, 502, body.slice(0, 300));
+  const url = `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`;
+  const body = JSON.stringify({ symbol: sym, model, interval });
+  let last: HeatmapFetchError = new HeatmapFetchError('apify unavailable', 502);
+  // Retry transient upstream failures — a 400/502/run-failed/empty result usually
+  // succeeds on a second attempt. Validation (above) is NOT retried.
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt) await sleep(1200);
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body, cache: 'no-store' });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        last = new HeatmapFetchError(`apify ${res.status}`, 502, txt.slice(0, 300));
+        continue;
+      }
+      const items = (await res.json()) as unknown;
+      const item = Array.isArray(items) ? items[0] : items;
+      if (!item || typeof item !== 'object') { last = new HeatmapFetchError('empty actor result', 502); continue; }
+      if ((item as { success?: boolean }).success === false) { last = new HeatmapFetchError('actor: ' + ((item as { message?: string }).message || 'run failed'), 502); continue; }
+      if (!Array.isArray((item as HeatmapData).liquidation_leverage_data)) { last = new HeatmapFetchError('actor: malformed result', 502); continue; }
+      return item as HeatmapData;
+    } catch (e) {
+      last = e instanceof HeatmapFetchError ? e : new HeatmapFetchError(String(e), 502);
+    }
   }
-  const items = (await res.json()) as unknown;
-  const item = Array.isArray(items) ? items[0] : items;
-  if (!item || typeof item !== 'object') throw new HeatmapFetchError('empty actor result', 502);
-  return item as HeatmapData;
+  throw last;
 }
