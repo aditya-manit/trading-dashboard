@@ -63,7 +63,9 @@ src/
   lib/
     gate-client.ts                    # HMAC signing + fetch wrapper
     trade-stats.ts                    # computeTradeStats, buildEquityData
+    apify-heatmap.ts                  # shared Apify Actor fetch (used by /api/heatmap + daily capture)
     heatmap-metrics.ts                # liquidation magnets / strongest wall / center-of-gravity (absolute USD)
+    heatmap-capture.ts                # captureDailyHeatmapMetrics() — pull+compute+upsert (cron + on-load)
     event-insight.ts                  # Claude (web-search) event insights + Gate BTC "2 prints" %
     formatters.ts
   types/gate.ts
@@ -219,6 +221,11 @@ tabs + scroll-spy are suppressed on this page (it has its own in-page controls).
   Magnets/strongest are point-in-time levels → NOT trended. Comparison is within ONE interval (TLL/LCG
   are window-dependent). Graceful: no table / no history → cells show "1st pt", no sparkline, no crash.
   Requires the `heatmap_metrics_daily` table — re-run `supabase/schema.sql` (idempotent) in the SQL editor.
+- **Daily auto-capture cron:** folded into `/api/keepalive` (NOT a 2nd cron — Vercel Hobby allows only one)
+  via `captureDailyHeatmapMetrics()` (`lib/heatmap-capture.ts`, canonical set = BTC/model1/24h; each entry
+  is one Actor run/day). Runs AFTER the keepalive ping, best-effort (an Apify `run-failed` can't break
+  keepalive). So the trend fills daily even when the owner doesn't open the page. The Apify fetch is shared
+  in `lib/apify-heatmap.ts` (`fetchHeatmapData`, `HeatmapFetchError`) by both `/api/heatmap` and the capture.
 - NB: the Apify Actor run occasionally fails upstream (`run-failed` → our route returns 502 with detail);
   the page shows the Retry overlay. Transient CoinGlass-side issue, not our code.
 
