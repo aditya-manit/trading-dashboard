@@ -131,8 +131,12 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
   const profRef = useRef<HTMLCanvasElement | null>(null);
   const plotRef = useRef<HTMLDivElement | null>(null);
   const paxRef = useRef<HTMLDivElement | null>(null);
+  const cbarRef = useRef<HTMLDivElement | null>(null);
   const [hover, setHover] = useState<HoverState | null>(null);
   const [profHover, setProfHover] = useState<ProfHover | null>(null);
+  // band-pass on liquidation intensity (fraction of max): cells outside [lo,hi]
+  // are hidden; price axis fits to the visible band. Defaults to 50–100%.
+  const [band, setBand] = useState({ lo: 0.5, hi: 1 });
 
   const getView = useCallback((): View => {
     if (!viewRef.current && prep) viewRef.current = { x0: 0, x1: 1, p0: prep.ya[0], p1: prep.ya[prep.Y - 1] };
@@ -143,13 +147,26 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
     return V.x0 > 0.001 || V.x1 < 0.999 || V.p0 > prep.ya[0] + 0.5 || V.p1 < prep.ya[prep.Y - 1] - 0.5;
   }, [prep]);
   const resetView = useCallback(() => { viewRef.current = null; bump(); }, [bump]);
-  useEffect(() => { viewRef.current = null; setHover(null); setProfHover(null); }, [data]);
+  useEffect(() => { viewRef.current = null; setHover(null); setProfHover(null); fitRef.current(); }, [data]);
 
   const clampView = useCallback((V: View) => {
     if (!prep) return V; const lo = prep.ya[0], hi = prep.ya[prep.Y - 1];
     let sx = V.x1 - V.x0; const minSx = 4 / (prep.X - 1); if (sx < minSx) sx = minSx; if (sx > 1) sx = 1; if (V.x0 < 0) V.x0 = 0; V.x1 = V.x0 + sx; if (V.x1 > 1) { V.x1 = 1; V.x0 = 1 - sx; }
     let sp = V.p1 - V.p0; const minSp = (hi - lo) * 0.03; if (sp < minSp) sp = minSp; if (sp > hi - lo) sp = hi - lo; if (V.p0 < lo) V.p0 = lo; V.p1 = V.p0 + sp; if (V.p1 > hi) { V.p1 = hi; V.p0 = hi - sp; } return V;
   }, [prep]);
+
+  // Fit the price scale to the levels currently visible under the band (load /
+  // refresh / handle-release). Full 0–100% band fits back to the whole range.
+  const fitToBand = useCallback(() => {
+    if (!prep) return; const { ya, dat, max } = prep, bl = band.lo, bh = band.hi;
+    let lo = Infinity, hi = -Infinity;
+    for (const r of dat) { const u = r[2] / max; if (u < bl || u > bh) continue; const p = ya[r[1]]; if (p < lo) lo = p; if (p > hi) hi = p; }
+    const V = getView(); if (!V) return;
+    if (!isFinite(lo) || hi <= lo) { V.p0 = ya[0]; V.p1 = ya[ya.length - 1]; }
+    else { const pad = (hi - lo) * 0.07; V.p0 = lo - pad; V.p1 = hi + pad; }
+    clampView(V); bump();
+  }, [prep, band, getView, clampView, bump]);
+  const fitRef = useRef(fitToBand); fitRef.current = fitToBand;
 
   // refs so the once-attached listeners read live values
   const refs = useRef({ prep, getView, clampView, bump });
@@ -169,7 +186,8 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
         const yP = (p: number) => (V.p1 - p) / spp * H, dp = (ya[Y - 1] - ya[0]) / (Y - 1);
         const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, P.plotTop); bg.addColorStop(1, P.plotBot); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
         const cw = (1 / (X - 1)) / spx * W + 1, ch = dp / spp * H + 0.9;
-        for (const r of D.dat) { const x = (r[0] / (X - 1) - V.x0) / spx * W; if (x < -cw || x > W) continue; const p = ya[r[1]]; if (p < V.p0 - dp || p > V.p1 + dp) continue; const c = ramped(P.ramp, r[2] / mx); ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; ctx.fillRect(x, yP(p) - ch / 2, cw, ch); }
+        const bl = band.lo, bh = band.hi;
+        for (const r of D.dat) { const u = r[2] / mx; if (u < bl || u > bh) continue; const x = (r[0] / (X - 1) - V.x0) / spx * W; if (x < -cw || x > W) continue; const p = ya[r[1]]; if (p < V.p0 - dp || p > V.p1 + dp) continue; const c = ramped(P.ramp, u); ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; ctx.fillRect(x, yP(p) - ch / 2, cw, ch); }
         const cs = D.cs, n = cs.length, slot = (1 / (n - 1)) / spx * W, cbw = Math.max(1.2, slot * 0.5);
         for (let i = 0; i < n; i++) { const cx = (i / (n - 1) - V.x0) / spx * W; if (cx < -5 || cx > W + 5) continue; const o = +cs[i][1], hi = +cs[i][2], lo = +cs[i][3], cl = +cs[i][4], up = cl >= o; ctx.strokeStyle = up ? P.up : P.down; ctx.fillStyle = up ? P.up : P.down; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx + 0.5, yP(hi)); ctx.lineTo(cx + 0.5, yP(lo)); ctx.stroke(); const yt = yP(Math.max(o, cl)), yb = yP(Math.min(o, cl)); ctx.fillRect(cx - cbw / 2, yt, cbw, Math.max(1.2, yb - yt)); }
         const last = +cs[n - 1][4]; ctx.strokeStyle = P.lastLine; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, yP(last)); ctx.lineTo(W, yP(last)); ctx.stroke(); ctx.setLineDash([]);
@@ -200,7 +218,7 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
         ctx.strokeStyle = P.profCross; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, priceY); ctx.lineTo(W, priceY); ctx.stroke(); ctx.setLineDash([]);
       }
     }
-  }, [theme, prep, prof, marks, profHover, getView]);
+  }, [theme, prep, prof, marks, profHover, getView, band]);
 
   const drawRef = useRef(drawAll); drawRef.current = drawAll;
   // redraw on data/theme/marks changes AND on every view mutation (tick), since
@@ -267,6 +285,20 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
 
   const toggleTheme = () => { const t = dark ? 'light' : 'dark'; try { localStorage.setItem('lh_theme', t); } catch {} setTheme(t); };
 
+  // drag a colorbar handle to set the band; fit the price scale on release
+  const cbarDown = (which: 'lo' | 'hi') => (e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    const el = cbarRef.current; if (!el) return;
+    document.body.classList.add('lh-dragging');
+    const move = (ev: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      let frac = 1 - (ev.clientY - r.top) / r.height; frac = Math.max(0, Math.min(1, frac));
+      setBand((b) => which === 'lo' ? { ...b, lo: Math.min(frac, b.hi - 0.05) } : { ...b, hi: Math.max(frac, b.lo + 0.05) });
+    };
+    const up = () => { document.body.classList.remove('lh-dragging'); window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); fitRef.current(); };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  };
+
   const notConfigured = data?.configured === false;
   const errMsg = data?.error;
 
@@ -322,7 +354,28 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
               </div>
               <div style={{ position: 'absolute', left: 10, top: 14, width: 44, bottom: 30, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                 <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 9.5, color: 'var(--muted)', marginBottom: 6, whiteSpace: 'nowrap' }}>{(prep.max / 1e6).toFixed(2)}M</span>
-                <div style={{ flex: 1, width: 13, borderRadius: 4, background: 'linear-gradient(180deg,#78145a,#bc2856,#e4523c,#f68c30,#fac854,#fce8a0,#faf8fc)' }} />
+                <div ref={cbarRef} style={{ position: 'relative', flex: 1, width: 13 }}>
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: 4, background: 'var(--cbar)' }} />
+                  {/* dim the excluded top (above hi) + bottom (below lo) */}
+                  <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${((1 - band.hi) * 100).toFixed(1)}%`, background: 'var(--panel)', opacity: 0.74, borderRadius: '4px 4px 0 0' }} />
+                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${(band.lo * 100).toFixed(1)}%`, background: 'var(--panel)', opacity: 0.74, borderRadius: '0 0 4px 4px' }} />
+                  {/* hi handle + label */}
+                  <div onMouseDown={cbarDown('hi')} style={{ position: 'absolute', left: -4, width: 21, height: 10, top: `${((1 - band.hi) * 100).toFixed(1)}%`, transform: 'translateY(-50%)', background: 'var(--panel)', border: '1.5px solid #7c5cff', borderRadius: 3, cursor: 'ns-resize', boxShadow: '0 1px 3px rgba(20,20,12,0.28)' }} />
+                  {band.hi < 0.99 && (
+                    <div style={{ position: 'absolute', left: 25, top: `${((1 - band.hi) * 100).toFixed(1)}%`, transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', lineHeight: 1.12, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                      <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9, color: 'var(--ink)' }}>{Math.round(band.hi * 100)}%</span>
+                      <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 7.5, color: 'var(--muted)' }}>{(band.hi * prep.max / 1e6).toFixed(1)}M</span>
+                    </div>
+                  )}
+                  {/* lo handle + label */}
+                  <div onMouseDown={cbarDown('lo')} style={{ position: 'absolute', left: -4, width: 21, height: 10, bottom: `${(band.lo * 100).toFixed(1)}%`, transform: 'translateY(50%)', background: 'var(--panel)', border: '1.5px solid #7c5cff', borderRadius: 3, cursor: 'ns-resize', boxShadow: '0 1px 3px rgba(20,20,12,0.28)' }} />
+                  {band.lo > 0.01 && (
+                    <div style={{ position: 'absolute', left: 25, bottom: `${(band.lo * 100).toFixed(1)}%`, transform: 'translateY(50%)', display: 'flex', flexDirection: 'column', lineHeight: 1.12, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                      <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9, color: 'var(--ink)' }}>{Math.round(band.lo * 100)}%</span>
+                      <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 7.5, color: 'var(--muted)' }}>{(band.lo * prep.max / 1e6).toFixed(1)}M</span>
+                    </div>
+                  )}
+                </div>
                 <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 9.5, color: 'var(--muted)', marginTop: 6 }}>0</span>
               </div>
               <div ref={setPriceAxis} style={{ position: 'absolute', right: 0, top: 14, width: 64, bottom: 30, cursor: 'ns-resize' }}>
@@ -360,15 +413,6 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
           </div>
         )}
       </div>
-
-      {/* footer */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 24px', borderTop: '1px solid var(--border)', flex: '0 0 auto' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontWeight: 600, fontSize: 11, color: 'var(--muted)' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: '#7c5cff' }} />Liquidation leverage</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: '#1f9d55' }} />Price</span>
-        </span>
-        <span style={{ marginLeft: 'auto', fontWeight: 600, fontSize: 10.5, color: 'var(--faint)', whiteSpace: 'nowrap' }}>Live dataset · Apify liquidation-heatmap Actor</span>
-      </div>
     </div>
   );
 }
@@ -376,8 +420,8 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
 const iconBtn: React.CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, padding: 0, flex: '0 0 auto', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, color: '#7c5cff', boxShadow: '0 1px 2px rgba(20,20,12,0.04)' };
 
 const LH_CSS = `
-.lhx{--bg:#e9e8e4;--panel:#ffffff;--ink:#1a1813;--muted:#9b988d;--faint:#a8a296;--border:#e7dffa;--divider:#f0ecfa;--navactive:#f1ecfb;--navink:#5b46c9;--dotidle:#d8d3ca;--tagbg:#1a1813;--tagink:#ffffff;--cross:rgba(40,36,28,0.32);--halo:#ffffff;}
-.lhx[data-theme=dark]{--bg:#0b0913;--panel:#13101c;--ink:#f3eeff;--muted:#8b8699;--faint:#615c75;--border:rgba(255,255,255,0.09);--divider:rgba(255,255,255,0.08);--navactive:rgba(255,255,255,0.10);--navink:#cbb8ff;--dotidle:rgba(255,255,255,0.22);--tagbg:#e7e3f0;--tagink:#0a0613;--cross:rgba(255,255,255,0.24);--halo:#0a0613;}
+.lhx{--bg:#e9e8e4;--panel:#ffffff;--ink:#1a1813;--muted:#9b988d;--faint:#a8a296;--border:#e7dffa;--divider:#f0ecfa;--navactive:#f1ecfb;--navink:#5b46c9;--dotidle:#d8d3ca;--tagbg:#1a1813;--tagink:#ffffff;--cross:rgba(40,36,28,0.32);--halo:#ffffff;--cbar:linear-gradient(180deg,#78145a,#bc2856,#e4523c,#f68c30,#fac854,#fce8a0,#faf8fc);}
+.lhx[data-theme=dark]{--bg:#0b0913;--panel:#13101c;--ink:#f3eeff;--muted:#8b8699;--faint:#615c75;--border:rgba(255,255,255,0.09);--divider:rgba(255,255,255,0.08);--navactive:rgba(255,255,255,0.10);--navink:#cbb8ff;--dotidle:rgba(255,255,255,0.22);--tagbg:#e7e3f0;--tagink:#0a0613;--cross:rgba(255,255,255,0.24);--halo:#0a0613;--cbar:linear-gradient(180deg,#fcffb4,#f9c946,#f0801a,#bb3754,#701c60,#2a1248,#0a0613);}
 @keyframes lhspin{to{transform:rotate(360deg);}}
 @keyframes lhwave{0%,100%{opacity:.22;transform:scaleX(.86);}50%{opacity:1;transform:scaleX(1);}}
 @keyframes lhglow{0%,100%{opacity:.55;}50%{opacity:1;}}

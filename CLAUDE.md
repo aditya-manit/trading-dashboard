@@ -199,6 +199,14 @@ the LIVE·SYMBOL/USDT eyebrow + title, **refresh** + **theme toggle**, and the *
   keeps the day-over-day Δ + 14d sparkline on the CoG + Leverage-load cells (the daily store/cron from
   handoff 31 still feeds it). Crosshair tooltip shows the cell's liquidation-leverage value.
 The data/route/metrics/daily-store from handoff 31 are unchanged (see below).
+- **Band-pass colorbar (handoff 35):** the colorbar IS the control — drag the lo/hi handle knobs to
+  set a band `[lo,hi]` (fraction of max liquidation intensity). Cells with `value/max` outside the band
+  are **hidden** in `drawHeat`; the colorbar dims the excluded top/bottom; each handle shows its `%` +
+  leverage value (label hidden at the 0%/100% extremes). State `band {lo,hi}`, default **50–100%**.
+  On load / refresh / handle-release, **`fitToBand` auto-zooms the PRICE axis** to exactly the levels
+  still visible (full 0–100% fits back to the whole range); drag-while-holding just filters, fit on release.
+  Colorbar gradient is now **theme-aware** via the `--cbar` CSS var (light magenta→cream / dark cream→dark).
+  The old footer (legend + Apify caption) was **removed** — chart + profile run full height.
 - **TODO (idea, deferred — needs accumulated daily history):** overlay the **CoG trajectory** on the
   heatmap instead of today's single flat line. Plan:
   - **One canonical daily CoG series** (the 24h-window `lcg`, already captured into `heatmap_metrics_daily`
