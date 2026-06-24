@@ -6,22 +6,31 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 const GBTN_STYLE: CSSProperties = { width: '100%', minHeight: 56, padding: '0 22px', borderRadius: 18, background: 'rgba(255,255,255,0.66)', backdropFilter: 'blur(14px) saturate(1.4)', WebkitBackdropFilter: 'blur(14px) saturate(1.4)', border: '1px solid rgba(255,255,255,0.7)', boxShadow: '0 14px 30px rgba(124,92,255,.16),inset 0 1px 0 rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 15.5, color: '#1a1813' };
 
-// Charlie Munger — a fresh one each load.
+// Charlie Munger — a fresh one each load. Curated to genuine, well-attributed
+// investing/decision lines (trimmed where the original ran long, not invented).
 const QUOTES = [
-  'The big money is not in the buying or selling, but in the waiting.',
-  'The first rule of compounding: never interrupt it unnecessarily.',
-  'Knowing what you don’t know is more useful than being brilliant.',
-  'The desire to get rich fast is pretty dangerous.',
+  'The big money is not in the buying and selling, but in the waiting.',
   'Invert, always invert.',
-  'A great business at a fair price is superior to a fair business at a great price.',
+  'All I want to know is where I’m going to die, so I’ll never go there.',
+  'Show me the incentive and I’ll show you the outcome.',
   'We try to be consistently not stupid, instead of trying to be very intelligent.',
-  'The wise ones bet heavily when the world offers them that opportunity.',
-  'Opportunity comes to the prepared mind.',
-  'You don’t have to be brilliant, only a little wiser than the others, on average, for a long time.',
-  'Mimicking the herd invites regression to the mean.',
+  'A great business at a fair price is superior to a fair business at a great price.',
+  'The desire to get rich fast is pretty dangerous.',
+  'Knowing what you don’t know is more useful than being brilliant.',
   'Spend each day trying to be a little wiser than you were when you woke up.',
-  'Live within your means and save so that you can invest.',
+  'Opportunity comes to the prepared mind.',
+  'The wise ones bet heavily when the world offers them that opportunity.',
+  'You don’t have to be brilliant, only a little wiser than the others, on average, for a long time.',
+  'It’s not supposed to be easy. Anyone who finds it easy is stupid.',
+  'The first rule of compounding: never interrupt it unnecessarily.',
   'A lot of success comes from knowing what you really want to avoid.',
+  'It takes character to sit with all that cash and to do nothing.',
+  'Mimicking the herd invites regression to the mean.',
+  'If you’re not willing to react with equanimity to a 50% decline two or three times a century, you’re not fit to be a common shareholder.',
+  'Live within your income and save so that you can invest.',
+  'Take a simple idea and take it seriously.',
+  'Those who keep learning will keep rising in life.',
+  'Patience combined with opportunity is a great thing.',
 ];
 
 const CURVE = 'M0,790 C180,730 340,500 520,468 C620,450 690,470 760,512 C840,560 900,592 1000,592 C1160,592 1280,500 1420,432 C1500,393 1540,372 1600,348 C1700,308 1820,250 1920,224';
