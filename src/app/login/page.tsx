@@ -7,20 +7,20 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 const DONE_MS = 600; // the "You're in" beat before redirecting to the dashboard
 const GBTN_STYLE: CSSProperties = { width: '100%', minHeight: 56, padding: '0 22px', borderRadius: 18, background: 'rgba(255,255,255,0.66)', backdropFilter: 'blur(14px) saturate(1.4)', WebkitBackdropFilter: 'blur(14px) saturate(1.4)', border: '1px solid rgba(255,255,255,0.7)', boxShadow: '0 14px 30px rgba(124,92,255,.16),inset 0 1px 0 rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 15.5, color: '#1a1813' };
 
-// Charlie Munger — a fresh one each load. Curated to genuine, well-attributed
-// investing/decision lines (trimmed where the original ran long, not invented).
+// Charlie Munger — a fresh one each page load. Curated to genuine, well-attributed
+// INVESTING / TRADING / MARKETS lines (trimmed where his original ran long, not invented).
 const QUOTES = [
   'The big money is not in the buying and selling, but in the waiting.',
+  'It’s waiting that helps you as an investor — a lot of people just can’t stand to wait.',
   'Invert, always invert.',
-  'All I want to know is where I’m going to die, so I’ll never go there.',
-  'Show me the incentive and I’ll show you the outcome.',
-  'We try to be consistently not stupid, instead of trying to be very intelligent.',
   'A great business at a fair price is superior to a fair business at a great price.',
+  'We try to be consistently not stupid, instead of trying to be very intelligent.',
+  'Buy a few great companies and then sit on your hands.',
   'The desire to get rich fast is pretty dangerous.',
-  'Knowing what you don’t know is more useful than being brilliant.',
-  'Spend each day trying to be a little wiser than you were when you woke up.',
+  'There are three ways a smart person can go broke: liquor, ladies, and leverage.',
   'Opportunity comes to the prepared mind.',
   'The wise ones bet heavily when the world offers them that opportunity.',
+  'When it’s raining gold, reach for a bucket, not a thimble.',
   'You don’t have to be brilliant, only a little wiser than the others, on average, for a long time.',
   'It’s not supposed to be easy. Anyone who finds it easy is stupid.',
   'The first rule of compounding: never interrupt it unnecessarily.',
@@ -28,9 +28,21 @@ const QUOTES = [
   'It takes character to sit with all that cash and to do nothing.',
   'Mimicking the herd invites regression to the mean.',
   'If you’re not willing to react with equanimity to a 50% decline two or three times a century, you’re not fit to be a common shareholder.',
+  'Knowing what you don’t know is more useful than being brilliant.',
+  'Put most opportunities in the “too hard” pile, and sift for the few easy ones.',
+  'View a stock as owning a piece of a business — judge it by its competitive advantage.',
+  'The trick is to get more quality than you pay for in price.',
+  'Don’t focus on the froth of the market — find good long-term investments and hold them.',
+  'Take out our fifteen best decisions and we’d have a pretty average record.',
+  'Betting on the quality of a business is usually better than betting on the quality of management.',
+  'Successful investing requires gutsy patience — and being ready to pounce when the opportunity comes.',
+  'Move only when you have the advantage — know the odds and bet only when they’re in your favor.',
+  'Calling someone who trades actively an investor is like calling someone who has one-night stands a romantic.',
+  'Rapid destruction of your wrong ideas is one of the most valuable qualities you can acquire.',
+  'Capitalism without failure is like religion without sin.',
+  'Show me the incentive and I’ll show you the outcome.',
+  'All I want to know is where I’m going to die, so I’ll never go there.',
   'Live within your income and save so that you can invest.',
-  'Take a simple idea and take it seriously.',
-  'Those who keep learning will keep rising in life.',
   'Patience combined with opportunity is a great thing.',
 ];
 
