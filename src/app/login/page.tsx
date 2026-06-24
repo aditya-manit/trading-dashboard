@@ -83,6 +83,7 @@ function SplashInner() {
   const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
   const [step, setStep] = useState<Step>('signin');
   const [email, setEmail] = useState('');
+  const [avatar, setAvatar] = useState('');
   const [factorId, setFactorId] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -104,6 +105,7 @@ function SplashInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setEmail(user.email || '');
+      setAvatar((user.user_metadata as { avatar_url?: string } | undefined)?.avatar_url || '');
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (aal?.currentLevel === 'aal2') { router.replace('/'); return; }
       const { data: f } = await supabase.auth.mfa.listFactors();
@@ -215,7 +217,10 @@ function SplashInner() {
   ) : (
     <div style={{ minHeight: 50, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <div style={{ fontWeight: 700, fontSize: 14.5, color: '#1a1813' }}>Signed in with Google</div>
-      <div style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d', marginTop: 2 }}>{email || 'your account'}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 3 }}>
+        {avatar && <img src={avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} style={{ width: 17, height: 17, borderRadius: '50%', flex: '0 0 auto', objectFit: 'cover', border: '1px solid rgba(124,92,255,.25)' }} />}
+        <span style={{ fontWeight: 600, fontSize: 12.5, color: '#9b988d' }}>{email || 'your account'}</span>
+      </div>
     </div>
   );
 
