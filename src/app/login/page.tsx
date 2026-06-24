@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState, type CSSProperties } from 'react
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
+const DONE_MS = 600; // the "You're in" beat before redirecting to the dashboard
 const GBTN_STYLE: CSSProperties = { width: '100%', minHeight: 56, padding: '0 22px', borderRadius: 18, background: 'rgba(255,255,255,0.66)', backdropFilter: 'blur(14px) saturate(1.4)', WebkitBackdropFilter: 'blur(14px) saturate(1.4)', border: '1px solid rgba(255,255,255,0.7)', boxShadow: '0 14px 30px rgba(124,92,255,.16),inset 0 1px 0 rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 15.5, color: '#1a1813' };
 
 // Charlie Munger — a fresh one each load. Curated to genuine, well-attributed
@@ -125,7 +126,7 @@ function SplashInner() {
     const { error: ve } = await supabase.auth.mfa.verify({ factorId, challengeId: ch.id, code: code.join('') });
     if (ve) { setError('Invalid code — try again.'); setCode(['', '', '', '', '', '']); setVerifying(false); setTimeout(() => codeRefs.current[0]?.focus(), 40); return; }
     setVerifying(false); setStep('done');
-    setTimeout(() => router.replace('/'), 1100);
+    setTimeout(() => router.replace('/'), DONE_MS);
   };
   verifyRef.current = verify;
 
@@ -251,12 +252,14 @@ function SplashInner() {
       <span>Your dashboard</span>
     </div>
   ) : (
-    <div style={{ minHeight: 56, padding: '0 22px', borderRadius: 18, background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(14px) saturate(1.3)', WebkitBackdropFilter: 'blur(14px) saturate(1.3)', border: '1px solid rgba(255,255,255,0.65)', boxShadow: '0 14px 30px rgba(31,157,85,.16),inset 0 1px 0 rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', gap: 12, animation: 'spLoCardIn .4s ease both' }}>
+    <div style={{ position: 'relative', overflow: 'hidden', minHeight: 56, padding: '0 22px', borderRadius: 18, background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(14px) saturate(1.3)', WebkitBackdropFilter: 'blur(14px) saturate(1.3)', border: '1px solid rgba(255,255,255,0.65)', boxShadow: '0 14px 30px rgba(31,157,85,.16),inset 0 1px 0 rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', gap: 12, animation: 'spLoCardIn .4s ease both' }}>
       <span style={{ width: 27, height: 27, borderRadius: '50%', background: '#eafaf1', display: 'grid', placeItems: 'center', flex: '0 0 auto', animation: 'spLoPop .5s cubic-bezier(.2,.9,.3,1.2) both' }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.2 4.2L19 7" stroke="#1f9d55" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" /></svg></span>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <span style={{ fontWeight: 800, fontSize: 15, color: '#1a1813' }}>You’re in</span>
         <span style={{ fontWeight: 600, fontSize: 12, color: '#8a8579', marginTop: 1 }}>Loading your dashboard…</span>
       </div>
+      {/* fills over exactly DONE_MS, then we redirect */}
+      <div style={{ position: 'absolute', left: 0, bottom: 0, height: 3, width: '100%', transformOrigin: 'left', transform: 'scaleX(0)', background: 'linear-gradient(90deg,#9d82ff,#1f9d55)', animation: `spLoProg ${DONE_MS}ms linear forwards` }} />
     </div>
   );
 
@@ -325,6 +328,7 @@ const SP_CSS = `
 @keyframes spLoSpin{to{transform:rotate(360deg);}}
 @keyframes spLoPop{0%{transform:scale(0);}60%{transform:scale(1.12);}100%{transform:scale(1);}}
 @keyframes spLoWave{0%,62%,100%{transform:rotate(0deg);}10%{transform:rotate(15deg);}20%{transform:rotate(-9deg);}30%{transform:rotate(15deg);}40%{transform:rotate(-5deg);}50%{transform:rotate(11deg);}}
+@keyframes spLoProg{from{transform:scaleX(0);}to{transform:scaleX(1);}}
 .spLoGbtn{transition:background .25s ease,border-color .25s ease,box-shadow .25s ease;}
 .spLoGbtn:hover:not(:disabled){background:rgba(255,255,255,0.86) !important;border-color:rgba(255,255,255,0.92) !important;box-shadow:0 16px 34px rgba(124,92,255,.2),inset 0 1px 0 rgba(255,255,255,.7) !important;}
 .spLoVbtn{transition:filter .25s ease;}
