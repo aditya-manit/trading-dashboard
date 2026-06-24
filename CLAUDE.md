@@ -198,6 +198,8 @@ the LIVE·SYMBOL/USDT eyebrow + title, **refresh** + **theme toggle**, and the *
   Hover shows a **price chip (left) + Liq-value chip (right)** at the crosshair; the title + readout
   carry a strong triple-halo `text-shadow` so they stay legible over bright bars (handoff 37).
 - **5-cell stats strip** (Center of gravity / Nearest magnet ↑ / ↓ / Strongest wall / Leverage load·σ)
+  — each label carries a **dot tinted to match its chart marker line** (CoG purple / MAG↑ green / MAG↓
+  theme-aware pink / WALL blue; Leverage load has none, it has no marker).
   keeps the day-over-day Δ + 14d sparkline on the CoG + Leverage-load cells (the daily store/cron from
   handoff 31 still feeds it). Crosshair tooltip shows the cell's liquidation-leverage value.
 The data/route/metrics/daily-store from handoff 31 are unchanged (see below).

@@ -352,7 +352,7 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
       </div>
 
       {/* stats strip */}
-      {metrics && <div style={{ padding: '12px 16px 4px', flex: '0 0 auto' }}><StatsStrip m={metrics} trend={trend} /></div>}
+      {metrics && <div style={{ padding: '12px 16px 4px', flex: '0 0 auto' }}><StatsStrip m={metrics} trend={trend} dark={dark} /></div>}
 
       {/* main */}
       <div style={{ flex: 1, display: 'flex', gap: 14, padding: '14px 16px', minHeight: 0 }}>
@@ -477,23 +477,29 @@ function Controls({ symbol, model, interval, onSym, onModel, onInterval }: { sym
   );
 }
 
-function StatsStrip({ m, trend }: { m: NonNullable<ReturnType<typeof computeHeatmapMetrics>>; trend: { tllSeries: number[]; gapSeries: number[]; tllPrev: number | null; gapPrev: number | null } }) {
+function StatsStrip({ m, trend, dark }: { m: NonNullable<ReturnType<typeof computeHeatmapMetrics>>; trend: { tllSeries: number[]; gapSeries: number[]; tllPrev: number | null; gapPrev: number | null }; dark: boolean }) {
   const GRN = '#1f9d55', RED = '#df5338', PUR = '#7c5cff', MUT = 'var(--muted)';
-  const label = (t: string) => <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: MUT, whiteSpace: 'nowrap' }}>{t}</span>;
+  // dot colors mirror the chart's marker lines (CoG / MAG↑ / MAG↓ / WALL)
+  const MAGDN = dark ? '#ff6b9d' : '#d6336c', WALL = '#2b6ce8';
+  const label = (t: string, dot?: string) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SANS, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: MUT, whiteSpace: 'nowrap' }}>
+      {dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flex: '0 0 auto' }} />}{t}
+    </span>
+  );
   const big = (t: string) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--ink)' }}>{t}</span>;
   const bigA = (arrow: string, ac: string, num: string) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--ink)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ color: ac, fontSize: 14 }}>{arrow}</span>{num}</span>;
   const sm = (t: string, c: string) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, color: c, whiteSpace: 'nowrap' }}>{t}</span>;
-  const cell = (lab: string, kids: React.ReactNode, last?: boolean) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '13px 20px', flex: '1 1 0', minWidth: 0, borderRight: last ? 'none' : '1px solid var(--divider)' }}>{label(lab)}<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 2 }}>{kids}</div></div>
+  const cell = (lab: string, kids: React.ReactNode, dot?: string, last?: boolean) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '13px 20px', flex: '1 1 0', minWidth: 0, borderRight: last ? 'none' : '1px solid var(--divider)' }}>{label(lab, dot)}<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 2 }}>{kids}</div></div>
   );
   const up = m.lcgGap >= 0;
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', width: '100%', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
-      {cell('Center of gravity', <>{big(fmtPrice(m.lcg))}{sm((up ? '▲ +' : '▼ −') + Math.abs(m.lcgGap).toFixed(2) + '%', up ? GRN : RED)}<GapDelta cur={m.lcgGap} prev={trend.gapPrev} /><Spark data={trend.gapSeries} color="#7c5cff" /></>)}
-      {cell('Nearest magnet ↑', m.nearestAbove ? <>{bigA('↑', GRN, fmtPrice(m.nearestAbove.peakPrice))}{sm(fmtVal(m.nearestAbove.peak), PUR)}{sm('+' + m.nearestAbove.dist.toFixed(2) + '%', GRN)}</> : big('—'))}
-      {cell('Nearest magnet ↓', m.nearestBelow ? <>{bigA('↓', RED, fmtPrice(m.nearestBelow.peakPrice))}{sm(fmtVal(m.nearestBelow.peak), PUR)}{sm('−' + m.nearestBelow.dist.toFixed(2) + '%', RED)}</> : big('—'))}
-      {cell('Strongest wall', m.strongest ? <>{big(fmtPrice(m.strongest.peakPrice))}{sm(fmtVal(m.strongest.mass), PUR)}{sm(Math.round(m.strongest.share * 100) + '%', MUT)}{sm(`[${fmtPrice(m.strongest.lo)}–${fmtPrice(m.strongest.hi)}]`, 'var(--faint)')}</> : big('—'))}
-      {cell('Leverage load · σ', <>{big(fmtVal(m.totalFuel))}<FuelDelta cur={m.totalFuel} prev={trend.tllPrev} /><Spark data={trend.tllSeries} color="#ef9512" />{sm('σ ' + m.sigma.toFixed(1) + '%', MUT)}</>, true)}
+      {cell('Center of gravity', <>{big(fmtPrice(m.lcg))}{sm((up ? '▲ +' : '▼ −') + Math.abs(m.lcgGap).toFixed(2) + '%', up ? GRN : RED)}<GapDelta cur={m.lcgGap} prev={trend.gapPrev} /><Spark data={trend.gapSeries} color="#7c5cff" /></>, PUR)}
+      {cell('Nearest magnet ↑', m.nearestAbove ? <>{bigA('↑', GRN, fmtPrice(m.nearestAbove.peakPrice))}{sm(fmtVal(m.nearestAbove.peak), PUR)}{sm('+' + m.nearestAbove.dist.toFixed(2) + '%', GRN)}</> : big('—'), GRN)}
+      {cell('Nearest magnet ↓', m.nearestBelow ? <>{bigA('↓', RED, fmtPrice(m.nearestBelow.peakPrice))}{sm(fmtVal(m.nearestBelow.peak), PUR)}{sm('−' + m.nearestBelow.dist.toFixed(2) + '%', RED)}</> : big('—'), MAGDN)}
+      {cell('Strongest wall', m.strongest ? <>{big(fmtPrice(m.strongest.peakPrice))}{sm(fmtVal(m.strongest.mass), PUR)}{sm(Math.round(m.strongest.share * 100) + '%', MUT)}{sm(`[${fmtPrice(m.strongest.lo)}–${fmtPrice(m.strongest.hi)}]`, 'var(--faint)')}</> : big('—'), WALL)}
+      {cell('Leverage load · σ', <>{big(fmtVal(m.totalFuel))}<FuelDelta cur={m.totalFuel} prev={trend.tllPrev} /><Spark data={trend.tllSeries} color="#ef9512" />{sm('σ ' + m.sigma.toFixed(1) + '%', MUT)}</>, undefined, true)}
     </div>
   );
 }
