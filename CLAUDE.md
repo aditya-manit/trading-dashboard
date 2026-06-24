@@ -143,6 +143,11 @@ The whole Plan funnel is ported and live. Files under `components/plan/`:
   mark from open-position `mark_price` else latest Gate daily close; equity from
   `useAccount().total`); threaded into `tpCompute(d, equity, mark)`. `CX-####` from
   the futures user id when a position is open, else omitted.
+  - **Risk backdrops** (`RiskAlert`): a full-screen red radial-wash modal fires when you cross
+    **above 5× leverage** ("liquor, ladies, and leverage" Munger quote → "Whoa. Past 5×.") or
+    **above 50% size** in a %-mode ("first rule of compounding" → "Over half your account."),
+    with a striped pulsing alert card + **Adjust to 5× / Trim to 50%** vs a dismiss button.
+    Fires on CROSSING up (re-arms when back in the safe zone); blocked thresholds are 10× / 70%.
 - `Board.tsx` — Plans board: `ac` cards (margin donut + coin/name/dir/lev +
   **conviction dots** + entry + risk/reward + split bar). Cursor: `pointer` at rest,
   `grabbing` while dragging. Lanes have colored **glow haloes** (no box) + **number-led

@@ -202,9 +202,24 @@ export function Editor() {
 
   const c = tpCompute(d, equity, d.sym === 'BTC' ? btcMark : undefined);
   const [full, setFull] = useState<string | null>(null);
+  // Dramatic risk backdrops: fire when crossing ABOVE 5× leverage / 50% size,
+  // re-arm once back in the safe zone (matches the dc.html behaviour).
   const [levAlert, setLevAlert] = useState(false);
+  const [sizeAlert, setSizeAlert] = useState(false);
   const prevLev = useRef(d.lev);
-  useEffect(() => { if (d.lev > 5 && prevLev.current <= 5) setLevAlert(true); prevLev.current = d.lev; }, [d.lev]);
+  const prevSizePct = useRef(0);
+  useEffect(() => {
+    if (d.lev > 5 && prevLev.current <= 5) setLevAlert(true);
+    if (d.lev <= 5) setLevAlert(false);
+    prevLev.current = d.lev;
+  }, [d.lev]);
+  useEffect(() => {
+    const isPct = d.sizeMode === 'marginpct' || d.sizeMode === 'riskpct';
+    const v = tpNum(d.sizeVal) || 0;
+    if (isPct && v > 50 && !(prevSizePct.current > 50)) setSizeAlert(true);
+    if (!isPct || v <= 50) setSizeAlert(false);
+    prevSizePct.current = isPct ? v : 0;
+  }, [d.sizeVal, d.sizeMode]);
 
   const curMode = SIZE_MODES.find((s) => s.v === d.sizeMode)!;
   const isPctMode = d.sizeMode === 'marginpct' || d.sizeMode === 'riskpct';
@@ -401,21 +416,72 @@ export function Editor() {
 
       {full ? <div onClick={() => setFull(null)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(14,13,11,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, boxSizing: 'border-box', cursor: 'zoom-out' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={full} alt="" style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', borderRadius: 10 }} /></div> : null}
 
-      {levAlert ? (
-        <div onClick={() => setLevAlert(false)} style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'rgba(20,18,12,0.55)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', padding: 24 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: 424, maxWidth: '100%', background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: '0 30px 80px rgba(20,18,12,0.4)' }}>
-            <div style={{ background: '#df5338', padding: '14px 22px', display: 'flex', alignItems: 'center', gap: 10 }}><svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg><span style={{ fontWeight: 800, fontSize: 14, color: '#fff', letterSpacing: '0.02em' }}>HIGH LEVERAGE</span></div>
-            <div style={{ padding: '24px 24px 0', textAlign: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: 19, color: '#1a1813', letterSpacing: '-0.02em' }}>Above 5× is how accounts die.</div>
-              <div style={{ fontWeight: 500, fontSize: 13.5, color: '#897f70', lineHeight: 1.5, margin: '10px 0 22px' }}>Leverage shrinks your distance to liquidation. At {levVal}× a small move against you wipes the position. Keep size small and let the trade breathe.</div>
-            </div>
-            <div style={{ display: 'flex' }}>
-              <button onClick={() => { planActions.setDraft({ lev: 5 }); setLevAlert(false); }} style={{ flex: 1, padding: 16, border: 'none', background: '#1f9d55', color: '#fff', fontWeight: 800, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}>Adjust to 5×</button>
-              <button onClick={() => setLevAlert(false)} style={{ flex: 1, padding: 16, border: 'none', borderLeft: '1px solid #f0efec', background: '#fff', color: '#a8a69b', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}>I know what I&rsquo;m doing</button>
-            </div>
+      <style>{RISK_KF}</style>
+      {levAlert && <RiskAlert kind="lev" onAdjust={() => { planActions.setDraft({ lev: 5 }); setLevAlert(false); }} onDismiss={() => setLevAlert(false)} />}
+      {sizeAlert && <RiskAlert kind="size" onAdjust={() => { planActions.setDraft({ sizeVal: '50' }); setSizeAlert(false); }} onDismiss={() => setSizeAlert(false)} />}
+    </div>
+  );
+}
+
+const RISK_KF = `
+@keyframes edFade{from{opacity:0}to{opacity:1}}
+@keyframes edAlertIn{0%{transform:scale(.7) translateY(30px) rotate(-1deg);opacity:0}55%{transform:scale(1.05) translateY(0) rotate(.5deg)}72%{transform:scale(.98) rotate(-.4deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+@keyframes edShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-9px)}30%{transform:translateX(8px)}45%{transform:translateX(-6px)}60%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
+@keyframes edStripes{from{background-position:0 0}to{background-position:64px 0}}
+@keyframes edThrob{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+@keyframes edRing{0%{transform:scale(.7);opacity:.65}100%{transform:scale(2.1);opacity:0}}
+`;
+
+// Full-screen risk backdrop shown when leverage > 5× or position size > 50%
+// (handoff: red radial wash + Munger quote + striped pulsing alert card).
+function RiskAlert({ kind, onAdjust, onDismiss }: { kind: 'lev' | 'size'; onAdjust: () => void; onDismiss: () => void }) {
+  const lev = kind === 'lev';
+  const quote = lev
+    ? 'There are three ways a smart person can go broke: liquor, ladies, and leverage.'
+    : 'The first rule of compounding: never interrupt it unnecessarily.';
+  const icon = lev
+    ? <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></>
+    : <><path d="M12 2v6" /><path d="m4.93 10.93 1.41 1.41" /><path d="M2 18h2" /><path d="M20 18h2" /><path d="m19.07 10.93-1.41 1.41" /><path d="M22 22H2" /><path d="m8 6 4-4 4 4" /><path d="M16 18a4 4 0 0 0-8 0" /></>;
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'radial-gradient(120% 105% at 50% 16%,rgba(178,30,12,0.60) 0%,rgba(92,12,6,0.80) 38%,rgba(34,7,5,0.92) 70%,rgba(10,4,3,0.96) 100%)', backdropFilter: 'blur(7px) saturate(1.15)', WebkitBackdropFilter: 'blur(7px) saturate(1.15)', animation: 'edFade .25s ease', fontFamily: 'inherit' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', padding: '40px 24px', pointerEvents: 'none' }}>
+        <div style={{ maxWidth: 640, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontWeight: 700, fontSize: 72, lineHeight: 0.5, color: 'rgba(255,255,255,0.5)' }}>“</span>
+          <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontWeight: 600, fontSize: 27, lineHeight: 1.38, letterSpacing: '-0.005em', color: 'rgba(255,255,255,0.72)' }}>{quote}”</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontWeight: 800, fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' }}><span style={{ width: 26, height: 1.5, background: 'rgba(255,255,255,0.45)' }} />Charlie Munger</span>
+        </div>
+      </div>
+      <div style={{ position: 'relative', width: 'min(424px,92vw)', background: '#fff', borderRadius: 26, overflow: 'hidden', boxShadow: '0 40px 100px rgba(60,8,4,0.55)', animation: 'edAlertIn .55s cubic-bezier(.2,1.2,.3,1) both' }}>
+        <div style={{ position: 'relative', overflow: 'hidden', background: '#df5338', padding: '24px 32px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 13, textAlign: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(45deg,rgba(0,0,0,0.10) 0 16px,transparent 16px 32px)', backgroundSize: '64px 64px', animation: 'edStripes 1.1s linear infinite' }} />
+          <div style={{ position: 'relative', width: 80, height: 80, display: 'grid', placeItems: 'center', animation: 'edShake .6s ease both .1s' }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(255,255,255,0.4)', animation: 'edRing 1.6s ease-out infinite' }} />
+            <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(255,255,255,0.4)', animation: 'edRing 1.6s ease-out infinite .8s' }} />
+            <span style={{ position: 'relative', width: 70, height: 70, borderRadius: '50%', background: '#fff', display: 'grid', placeItems: 'center', boxShadow: '0 8px 22px rgba(60,8,4,0.35)', animation: 'edThrob 1s ease-in-out infinite' }}>
+              <svg width={38} height={38} viewBox="0 0 24 24" fill="none" stroke="#df5338" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
+            </span>
+          </div>
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.82)' }}>{lev ? 'Leverage check' : 'Position size check'}</span>
+            <span style={{ fontWeight: 800, fontSize: 34, letterSpacing: '-0.025em', color: '#fff', lineHeight: 1.02 }}>{lev ? 'Whoa. Past 5×.' : 'Over half your account.'}</span>
           </div>
         </div>
-      ) : null}
+        <div style={{ padding: '16px 26px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 11, textAlign: 'center' }}>
+          <span style={{ fontWeight: 700, fontSize: 17, lineHeight: 1.45, color: '#1a1813', letterSpacing: '-0.01em' }}>
+            {lev ? <>Last time you pushed past this, you <span style={{ color: '#df5338' }}>nearly blew the account.</span></> : <>One trade shouldn’t be able to <span style={{ color: '#df5338' }}>decide your whole month.</span></>}
+          </span>
+          <span style={{ fontWeight: 500, fontSize: 13.5, lineHeight: 1.5, color: '#897f70' }}>{lev ? 'Slow down. Is this size really worth it — or is this the same impulse as before? Above 10× you won’t even be able to save the plan.' : 'A single idea this size leaves no room to be wrong. Above 70% you won’t even be able to save the plan.'}</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid #f0efec' }}>
+          <button onClick={onAdjust} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', fontFamily: 'inherit', background: '#eef8f1', border: 'none', borderRight: '1px solid #ebe9e3', padding: '17px 14px' }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#1f8a4a" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+            <span style={{ fontWeight: 800, fontSize: 13.5, color: '#1f8a4a', letterSpacing: '-0.01em' }}>{lev ? 'Adjust to 5×' : 'Trim to 50%'}</span>
+          </button>
+          <button onClick={onDismiss} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontFamily: 'inherit', background: '#fff', border: 'none', padding: '17px 14px' }}>
+            <span style={{ fontWeight: 700, fontSize: 12.5, color: '#d6a59b', letterSpacing: '-0.01em' }}>{lev ? 'Fuck you, I am god' : 'I know what I’m doing'}</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
