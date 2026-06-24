@@ -641,16 +641,20 @@ Files:
   clients (publishable key + cookies). `cookies()` is async in Next 16.
 - `src/app/login/page.tsx` — **unified "Opening Splash" sign-in** (handoff 39): editorial
   lavender scene (drifting aurora, faint grid, self-drawing purple price curve + pulsing live
-  dot), top-right mark + PLAN·EXECUTE·REVIEW, bottom-right rotating Charlie Munger quote (random
-  each load), and a left **3-step roadmap** on a thread: ① Continue with Google → ② Authenticator
-  code → ③ Your dashboard. **It hosts BOTH auth steps** (real, not the handoff mock):
+  dot), top-right mark + PLAN·EXECUTE·REVIEW, bottom-right Charlie Munger quote, and a left
+  **3-step roadmap** on a thread: ① Continue with Google → ② Authenticator code → ③ Your dashboard.
+  **It hosts BOTH auth steps** (real, not the handoff mock):
   - **State-adaptive on mount** — reads the live session: no session → step ① active (real
     `signInWithOAuth('google')`); signed-in owner **AAL1 + verified factor** → step ① collapses to
-    "Signed in · email ✓" and step ② expands into the 6-digit grid wired to **real `mfa.challenge`
-    + `mfa.verify`** (auto-verifies on the 6th digit; wrong code rejected server-side, NOT "any 6
-    digits"); on success → step ③ "You're in" → `router.replace('/')`; AAL1 **no factor** →
-    `/mfa/setup`; already **AAL2** → `/`.
+    "Signed in · email ✓" (with the user's **Google avatar** before the email — `user_metadata.avatar_url`,
+    `referrerPolicy="no-referrer"`, hide-on-error) and step ② expands into the 6-digit grid wired to
+    **real `mfa.challenge` + `mfa.verify`** (auto-verifies on the 6th digit; wrong code rejected
+    server-side, NOT "any 6 digits"); on success → step ③ "You're in" with a progress bar that fills
+    over **`DONE_MS` = 600ms**, then `router.replace('/')`; AAL1 **no factor** → `/mfa/setup`; **AAL2** → `/`.
   - "Use a different account" + the `?error=unauthorized` not-authorized banner POST to `/auth/signout`.
+  - **Quote** = `QUOTES` array, **random pick per page load** (not a timed rotation) — ~34 genuine,
+    well-attributed Munger INVESTING/TRADING/MARKETS lines (trimmed where his original ran long, not
+    invented; deliberately excludes his general life/temperament quotes).
   - Security UNCHANGED — same Google + real TOTP + owner-only + AAL2 + 24h + fail-closed gate,
     re-checked server-side per request; the splash only unifies the UI. The code step renders only
     for an AAL1 session, so a stranger never sees it.
