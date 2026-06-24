@@ -259,8 +259,12 @@ The data/route/metrics/daily-store from handoff 31 are unchanged (see below).
     1-week — so metrics are comparable only within one symbol+interval). The colorbar top label is
     literally that max value.
   - **Shared preprocessing:** surviving fuel per level `L(p)` = max over the last `max(3, 2% of cols)`
-    columns (the "now" edge); baseline `b` = median of nonzero `L(p)` (noise floor); clusters = adjacent
-    above-baseline levels merged within `0.25% × price`; `totalFuel` (TLL) = Σ`L(p)`; `share = mass/total`.
+    columns (the "now" edge); baseline `b` = median of nonzero `L(p)` (noise floor); adjacent above-baseline
+    levels merged within `0.25% × price` into runs, then each run is trimmed to its **dense core** —
+    the contiguous levels ≥ `CORE_FRAC` (0.35) of the run's peak around that peak (FWHM-style). So a broad
+    continuous smear collapses to its center (e.g. a 2%-wide band → ~0.5%) instead of summing the whole 2%.
+    Each cluster carries `peak` (single strongest level value), `mass` (Σ over the core), `lo/hi` (core range),
+    `peakPrice`. `totalFuel` (TLL) = Σ`L(p)`; `share = mass/total`.
   - **Distance scale τ = realized window volatility** (1σ of log-return moves, %), floored at 0.5% —
     fully self-tuning across 12h/24h/1w (bigger window → bigger σ → distant magnets count more), NO
     hardcoded proportion (we explicitly chose `τ = σ` over `τ = R/2` to drop the magic ÷2).
@@ -268,8 +272,11 @@ The data/route/metrics/daily-store from handoff 31 are unchanged (see below).
     below. Chosen over ChatGPT's `liquidity/distance` because the latter diverges as distance→0 (a tiny
     cluster on top of price wins), uses dollar (non-scale-free) distance, raw window-dependent size, and
     has no horizon knob; `exp()` is bounded and τ is vol-calibrated.
-  - **Metric 2 — Strongest wall:** `argmax(mass)` over clusters (distance-agnostic). Same core as
-    ChatGPT but on grouped walls, not single bins.
+    The **strip shows each magnet's `peak`** (single strongest level — matches a bright cell), NOT the
+    band `mass`, so the number isn't inflated by the band width.
+  - **Metric 2 — Strongest wall:** `argmax(mass)` over clusters (distance-agnostic); mass = the core-band
+    sum, and the strip shows the core `[lo–hi]` range next to it. Same idea as ChatGPT but on grouped/
+    core-trimmed walls, not single bins or a 2% smear.
   - **Metric 3 — Liquidation center of gravity:** `Σ(p·max(0,L(p)−b)) / Σ max(0,L(p)−b)` — the
     fuel-weighted price; baseline-subtracted so the diffuse background doesn't drag it to the y-range
     midpoint (ChatGPT's raw `Σ(p·liq)/Σliq` degenerates on flat days). `lcgGap>0 ⇒ fuel above ⇒ upward pull`.

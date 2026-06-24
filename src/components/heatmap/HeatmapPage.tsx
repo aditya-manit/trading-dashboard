@@ -490,9 +490,9 @@ function StatsStrip({ m, trend }: { m: NonNullable<ReturnType<typeof computeHeat
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', width: '100%', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
       {cell('Center of gravity', <>{big(fmtPrice(m.lcg))}{sm((up ? '▲ +' : '▼ −') + Math.abs(m.lcgGap).toFixed(2) + '%', up ? GRN : RED)}<GapDelta cur={m.lcgGap} prev={trend.gapPrev} /><Spark data={trend.gapSeries} color="#7c5cff" /></>)}
-      {cell('Nearest magnet ↑', m.nearestAbove ? <>{bigA('↑', GRN, fmtPrice(m.nearestAbove.peakPrice))}{sm(fmtVal(m.nearestAbove.mass), PUR)}{sm('+' + m.nearestAbove.dist.toFixed(2) + '%', GRN)}</> : big('—'))}
-      {cell('Nearest magnet ↓', m.nearestBelow ? <>{bigA('↓', RED, fmtPrice(m.nearestBelow.peakPrice))}{sm(fmtVal(m.nearestBelow.mass), PUR)}{sm('−' + m.nearestBelow.dist.toFixed(2) + '%', RED)}</> : big('—'))}
-      {cell('Strongest wall', m.strongest ? <>{big(fmtPrice(m.strongest.peakPrice))}{sm(fmtVal(m.strongest.mass), PUR)}{sm(Math.round(m.strongest.share * 100) + '%', MUT)}</> : big('—'))}
+      {cell('Nearest magnet ↑', m.nearestAbove ? <>{bigA('↑', GRN, fmtPrice(m.nearestAbove.peakPrice))}{sm(fmtVal(m.nearestAbove.peak), PUR)}{sm('+' + m.nearestAbove.dist.toFixed(2) + '%', GRN)}</> : big('—'))}
+      {cell('Nearest magnet ↓', m.nearestBelow ? <>{bigA('↓', RED, fmtPrice(m.nearestBelow.peakPrice))}{sm(fmtVal(m.nearestBelow.peak), PUR)}{sm('−' + m.nearestBelow.dist.toFixed(2) + '%', RED)}</> : big('—'))}
+      {cell('Strongest wall', m.strongest ? <>{big(fmtPrice(m.strongest.peakPrice))}{sm(fmtVal(m.strongest.mass), PUR)}{sm(Math.round(m.strongest.share * 100) + '%', MUT)}{sm(`[${fmtPrice(m.strongest.lo)}–${fmtPrice(m.strongest.hi)}]`, 'var(--faint)')}</> : big('—'))}
       {cell('Leverage load · σ', <>{big(fmtVal(m.totalFuel))}<FuelDelta cur={m.totalFuel} prev={trend.tllPrev} /><Spark data={trend.tllSeries} color="#ef9512" />{sm('σ ' + m.sigma.toFixed(1) + '%', MUT)}</>, true)}
     </div>
   );

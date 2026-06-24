@@ -8,10 +8,11 @@ import type { HeatmapData } from '@/hooks/useHeatmap';
 // (self-tuning across 12h/24h/1w), floored so a dead-flat window can't collapse it.
 
 export interface Cluster {
-  lo: number;        // zone low price
-  hi: number;        // zone high price
+  lo: number;        // zone low price (the dense CORE — see CORE_FRAC)
+  hi: number;        // zone high price (core)
   peakPrice: number; // price of the strongest level in the zone (the magnet line)
-  mass: number;      // Σ surviving fuel in the zone (USD)
+  peak: number;      // value of that single strongest level (USD) — magnets report this
+  mass: number;      // Σ surviving fuel in the CORE band (USD) — wall reports this
   share: number;     // mass / totalFuel  (0..1, scale-free)
   dist: number;      // |peakPrice − price| / price × 100  (% from current price)
   side: 'above' | 'below';
@@ -35,6 +36,9 @@ export interface HeatmapMetrics {
 const NOW_FRAC = 0.02;     // "now" edge = last max(3, 2% of columns)
 const GAP_FRAC = 0.0025;   // merge adjacent active levels within 0.25% of price
 const TAU_FLOOR = 0.5;     // % — safety rail for near-zero-vol windows
+const CORE_FRAC = 0.35;    // a wall's reported band = contiguous levels ≥ 35% of its peak
+                           // (a moderate dense core), so a broad smear collapses to its center
+                           // without shrinking to a single cell (0.5 = tighter, 0.25 = wider)
 
 function median(xs: number[]): number {
   if (!xs.length) return 0;
@@ -65,29 +69,32 @@ export function computeHeatmapMetrics(d: HeatmapData | undefined | null): Heatma
   const totalFuel = levels.reduce((s, r) => s + r.v, 0);
   const baseline = median(levels.filter((r) => r.v > 0).map((r) => r.v));
 
-  // 2) Group adjacent above-baseline levels into clusters (walls).
+  // 2) Group adjacent above-baseline levels into runs, then report each as its
+  //    dense CORE (contiguous levels ≥ CORE_FRAC of the run's peak around that
+  //    peak) — so a broad continuous smear collapses to its bright center
+  //    instead of a 2%-wide band. mass/lo/hi describe the core; peak is the
+  //    single strongest level.
   const gap = GAP_FRAC * price;
-  const clusters: Cluster[] = [];
-  let cur: { lo: number; hi: number; mass: number; peak: number; peakPrice: number } | null = null;
-  const flush = () => {
-    if (!cur) return;
-    const dist = Math.abs(cur.peakPrice / price - 1) * 100;
-    clusters.push({
-      lo: cur.lo, hi: cur.hi, peakPrice: cur.peakPrice, mass: cur.mass,
-      share: totalFuel ? cur.mass / totalFuel : 0, dist,
-      side: cur.peakPrice >= price ? 'above' : 'below', score: 0,
-    });
-    cur = null;
-  };
+  const runs: { p: number; v: number }[][] = [];
+  let cur: { p: number; v: number }[] | null = null;
   for (const r of levels) {
     if (r.v > baseline) {
-      if (cur && r.p - cur.hi <= gap) {
-        cur.hi = r.p; cur.mass += r.v;
-        if (r.v > cur.peak) { cur.peak = r.v; cur.peakPrice = r.p; }
-      } else { flush(); cur = { lo: r.p, hi: r.p, mass: r.v, peak: r.v, peakPrice: r.p }; }
-    } else if (cur && r.p - cur.hi > gap) { flush(); }
+      if (cur && r.p - cur[cur.length - 1].p <= gap) cur.push(r);
+      else { if (cur) runs.push(cur); cur = [r]; }
+    } else if (cur && r.p - cur[cur.length - 1].p > gap) { runs.push(cur); cur = null; }
   }
-  flush();
+  if (cur) runs.push(cur);
+
+  const clusters: Cluster[] = runs.map((mem) => {
+    let pi = 0; for (let i = 1; i < mem.length; i++) if (mem[i].v > mem[pi].v) pi = i;
+    const peak = mem[pi].v, floor = CORE_FRAC * peak;
+    let a = pi, b = pi;
+    while (a - 1 >= 0 && mem[a - 1].v >= floor) a--;
+    while (b + 1 < mem.length && mem[b + 1].v >= floor) b++;
+    let mass = 0; for (let i = a; i <= b; i++) mass += mem[i].v;
+    const peakPrice = mem[pi].p, dist = Math.abs(peakPrice / price - 1) * 100;
+    return { lo: mem[a].p, hi: mem[b].p, peakPrice, peak, mass, share: totalFuel ? mass / totalFuel : 0, dist, side: peakPrice >= price ? 'above' : 'below', score: 0 };
+  });
 
   // 3) τ = realized window volatility (1σ move %), floored.
   const rets: number[] = [];
