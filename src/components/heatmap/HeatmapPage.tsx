@@ -499,7 +499,7 @@ function StatsStrip({ m, trend, dark }: { m: NonNullable<ReturnType<typeof compu
       {cell('Nearest magnet ↑', m.nearestAbove ? <>{bigA('↑', GRN, fmtPrice(m.nearestAbove.peakPrice))}{sm(fmtVal(m.nearestAbove.peak), PUR)}{sm('+' + m.nearestAbove.dist.toFixed(2) + '%', GRN)}</> : big('—'), GRN)}
       {cell('Nearest magnet ↓', m.nearestBelow ? <>{bigA('↓', RED, fmtPrice(m.nearestBelow.peakPrice))}{sm(fmtVal(m.nearestBelow.peak), PUR)}{sm('−' + m.nearestBelow.dist.toFixed(2) + '%', RED)}</> : big('—'), MAGDN)}
       {cell('Strongest wall', m.strongest ? <>{big(fmtPrice(m.strongest.peakPrice))}{sm(fmtVal(m.strongest.mass), PUR)}{sm(Math.round(m.strongest.share * 100) + '%', MUT)}{sm(`[${fmtPrice(m.strongest.lo)}–${fmtPrice(m.strongest.hi)}]`, 'var(--faint)')}</> : big('—'), WALL)}
-      {cell('Leverage load · σ', <>{big(fmtVal(m.totalFuel))}<FuelDelta cur={m.totalFuel} prev={trend.tllPrev} /><Spark data={trend.tllSeries} color="#ef9512" />{sm('σ ' + m.sigma.toFixed(1) + '%', MUT)}</>, undefined, true)}
+      {cell('Leverage load · σ', <>{big(fmtVal(m.totalFuel))}<FuelDelta cur={m.totalFuel} prev={trend.tllPrev} /><Spark data={trend.tllSeries} color="#ef9512" />{sm('σ ' + m.sigma.toFixed(1) + '%', MUT)}</>, '#ef9512', true)}
     </div>
   );
 }
