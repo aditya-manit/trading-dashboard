@@ -639,9 +639,21 @@ Files:
   misconfigured deploy redirects to `/login` rather than white-screening.
 - `src/lib/supabase/{client,server}.ts` — `@supabase/ssr` browser + server
   clients (publishable key + cookies). `cookies()` is async in Next 16.
-- `src/app/login/page.tsx` — login screen (favicon logo from `app/icon.svg`),
-  "Continue with Google"; shows "not authorized" + sign-out when a non-owner is
-  signed in (`?error=unauthorized`).
+- `src/app/login/page.tsx` — **unified "Opening Splash" sign-in** (handoff 39): editorial
+  lavender scene (drifting aurora, faint grid, self-drawing purple price curve + pulsing live
+  dot), top-right mark + PLAN·EXECUTE·REVIEW, bottom-right rotating Charlie Munger quote (random
+  each load), and a left **3-step roadmap** on a thread: ① Continue with Google → ② Authenticator
+  code → ③ Your dashboard. **It hosts BOTH auth steps** (real, not the handoff mock):
+  - **State-adaptive on mount** — reads the live session: no session → step ① active (real
+    `signInWithOAuth('google')`); signed-in owner **AAL1 + verified factor** → step ① collapses to
+    "Signed in · email ✓" and step ② expands into the 6-digit grid wired to **real `mfa.challenge`
+    + `mfa.verify`** (auto-verifies on the 6th digit; wrong code rejected server-side, NOT "any 6
+    digits"); on success → step ③ "You're in" → `router.replace('/')`; AAL1 **no factor** →
+    `/mfa/setup`; already **AAL2** → `/`.
+  - "Use a different account" + the `?error=unauthorized` not-authorized banner POST to `/auth/signout`.
+  - Security UNCHANGED — same Google + real TOTP + owner-only + AAL2 + 24h + fail-closed gate,
+    re-checked server-side per request; the splash only unifies the UI. The code step renders only
+    for an AAL1 session, so a stranger never sees it.
 - `src/app/auth/callback/route.ts` — `exchangeCodeForSession`.
 - `src/app/auth/signout/route.ts` — POST → `signOut()` → `/login`.
 - `src/components/layout/ProfileMenu.tsx` — Topbar avatar (Google
@@ -663,18 +675,17 @@ On top of Google login the owner must pass a **TOTP** check (authenticator app)
 to reach **AAL2**, re-prompted every **24h** (`MFA_MAX_AGE_S = 24*3600`, defined
 in BOTH `proxy.ts` and `auth-guard.ts` — keep them equal).
 - **Enforcement:** the proxy decodes the session JWT (`aal` + `amr[].timestamp`);
-  `mfaOk = aal==='aal2' && newest TOTP amr < 24h`. Owner-but-not-`mfaOk` → `/mfa`
-  (pages) / `401 {mfa_required}` (api). `requireOwner()` re-checks the same on
-  every `/api/gate/*` (defense in depth). Decode is safe — `getUser()` validated
-  the JWT first; `getSession()` is just for the claims.
-- **Pages** (`src/app/mfa/`): `/mfa/setup` — one-time enroll (`mfa.enroll` totp →
-  QR + secret → `challenge`+`verify`); `/mfa` — step-up/24h re-prompt (challenge a
-  verified factor). Both use `components/auth/AuthCard.tsx` (`AuthCard` + 6-digit
-  `CodeForm`). `/mfa` with no verified factor → `/mfa/setup`; setup clears
-  abandoned unverified factors before enrolling.
-- **Flow:** Google callback → session AAL1 → proxy → `/mfa` → (no factor) →
-  `/mfa/setup` → enroll → AAL2 → dashboard. Verifying refreshes the TOTP
-  timestamp, resetting the 24h window.
+  `mfaOk = aal==='aal2' && newest TOTP amr < 24h`. Owner-but-not-`mfaOk` → **`/login`**
+  (the unified splash hosts the code step now — handoff 39) / `401 {mfa_required}` (api).
+  `requireOwner()` re-checks the same on every `/api/gate/*` (defense in depth). Decode is
+  safe — `getUser()` validated the JWT first; `getSession()` is just for the claims.
+- **Pages:** the 24h re-prompt + first-login code step live on **`/login`** (the splash,
+  see above). `src/app/mfa/page.tsx` is now just a `redirect('/login')`. `/mfa/setup` —
+  one-time enroll (`mfa.enroll` totp → QR + secret → `challenge`+`verify`, uses
+  `components/auth/AuthCard.tsx`); setup clears abandoned unverified factors before enrolling.
+- **Flow:** Google callback (`exchangeCodeForSession`) → session AAL1 → proxy sends to
+  **`/login`**, which detects AAL1 → shows the code step (real `mfa.verify`) → AAL2 → dashboard.
+  No factor → `/mfa/setup` → enroll → AAL2. Verifying refreshes the TOTP timestamp (24h window).
 - **Needs Supabase MFA/TOTP enabled** in the project (Authentication settings;
   on by default). QR is a `data:` URI — already allowed by the CSP `img-src`.
 

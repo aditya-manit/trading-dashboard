@@ -90,10 +90,12 @@ export async function proxy(request: NextRequest) {
   }
 
   // Owner from here.
-  // 2) Owner without a fresh 2FA → must complete it (allow the /mfa pages + auth routes).
+  // 2) Owner without a fresh 2FA → must complete it. The unified splash (/login)
+  //    hosts the 2FA code step, so send them there (not the legacy /mfa). /mfa/setup
+  //    stays for first-time enrollment, so still allow the /mfa pages + auth routes.
   if (!mfaOk && !isMfa && !isPublic) {
     if (path.startsWith('/api/')) return NextResponse.json({ error: 'mfa_required' }, { status: 401 });
-    return go('/mfa');
+    return go('/login');
   }
 
   // 3) Fully authed but sitting on /login or an /mfa page → home.
