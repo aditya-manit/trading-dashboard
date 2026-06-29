@@ -429,6 +429,7 @@ function DrawerBody({ e, onClose }: { e: JEntry; onClose: () => void }) {
           <SpecRow label="Leverage" vPlan={plan ? (plan.lev + '×') : '—'} vAct={t.lev} ac={(plan && t.levN > (parseInt(String(plan.lev), 10) || 99)) ? '#df5338' : '#1a1813'} />
           <SpecRow label="Margin" vPlan={planMarTxt} vAct={actMarTxt} ac={marOver ? '#df5338' : '#1a1813'} />
           <SpecRow label={exitLabel} vPlan={planExitTxt} vAct={t.exitStr + (t.ret ? ' · ' + t.ret : '')} ac={up ? '#1f9d55' : '#df5338'} />
+          <SpecRow label="Fees" vPlan="—" vAct={t.feeStr} ac="#897f70" />
         </div>
       </div>
 

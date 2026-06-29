@@ -176,6 +176,9 @@ encoded in the component and no longer surprising.
   derived from `drawerW`, and the handle live-syncs it via `querySelector` during the drag).
 - **News drawer**: Upcoming card Forecast label column widened **72→92px** (`NewsCard` in
   `PlanPage.tsx`) so "Forecast" fits one line. Strip cards stay 72px; released cards unchanged.
+- **Journal drawer**: added the **Fees** row to the "Intended vs actual" spec table (was
+  missing from the React port vs the dc.html). `JTrade.feeStr` is derived in `lib/journal.ts`
+  `mapTrade` from the real Gate `pnl_fee` (`−$N`, or `—` when zero); planned col is `—`.
 
 ### Plan funnel — built components (handoff 22→26)
 The whole Plan funnel is ported and live. Files under `components/plan/`:

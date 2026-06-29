@@ -24,6 +24,7 @@ export interface JTrade {
   entryStr: string;
   exitStr: string;
   marginStr: string;
+  feeStr: string;     // '−$123' (trading fees paid; '—' if none)
   durStr: string;
   entryN: number;
   exitN: number;
@@ -146,6 +147,7 @@ export function mapTrade(p: GateFuturesPositionClose): JTrade {
   const levN = parseFloat(p.leverage) || 0;
   const notional = notionalUsd(p);
   const marginN = levN > 0 && notional > 0 ? notional / levN : 0;
+  const feeN = Math.abs(parseFloat(p.pnl_fee) || 0);
   return {
     pid: tradePid(p),
     sym: contractToSym(p.contract),
@@ -157,6 +159,7 @@ export function mapTrade(p: GateFuturesPositionClose): JTrade {
     entryStr: fmtPrice(entryPriceRaw(p)),
     exitStr: fmtPrice(exitPriceRaw(p)),
     marginStr: marginN > 0 ? '$' + Math.round(marginN).toLocaleString('en-US') : '—',
+    feeStr: feeN > 0 ? '−$' + Math.round(feeN).toLocaleString('en-US') : '—',
     durStr: holdDuration(p),
     entryN, exitN, levN, marginN, pnlN,
   };
