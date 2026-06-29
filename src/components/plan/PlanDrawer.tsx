@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { usePlanStore, planActions } from '@/lib/plan-store';
-import { tpCompute, planToDraft, tpPlanName, TP_EQUITY, type Plan, type PlanDraft, type Status } from '@/lib/plan-model';
+import { tpCompute, planToDraft, tpPlanName, relDateLabel, TP_EQUITY, type Plan, type PlanDraft, type Status } from '@/lib/plan-model';
 import { useAccount } from '@/hooks/useAccount';
 import { usePositions } from '@/hooks/usePositions';
 import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { LiveMath } from './LiveMath';
 import { RrDiagram } from './RrDiagram';
 import { CoinIcon } from './coins';
+import { PlanDateModal, CalIcon } from './MiniCalendar';
+import { DrawerResizeHandle, useDrawerWidth } from './DrawerResize';
 
 const STATUSES: { k: Status; label: string; c: string; bg: string }[] = [
   { k: 'idea', label: 'Idea', c: '#6a45d8', bg: '#f3f0ff' },
@@ -44,7 +46,9 @@ export function PlanDrawer() {
   const [full, setFull] = useState<string | null>(null);
   const [statusMenu, setStatusMenu] = useState(false);
   const [convMenu, setConvMenu] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
   const [stage, setStage] = useState(false); // desktop ≥900px → side stage panel
+  const drawerW = useDrawerWidth();
   useEffect(() => {
     const u = () => setStage(window.innerWidth >= 900);
     u(); window.addEventListener('resize', u);
@@ -67,8 +71,7 @@ export function PlanDrawer() {
   const convCur = p.conv === 'high' ? 3 : p.conv === 'low' ? 1 : 2;
   const close = () => planActions.closePlan();
   const name = tpPlanName(p);
-  let l1 = name, l2 = '';
-  if (name.length > 26) { const cut = name.lastIndexOf(' ', 26); const k = cut > 12 ? cut : 26; l1 = name.slice(0, k); l2 = name.slice(k).trim(); }
+  const rel = relDateLabel(p.tradeDate);
   const dirArrow = <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">{long ? <><path d="M7 17 17 7" /><path d="M8 7h9v9" /></> : <><path d="M7 7 17 17" /><path d="M17 8v9H8" /></>}</svg>;
 
   const thesisEl = (
@@ -109,7 +112,7 @@ export function PlanDrawer() {
 
       {/* desktop stage panel: big R/R map + chart, left of the drawer */}
       {stage ? (
-        <div style={{ position: 'fixed', top: 0, bottom: 0, right: 434, width: 'min(680px, calc(100vw - 494px))', zIndex: 92, background: '#faf9f7', borderRight: '1px solid #e7e5de', display: 'flex', flexDirection: 'column', animation: 'pdStageIn .36s cubic-bezier(.22,.9,.28,1) both' }}>
+        <div className="tp-plan-stage" style={{ position: 'fixed', top: 0, bottom: 0, right: drawerW, width: `min(680px, calc(100vw - ${drawerW + 60}px))`, zIndex: 92, background: '#faf9f7', borderRight: '1px solid #e7e5de', display: 'flex', flexDirection: 'column', animation: 'pdStageIn .36s cubic-bezier(.22,.9,.28,1) both' }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 30px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={cardWrap}>
               <StageHead txt="Risk / reward map" accent="#7c5cff" />
@@ -128,15 +131,15 @@ export function PlanDrawer() {
         </div>
       ) : null}
 
-      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 434, maxWidth: '100vw', zIndex: 91, background: '#fff', boxShadow: '-12px 0 40px rgba(20,18,12,0.16)', display: 'flex', flexDirection: 'column', animation: 'pdIn .28s cubic-bezier(.22,1,.36,1) both' }}>
+      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: drawerW, maxWidth: '96vw', zIndex: 91, background: '#fff', boxShadow: '-12px 0 40px rgba(20,18,12,0.16)', display: 'flex', flexDirection: 'column', animation: 'pdIn .28s cubic-bezier(.22,1,.36,1) both' }}>
+        <DrawerResizeHandle />
         {/* header */}
         <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '20px 22px', borderBottom: '1px solid #f0efec', background: 'linear-gradient(180deg,#fcfbf9,#fff)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
               <div style={{ width: 38, height: 38, flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ transform: 'scale(2.53)', display: 'flex' }}><CoinIcon sym={p.sym} /></div></div>
               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <span style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#1a1813', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l1}</span>
-                {l2 ? <span style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2, color: '#b3b0a6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l2}</span> : null}
+                <span style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.25, letterSpacing: '-0.02em', color: '#1a1813', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -155,6 +158,11 @@ export function PlanDrawer() {
                 <button onClick={(e) => { e.stopPropagation(); setStatusMenu((v) => !v); setConvMenu(false); }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 800, fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: sm.c, background: sm.bg, padding: '3px 6px 3px 9px', borderRadius: 99, border: 'none' }}>{sm.label}<svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.65 }}><polyline points="6 9 12 15 18 9" /></svg></button>
                 {statusMenu ? <Menu onClose={() => setStatusMenu(false)}>{STATUSES.map((st) => <MenuRow key={st.k} active={st.k === p.status} onClick={() => { setStatusMenu(false); if (st.k !== p.status) planActions.movePlan(p.id, st.k); }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: st.c }} />{st.label}</MenuRow>)}</Menu> : null}
               </span>
+              <Dot />
+              <button onClick={(e) => { e.stopPropagation(); setDateOpen(true); }} title={rel ? 'Change expected date' : 'Set expected date'}
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 800, fontSize: 10, letterSpacing: '0.03em', color: rel ? '#6b46e0' : '#a99ce4', background: rel ? '#f3eefe' : 'transparent', border: '1px solid ' + (rel ? '#e5dcfa' : '#e3dcf6'), borderRadius: 99, padding: '3px 9px 3px 7px', borderStyle: rel ? 'solid' : 'dashed', fontFamily: 'inherit' }}>
+                <CalIcon size={11} stroke="currentColor" />{rel ? rel.label + (rel.sub ? ' · ' + rel.sub : '') : 'Set date'}
+              </button>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,34px)', gap: 7, flex: '0 0 auto' }}>
@@ -172,6 +180,8 @@ export function PlanDrawer() {
       </div>
 
       {full ? <div onClick={() => setFull(null)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(14,13,11,0.88)', display: 'grid', placeItems: 'center', padding: 40, cursor: 'zoom-out' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={full} alt="" style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', borderRadius: 10 }} /></div> : null}
+
+      {dateOpen ? <PlanDateModal plan={p} onClose={() => setDateOpen(false)} /> : null}
     </>
   );
 }

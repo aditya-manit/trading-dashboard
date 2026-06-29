@@ -8,7 +8,7 @@
 import { useSyncExternalStore } from 'react';
 import {
   type Plan, type PlanDraft, type Status, type SizeMode,
-  TP_BLANK, TP_SEED, PLAN_KEYS,
+  TP_BLANK, TP_SEED, PLAN_KEYS, todayISO,
 } from './plan-model';
 
 export type PlanView = 'workbook' | 'editor' | 'board' | 'journal';
@@ -52,6 +52,22 @@ const read = <T,>(k: string, fallback: T): T => {
 const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ } };
 const writeRaw = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* quota */ } };
 
+// When a plan's expected date is today, auto-promote it from idea → armed.
+// Returns the (possibly) updated array + the plans that actually changed.
+function autoArmToday(arr: Plan[]): { plans: Plan[]; changed: Plan[] } {
+  const today = todayISO();
+  const changed: Plan[] = [];
+  const plans = arr.map((p) => {
+    if (p && p.tradeDate === today && p.status === 'idea') {
+      const np = { ...p, status: 'armed' as Status };
+      changed.push(np);
+      return np;
+    }
+    return p;
+  });
+  return { plans, changed };
+}
+
 let hydrated = false;
 function hydrate() {
   if (hydrated || typeof window === 'undefined') return;
@@ -60,6 +76,7 @@ function hydrate() {
   const draft = read<PlanDraft>(PLAN_KEYS.draft, TP_BLANK());
   let plans = read<Plan[]>(PLAN_KEYS.board, []);
   if (!plans.length) plans = TP_SEED();
+  { const a = autoArmToday(plans); plans = a.plans; if (a.changed.length) write(PLAN_KEYS.board, plans); }
   const editingId = localStorage.getItem(PLAN_KEYS.editing) || null;
   const links = { ...SEED_LINKS, ...read<Record<string, string>>(PLAN_KEYS.links, {}) };
   const journal = read<Record<string, JournalRecord>>(PLAN_KEYS.journal, {});
@@ -79,7 +96,10 @@ async function syncRemote() {
     if (pr.status === 501) return; // not configured → localStorage mode
     if (!pr.ok) return;
     const patch: Partial<PlanState> = { remote: true };
-    const pj = await pr.json(); patch.plans = (pj.plans as Plan[]) || [];
+    const pj = await pr.json();
+    const armed = autoArmToday((pj.plans as Plan[]) || []);
+    patch.plans = armed.plans;
+    armed.changed.forEach((p) => void apiPostPlan(p)); // persist promotions remotely
     if (lr.ok) { const lj = await lr.json(); patch.links = (lj.links as Record<string, string>) || {}; }
     if (jr.ok) { const jj = await jr.json(); patch.journal = (jj.journal as Record<string, JournalRecord>) || {}; }
     set(patch);
@@ -148,6 +168,25 @@ export const planActions = {
     const plans = state.plans.map((p) => (p.id === id ? { ...p, status } : p));
     set({ plans });
     if (state.remote) { const np = plans.find((p) => p.id === id); if (np) void apiPostPlan(np); }
+    else write(PLAN_KEYS.board, plans);
+  },
+  // Set a plan's expected date (board card / drawer calendar). Carries the date
+  // into the editor snapshot only when one already exists (never fabricates a
+  // partial draft — that would blank the card's math); auto-arms if it's today.
+  setPlanDate(id: string, iso: string) {
+    const today = todayISO();
+    let updated: Plan | undefined;
+    const plans = state.plans.map((p) => {
+      if (p.id !== id) return p;
+      const np: Plan = { ...p, tradeDate: iso };
+      if (p.draft && p.draft.sym) np.draft = { ...p.draft, tradeDate: iso };
+      else if (np.draft) delete np.draft;
+      if (iso && iso === today && np.status === 'idea') np.status = 'armed';
+      updated = np;
+      return np;
+    });
+    set({ plans });
+    if (state.remote) { if (updated) void apiPostPlan(updated); }
     else write(PLAN_KEYS.board, plans);
   },
   startEdit(id: string, draft: PlanDraft) {

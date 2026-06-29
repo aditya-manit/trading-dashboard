@@ -135,6 +135,47 @@ This is the source of truth for component-level styling decisions that aren't
 obvious from the code. Keep it current; delete entries once they're plainly
 encoded in the component and no longer surprising.
 
+### Plan funnel — handoff 40 (expected dates, kebab, resizable drawers)
+- **Model** (`lib/plan-model.ts`): `PlanDraft`/`Plan` gained `tradeDate` (ISO yyyy-mm-dd);
+  `PlanDraft` also `trailPeriod`/`bankPct`/`bankTarget` (the management-rule slots). `TP_BLANK`
+  defaults `tradeDate: todayISO()`, `bankPct:'70'`, `bankTarget:'100k'`, `trailPeriod:''`.
+  New shared helpers: `todayISO` · `dateToISO` · `isoToDate` · `relDateLabel(iso)` →
+  `{label,sub}` (Today/Tomorrow/weekday/`Jun 30, 2026`) · `composeNote(pct,period,target)`
+  (the "Trail with Donchian(…, 3) … Bank N% when reward hits $X …" sentence).
+- **Editor** (`Editor.tsx`): the Target/exit thesis cell is now a **management-rule strip**
+  (`TargetRule`/`MgmtChip`) — tappable colored slots: period (purple), % (amber), $target
+  (green), each with presets; editing any slot recomposes `targetNote` via `composeNote`.
+  The other 3 thesis fields have **Tab-to-autofill** (Tab on an empty field accepts its
+  placeholder). The name row carries an **Expected-date dropdown** (`ExpectedDate`, defaults
+  today) — a relative popover over the shared `MiniCalendar` (fits inside the card, no portal).
+- **Shared calendar** (`MiniCalendar.tsx`): presentational month grid (`MiniCalendar`),
+  the `CalIcon`, and **`PlanDateModal`** — a centered modal (title row + calendar) for
+  editing a saved plan's date. ⚠️ `PlanDateModal` is **`createPortal`'d to `document.body`**
+  — the board lanes / drawer panels carry transforms that would otherwise contain & clip a
+  `position:fixed` modal (same reason `HoverTip` portals). The editor popover is `absolute`
+  inside its card so it doesn't need the portal.
+- **Board cards** (`Board.tsx`): direction bookmark moved to a **top-left triangle**
+  (`polygon(0 0,100% 0,0 100%)`) to free the top-right corner for a **date trigger** (relative
+  label, purple when set / dashed "Date" when empty) under a **3-dot kebab** (hover-revealed;
+  Edit plan / Duplicate / Delete) — replaces the old hover trash button. Clicking the date
+  opens `PlanDateModal`. Name row right-pad bumped 42→58 for the corner.
+- **Auto-promote** (`plan-store.ts` `autoArmToday`): a plan whose `tradeDate` is today and
+  `status==='idea'` is promoted to `armed` on hydrate + after `syncRemote` (remote promotions
+  re-POST). `planActions.setPlanDate(id, iso)` sets the date (carries it into the editor
+  snapshot ONLY when one already exists — never fabricates a partial draft, which would blank
+  the card's math — and auto-arms if today).
+- **Plan drawer** (`PlanDrawer.tsx`): title is now **single-line ellipsis** (dropped the
+  l1/l2 split); pill row gained an editable **Set-date pill** → `PlanDateModal`.
+- **Resizable drawers** (`DrawerResize.tsx`): `useDrawerWidth()` external store + persisted
+  `tdplan_drawer_w` (default **534**, clamp 360…min(96vw,1000)); `<DrawerResizeHandle/>` is the
+  drop-in left-edge grip (drags the parent fixed drawer's width directly, commits to the store
+  on mouseup). Wired into the plan, open-position (`PositionsTable`), recent-trade
+  (`PositionHistoryTable`), and journal (`Journal`) drawers — all share one width. The plan
+  drawer's companion **stage panel tracks the width** (className `tp-plan-stage`; `right`/`width`
+  derived from `drawerW`, and the handle live-syncs it via `querySelector` during the drag).
+- **News drawer**: Upcoming card Forecast label column widened **72→92px** (`NewsCard` in
+  `PlanPage.tsx`) so "Forecast" fits one line. Strip cards stay 72px; released cards unchanged.
+
 ### Plan funnel — built components (handoff 22→26)
 The whole Plan funnel is ported and live. Files under `components/plan/`:
 - `PlanFunnel.tsx` — view switcher (workbook/editor/board/journal) + always-on `PlanDrawer`.

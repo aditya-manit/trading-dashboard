@@ -5,6 +5,7 @@ import { usePositionHistory } from '@/hooks/usePositionHistory';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GateFuturesPositionClose } from '@/types/gate';
 import { PlanLinkCell } from '@/components/plan/PlanLinkCell';
+import { DrawerResizeHandle, useDrawerWidth } from '@/components/plan/DrawerResize';
 import { tradePid } from '@/lib/journal';
 
 const PAGE_SIZE = 8;
@@ -139,6 +140,7 @@ function buildTradeCalendar(positions: GateFuturesPositionClose[], year: number,
 // ─── Trade Detail Drawer ──────────────────────────────────────────────────────
 
 export function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose; onClose: () => void }) {
+  const drawerW = useDrawerWidth();
   const pnl = parseFloat(p.pnl);
   const isUp = pnl >= 0;
   const isLong = p.side === 'long';
@@ -153,7 +155,8 @@ export function TradeDetailDrawer({ p, onClose }: { p: GateFuturesPositionClose;
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(20,18,12,0.34)', animation: 'fadeIn .2s ease' }} />
-      <div style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: 434, maxWidth: '92vw', background: '#ffffff', zIndex: 91, boxShadow: '-24px 0 60px rgba(20,18,12,0.2)', display: 'flex', flexDirection: 'column', fontFamily: FONT, animation: 'drawerIn .28s cubic-bezier(.22,.8,.3,1)' }}>
+      <div style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: drawerW, maxWidth: '96vw', background: '#ffffff', zIndex: 91, boxShadow: '-24px 0 60px rgba(20,18,12,0.2)', display: 'flex', flexDirection: 'column', fontFamily: FONT, animation: 'drawerIn .28s cubic-bezier(.22,.8,.3,1)' }}>
+        <DrawerResizeHandle />
         <style>{`
           @keyframes drawerIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
           @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }

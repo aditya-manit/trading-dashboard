@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   type PlanDraft, type SizeMode, type Sym, type Dir, type Conv,
   tpCompute, tpFmtNum, tpNum, tpMoney, tpAutoName, TP_MARKETS, TP_EQUITY, type Plan, type Status,
+  composeNote, isoToDate,
 } from '@/lib/plan-model';
 import { planActions, usePlanStore } from '@/lib/plan-store';
 import { useAccount } from '@/hooks/useAccount';
@@ -13,6 +14,7 @@ import { HeatmapLaunchCard } from '@/components/heatmap/HeatmapLaunchCard';
 import type { HeatSymbol } from '@/hooks/useHeatmap';
 import { LiveMath } from './LiveMath';
 import { RrDiagram } from './RrDiagram';
+import { MiniCalendar, CalIcon } from './MiniCalendar';
 
 const PURP = '#7c5cff';
 const SIZE_MODES: { v: SizeMode; label: string; unit: string; hint: string }[] = [
@@ -113,6 +115,13 @@ const THESIS_FIELDS: ThesisFieldDef[] = [
 ];
 function ThesisField({ f, i, d }: { f: ThesisFieldDef; i: number; d: PlanDraft }) {
   const [foc, setFoc] = useState(false);
+  // Tab on an empty field accepts the placeholder suggestion.
+  const onTab = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab' && !e.shiftKey && !e.currentTarget.value && e.currentTarget.placeholder) {
+      e.preventDefault();
+      planActions.setDraft({ [f.k]: e.currentTarget.placeholder } as Partial<PlanDraft>);
+    }
+  };
   return (
     <div style={{ padding: '15px 18px', borderRight: i % 2 === 0 ? '1px solid #f0efec' : 'none', borderBottom: i < 2 ? '1px solid #f0efec' : 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -122,13 +131,92 @@ function ThesisField({ f, i, d }: { f: ThesisFieldDef; i: number; d: PlanDraft }
         </span>
         <span style={{ fontWeight: 500, fontSize: 10.5, color: '#bdbbb1', letterSpacing: '0.01em' }}>{f.cap}</span>
       </div>
-      <textarea value={String(d[f.k] ?? '')} onChange={(e) => planActions.setDraft({ [f.k]: e.target.value } as Partial<PlanDraft>)} onFocus={() => setFoc(true)} onBlur={() => setFoc(false)} placeholder={f.ph}
-        style={{ width: '100%', boxSizing: 'border-box', minHeight: 82, resize: 'vertical', padding: '9px 11px', border: 'none', borderRadius: 10, background: foc ? f.tint : 'transparent', fontFamily: 'inherit', fontWeight: 600, fontSize: 13, color: '#1a1813', outline: 'none', lineHeight: 1.6, transition: 'background .15s' }} />
+      {f.k === 'targetNote' ? <TargetRule d={d} /> : (
+        <textarea value={String(d[f.k] ?? '')} onChange={(e) => planActions.setDraft({ [f.k]: e.target.value } as Partial<PlanDraft>)} onKeyDown={onTab} onFocus={() => setFoc(true)} onBlur={() => setFoc(false)} placeholder={f.ph}
+          style={{ width: '100%', boxSizing: 'border-box', minHeight: 82, resize: 'vertical', padding: '9px 11px', border: 'none', borderRadius: 10, background: foc ? f.tint : 'transparent', fontFamily: 'inherit', fontWeight: 600, fontSize: 13, color: '#1a1813', outline: 'none', lineHeight: 1.6, transition: 'background .15s' }} />
+      )}
     </div>
   );
 }
 function Thesis({ d }: { d: PlanDraft }) {
   return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', flex: 1 }}>{THESIS_FIELDS.map((f, i) => <ThesisField key={f.k} f={f} i={i} d={d} />)}</div>;
+}
+
+// ── Management rule strip (Target / exit) — tappable colored slots ──────────
+const MONO = "'JetBrains Mono', monospace";
+function MgmtChip({ val, presets, set, fmt, empty, ph, w, col, bg, bd }: {
+  val: string; presets: string[]; set: (v: string) => void; fmt?: (x: string) => string; empty: string; ph: string; w: number; col: string; bg: string; bd: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, verticalAlign: 'middle' }}>
+        <input autoFocus value={val} placeholder={ph} onChange={(e) => set(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditing(false); }} onBlur={() => setEditing(false)}
+          style={{ width: w, border: '1px solid ' + bd, background: '#fff', borderRadius: 7, padding: '3px 8px', fontFamily: MONO, fontWeight: 800, fontSize: 12.5, color: col, outline: 'none' }} />
+        {presets.map((p) => (
+          <button key={p} onMouseDown={(e) => { e.preventDefault(); set(p); setEditing(false); }}
+            style={{ cursor: 'pointer', border: '1px solid ' + bd, background: bg, color: col, borderRadius: 6, padding: '3px 7px', fontFamily: MONO, fontWeight: 800, fontSize: 10.5, lineHeight: 1 }}>{fmt ? fmt(p) : p}</button>
+        ))}
+      </span>
+    );
+  }
+  return (
+    <button onClick={() => setEditing(true)}
+      style={{ cursor: 'pointer', verticalAlign: 'middle', display: 'inline-flex', alignItems: 'center', gap: 4, border: (val ? '1px solid ' : '1px dashed ') + bd, background: bg, color: col, borderRadius: 7, padding: '2px 10px', fontFamily: MONO, fontWeight: 800, fontSize: 12.5, lineHeight: 1.45 }}>
+      {val ? (fmt ? fmt(val) : val) : empty}
+    </button>
+  );
+}
+function TargetRule({ d }: { d: PlanDraft }) {
+  const period = d.trailPeriod || '';
+  const pct = d.bankPct == null ? '70' : d.bankPct;
+  const target = d.bankTarget == null ? '100k' : d.bankTarget;
+  const setPeriod = (v: string) => planActions.setDraft({ trailPeriod: v, targetNote: composeNote(pct, v, target) });
+  const setPct = (v: string) => { const n = String(v).replace(/[^0-9]/g, ''); planActions.setDraft({ bankPct: n, targetNote: composeNote(n, period, target) }); };
+  const setTarget = (v: string) => { const t = String(v).trim(); planActions.setDraft({ bankTarget: t, targetNote: composeNote(pct, period, t) }); };
+  return (
+    <div style={{ minHeight: 82, boxSizing: 'border-box', padding: '12px 13px', borderRadius: 10, background: '#fbf8f3', border: '1px solid #f0e7d9', fontWeight: 600, fontSize: 13, lineHeight: 1.95, color: '#1a1813' }}>
+      Trail with <b style={{ color: '#7c5cff', fontFamily: MONO, fontWeight: 800 }}>Donchian(</b>
+      <MgmtChip val={period} presets={['15m', '1h', '4h']} set={setPeriod} empty="set period" ph="e.g. 1h" w={58} col="#7c5cff" bg="#f3eefe" bd="#ddd0f7" />
+      <b style={{ color: '#7c5cff', fontFamily: MONO, fontWeight: 800 }}>, 3)</b>
+      {' on impulse candles (HA). Bank '}
+      <MgmtChip val={pct} presets={['50', '70', '100']} set={setPct} fmt={(x) => x + '%'} empty="set %" ph="e.g. 70" w={54} col="#e07b2f" bg="#fdf2e8" bd="#f0d4b6" />
+      {' when reward hits '}
+      <MgmtChip val={target} presets={['100k', '150k', '200k']} set={setTarget} fmt={(x) => '$' + x} empty="set target" ph="e.g. 100k" w={66} col="#1f9d55" bg="#edf7f0" bd="#bce0cb" />
+      {', then trail the rest as before.'}
+    </div>
+  );
+}
+
+// ── Expected-date dropdown (in the name row) ─────────────────────────────────
+function ExpectedDate({ d }: { d: PlanDraft }) {
+  const [open, setOpen] = useState(false);
+  const sel = isoToDate(d.tradeDate);
+  const MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const label = sel ? `${MONS[sel.getMonth()]} ${sel.getDate()}, ${sel.getFullYear()}` : 'dd / mm / yyyy';
+  const pick = (iso: string) => { planActions.setDraft({ tradeDate: iso }); setOpen(false); };
+  return (
+    <div style={{ position: 'relative', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 9, borderLeft: '1px solid #f0efec', paddingLeft: 16 }}>
+      <span style={{ width: 30, height: 30, borderRadius: 9, background: '#f3eefe', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}><CalIcon /></span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1.1 }}>
+        <span style={{ fontWeight: 700, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a89cd6' }}>Expected</span>
+        <button onClick={() => setOpen((v) => !v)} style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: sel ? '#1a1813' : '#b0aea3', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          {label}
+          <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.45 }}><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+      </div>
+      {open ? (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 70 }} />
+          <div style={{ position: 'absolute', top: 'calc(100% + 9px)', right: 0, zIndex: 71, width: 288, boxSizing: 'border-box', background: '#fff', border: '1px solid #ecebe6', borderRadius: 14, boxShadow: '0 14px 40px -12px rgba(20,20,12,0.28)', padding: 16, animation: 'pkUp .16s ease both' }}>
+            <style>{`@keyframes pkUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
+            <MiniCalendar value={d.tradeDate} onPick={pick} onClear={() => pick('')} cellH={32} />
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
 }
 
 // read an image file → (downscaled) data URL on the draft
@@ -232,7 +320,7 @@ export function Editor() {
     const name = d.name.trim();
     const plan: Plan = editing
       ? { ...editing, ...d, name, draft: { ...d }, status: editing.status }
-      : { id: 'tp_' + Date.now().toString(36), sym: d.sym, dir: d.dir, conv: d.conv, status: 'idea' as Status, createdAt: Date.now(), name, lev: d.lev, rationale: d.rationale, trigger: d.trigger, invalidation: d.invalidation, targetNote: d.targetNote, entry: d.entry, stop: d.stop, rr: c.rrList[0]?.rr, draft: { ...d } };
+      : { id: 'tp_' + Date.now().toString(36), sym: d.sym, dir: d.dir, conv: d.conv, status: 'idea' as Status, createdAt: Date.now(), name, lev: d.lev, rationale: d.rationale, trigger: d.trigger, invalidation: d.invalidation, targetNote: d.targetNote, tradeDate: d.tradeDate, entry: d.entry, stop: d.stop, rr: c.rrList[0]?.rr, draft: { ...d } };
     planActions.savePlan(plan);
   };
 
@@ -264,6 +352,7 @@ export function Editor() {
               {num('1')}
               <input value={d.name} onChange={(e) => planActions.setDraft({ name: e.target.value })} placeholder={tpAutoName(d)} style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontWeight: 800, fontSize: 17, letterSpacing: '-0.015em', color: '#1a1813', padding: '9px 0' }} />
               <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#c4c2b8', flex: '0 0 auto' }}>Name · optional</span>
+              <ExpectedDate d={d} />
             </div>
             <Thesis d={d} />
           </div>

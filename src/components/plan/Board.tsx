@@ -1,10 +1,11 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { type Plan, type Status, tpCompute, planToDraft, tpPlanName, tpMoney } from '@/lib/plan-model';
+import { type Plan, type Status, tpCompute, planToDraft, tpPlanName, tpMoney, relDateLabel } from '@/lib/plan-model';
 import { planActions, usePlanStore } from '@/lib/plan-store';
 import { CoinIcon } from './coins';
 import { StatsBar } from './StatsBar';
+import { PlanDateModal, CalIcon } from './MiniCalendar';
 
 type EmptyCfg = { ink: string; ring: string; tint: string; sub: string; icon: 'plus' | 'target' | 'bolt'; title: string };
 type Lane = {
@@ -27,11 +28,12 @@ const money = (v: number) => (isFinite(v) ? tpMoney(v, v < 1000 ? 2 : 0) : '—'
 // Board card — the 'ac' variant the design actually renders: margin donut +
 // coin/name/dir/lev + entry, over big Risk·equity / Reward·equity numbers + bar.
 function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
-  const [confirmDel, setConfirmDel] = useState(false);
   const [hover, setHover] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const delT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
   const dragAt = useRef(0);
+  const rel = relDateLabel(p.tradeDate);
   const long = p.dir === 'long', col = long ? '#1f9d55' : '#df5338';
   const d = planToDraft(p), c = tpCompute(d);
   const tp1 = c.rrList[0], rr = c.primaryR;
@@ -47,20 +49,45 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
       onClick={() => { if (Date.now() - dragAt.current > 250) onOpen(p); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ position: 'relative', background: '#fff', border: '1px solid #efedea', borderRadius: 14, overflow: 'hidden', cursor: dragging ? 'grabbing' : 'pointer', display: 'flex', flexDirection: 'column', opacity: dragging ? 0.45 : 1, boxShadow: dragging ? '0 12px 28px rgba(20,20,12,0.16)' : hover ? '0 6px 18px rgba(20,18,12,0.08)' : '0 1px 3px rgba(20,20,12,0.04)', transition: 'box-shadow .15s, opacity .12s' }}>
-      {/* direction bookmark */}
-      <div style={{ position: 'absolute', top: 0, right: 24, width: 26, height: 34, background: col, clipPath: 'polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)', zIndex: 2 }} />
-      {/* delete */}
-      <div style={{ position: 'absolute', top: 6, right: 7, zIndex: 4, opacity: hover || confirmDel ? 1 : 0, transition: 'opacity .12s' }}>
-        {confirmDel ? (
-          <button onClick={(e) => { e.stopPropagation(); if (delT.current) clearTimeout(delT.current); planActions.deletePlan(p.id); }} title="Confirm delete" style={{ cursor: 'pointer', border: 'none', background: '#df5338', color: '#fff', padding: 4, display: 'inline-flex', borderRadius: 8, boxShadow: '0 2px 6px rgba(223,83,56,0.3)' }}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-          </button>
-        ) : (
-          <button onClick={(e) => { e.stopPropagation(); setConfirmDel(true); delT.current = setTimeout(() => setConfirmDel(false), 2600); }} title="Delete plan" style={{ cursor: 'pointer', border: '1px solid #efedea', background: '#fff', color: '#c2c0b6', padding: 4, display: 'inline-flex', borderRadius: 8, boxShadow: '0 1px 3px rgba(20,20,12,0.1)' }}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-          </button>
-        )}
+      {/* direction bookmark (top-left triangle) */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: 36, height: 36, background: col, clipPath: 'polygon(0 0,100% 0,0 100%)', zIndex: 3 }} />
+      {/* corner: kebab (hover) over the always-on date trigger */}
+      <div style={{ position: 'absolute', top: 8, right: 11, zIndex: 6, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
+        <button title="Plan actions" onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+          style={{ width: 22, height: 22, flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid ' + (menuOpen ? '#ddd0f7' : '#efedea'), background: menuOpen ? '#f3eefe' : '#fff', borderRadius: 7, cursor: 'pointer', color: menuOpen ? '#7c5cff' : '#a8a39a', padding: 0, opacity: menuOpen || hover ? 1 : 0, transition: 'opacity .12s, background .12s, border-color .12s, color .12s' }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><circle cx={12} cy={5} r={1.7} /><circle cx={12} cy={12} r={1.7} /><circle cx={12} cy={19} r={1.7} /></svg>
+        </button>
+        <button title={rel ? 'Change expected date' : 'Set expected date'} onClick={(e) => { e.stopPropagation(); setDateOpen(true); }}
+          style={{ border: 'none', background: 'transparent', padding: '2px 4px', margin: '-2px -4px', borderRadius: 7, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#f7f5ff'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+          {rel ? (
+            <>
+              <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '-0.015em', color: '#6b46e0' }}>{rel.label}</span>
+              {rel.sub ? <span style={{ fontWeight: 600, fontSize: 9, letterSpacing: '0.02em', color: '#b3aea2' }}>{rel.sub}</span> : null}
+            </>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#b9a9ee' }}><CalIcon size={11} stroke="currentColor" />Date</span>
+          )}
+        </button>
       </div>
+      {menuOpen ? (
+        <>
+          <div onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 7 }} />
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 35, right: 11, zIndex: 8, width: 154, background: '#fff', border: '1px solid #ecebe5', borderRadius: 11, boxShadow: '0 8px 24px rgba(20,20,12,0.16)', padding: 4, display: 'flex', flexDirection: 'column' }}>
+            <MenuItem label="Edit plan" onClick={() => { setMenuOpen(false); planActions.startEdit(p.id, planToDraft(p)); }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+            </MenuItem>
+            <MenuItem label="Duplicate" onClick={() => { setMenuOpen(false); planActions.duplicatePlan(p.id); }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x={9} y={9} width={13} height={13} rx={2} /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+            </MenuItem>
+            <div style={{ height: 1, background: '#f1f0ed', margin: '4px 6px' }} />
+            <MenuItem label="Delete" danger onClick={() => { setMenuOpen(false); planActions.deletePlan(p.id); }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+            </MenuItem>
+          </div>
+        </>
+      ) : null}
+      {dateOpen ? <PlanDateModal plan={p} onClose={() => setDateOpen(false)} /> : null}
       {/* head: donut + name/dir/lev + entry */}
       <div style={{ display: 'flex', alignItems: 'stretch', gap: 13, padding: '12px 15px 9px' }}>
         <div style={{ position: 'relative', width: 66, height: 66, flex: '0 0 auto', alignSelf: 'center', borderRadius: '50%', background: `conic-gradient(#7c5cff 0 ${mp}%,#f0efeb ${mp}% 100%)` }}>
@@ -70,7 +97,7 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 11, paddingRight: 42 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 11, paddingRight: 58 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><CoinIcon sym={p.sym} /><span style={{ fontWeight: 800, fontSize: 13.5, letterSpacing: '-0.015em', color: '#1a1813', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpPlanName(p)}</span></span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 800, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: col }}>
@@ -109,6 +136,16 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
       </div>
       <div style={{ display: 'flex', height: 4 }}><div style={{ width: riskW + '%', background: '#df5338' }} /><div style={{ flex: 1, background: '#1f9d55' }} /></div>
     </div>
+  );
+}
+
+function MenuItem({ label, onClick, danger, children }: { label: string; onClick: () => void; danger?: boolean; children: React.ReactNode }) {
+  const [h, setH] = useState(false);
+  return (
+    <button onClick={(e) => { e.stopPropagation(); onClick(); }} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', textAlign: 'left', padding: '8px 11px', border: 'none', background: h ? (danger ? '#fdf2ef' : '#f7f5ff') : 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 12.5, color: danger ? '#df5338' : '#3a3833', borderRadius: 7 }}>
+      {children}<span>{label}</span>
+    </button>
   );
 }
 

@@ -31,6 +31,11 @@ export interface PlanDraft {
   trigger: string;
   invalidation: string;
   targetNote: string;
+  // management-rule slots (compose into targetNote) + expected trade date (ISO)
+  trailPeriod?: string;
+  bankPct?: string;
+  bankTarget?: string;
+  tradeDate?: string;
 }
 
 // A saved plan: board metadata + (for user plans) a full `draft` snapshot. Seeds
@@ -58,6 +63,7 @@ export interface Plan {
   riskPctLabel?: string;
   chart?: string;
   draft?: PlanDraft;
+  tradeDate?: string; // expected trade date (ISO yyyy-mm-dd)
 }
 
 // Account equity used for % sizing. Mirrors the dashboard header; the Editor can
@@ -76,8 +82,41 @@ export function TP_BLANK(): PlanDraft {
     entry: '', ez1: '', ez2: '', stop: '', t1: '', t2: '', t3: '',
     lev: 5, sizeMode: 'marginpct', sizeVal: '', sizeVals: {},
     chart: '', name: '', rationale: '', trigger: '', invalidation: '', targetNote: '',
+    trailPeriod: '', bankPct: '70', bankTarget: '100k', tradeDate: todayISO(),
   };
 }
+
+// ── date helpers (shared by editor / board cards / plan drawer) ──────────────
+export const todayISO = (): string => dateToISO(new Date());
+export const dateToISO = (dt: Date): string =>
+  dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+export const isoToDate = (s?: string): Date | null => {
+  if (!s) return null;
+  const a = String(s).split('-');
+  const dt = new Date(+a[0], +a[1] - 1, +a[2]);
+  return isNaN(dt.getTime()) ? null : dt;
+};
+
+const REL_M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const REL_WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+// compact relative label for an ISO date (Today / Tomorrow / weekday / Jun 30, 2026)
+export function relDateLabel(iso?: string): { label: string; sub: string | null } | null {
+  const dt = isoToDate(iso);
+  if (!dt) return null;
+  const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+  const diff = Math.round((dt.getTime() - t0.getTime()) / 86400000);
+  const short = REL_M[dt.getMonth()] + ' ' + dt.getDate();
+  if (diff === 0) return { label: 'Today', sub: short };
+  if (diff === 1) return { label: 'Tomorrow', sub: short };
+  if (diff > 1 && diff <= 6) return { label: REL_WD[dt.getDay()], sub: short };
+  if (diff === -1) return { label: 'Yesterday', sub: short };
+  return { label: short + ', ' + dt.getFullYear(), sub: null };
+}
+
+// the management rule sentence composed from the three editable slots
+export const composeNote = (pct?: string, period?: string, target?: string): string =>
+  'Trail with Donchian(' + (period || 'your TF') + ', 3) on impulse candles (HA). Bank ' +
+  (pct || '70') + '% when reward hits $' + (target || '100k') + ', then trail the rest as before.';
 
 export const tpNum = (v: unknown): number => parseFloat(String(v ?? '').replace(/,/g, ''));
 export const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));

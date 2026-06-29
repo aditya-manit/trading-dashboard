@@ -6,6 +6,7 @@ import { useAccount } from '@/hooks/useAccount';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { GateFuturesPosition } from '@/types/gate';
 import { PlanLinkCell } from '@/components/plan/PlanLinkCell';
+import { DrawerResizeHandle, useDrawerWidth } from '@/components/plan/DrawerResize';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 const BTC_CONTRACT_SIZE = 0.0001;
@@ -64,6 +65,7 @@ function GrayChip({ icon }: { icon: React.ReactNode }) {
 // ─── Position Detail Drawer ───────────────────────────────────────────────────
 
 function PositionDetailDrawer({ p, totalValue, onClose }: { p: GateFuturesPosition; totalValue: number; onClose: () => void }) {
+  const drawerW = useDrawerWidth();
   const isLong = p.size > 0;
   const pnl = parseFloat(p.unrealised_pnl);
   const isUp = pnl >= 0;
@@ -100,7 +102,8 @@ function PositionDetailDrawer({ p, totalValue, onClose }: { p: GateFuturesPositi
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(20,18,12,0.34)', animation: 'fadeIn .2s ease' }} />
-      <div style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: 434, maxWidth: '92vw', background: '#ffffff', zIndex: 91, boxShadow: '-24px 0 60px rgba(20,18,12,0.2)', display: 'flex', flexDirection: 'column', fontFamily: FONT, animation: 'drawerIn .28s cubic-bezier(.22,.8,.3,1)' }}>
+      <div style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: drawerW, maxWidth: '96vw', background: '#ffffff', zIndex: 91, boxShadow: '-24px 0 60px rgba(20,18,12,0.2)', display: 'flex', flexDirection: 'column', fontFamily: FONT, animation: 'drawerIn .28s cubic-bezier(.22,.8,.3,1)' }}>
+        <DrawerResizeHandle />
         <style>{`
           @keyframes drawerIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
           @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }

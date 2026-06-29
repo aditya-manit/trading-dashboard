@@ -12,6 +12,7 @@ import {
 import { CoinIcon } from './coins';
 import { HoverTip } from './HoverTip';
 import { PlanLinkCell } from './PlanLinkCell';
+import { DrawerResizeHandle, useDrawerWidth } from './DrawerResize';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 // Grade colors — one source of truth, used in all 5 spots (KPI cell, Reviewed
@@ -309,11 +310,13 @@ function EntryRow({ e, last, onOpen }: { e: JEntry; last: boolean; onOpen: (e: J
 
 // ── drawer ───────────────────────────────────────────────────────────────────
 function JournalDrawer({ e, onClose }: { e: JEntry; onClose: () => void }) {
+  const drawerW = useDrawerWidth();
   const t = e.t, long = t.sideLong, dirCol = long ? '#1f9d55' : '#df5338', up = t.up;
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,12,0.32)', zIndex: 120, animation: 'fadeIn .2s ease' }} />
-      <div onClick={(ev) => ev.stopPropagation()} style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: 486, maxWidth: '94vw', background: '#fff', zIndex: 121, boxShadow: '-24px 0 60px rgba(20,18,12,0.2)', display: 'flex', flexDirection: 'column', animation: 'drawerIn .3s cubic-bezier(.22,.8,.3,1)', fontFamily: FONT }}>
+      <div onClick={(ev) => ev.stopPropagation()} style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: drawerW, maxWidth: '96vw', background: '#fff', zIndex: 121, boxShadow: '-24px 0 60px rgba(20,18,12,0.2)', display: 'flex', flexDirection: 'column', animation: 'drawerIn .3s cubic-bezier(.22,.8,.3,1)', fontFamily: FONT }}>
+        <DrawerResizeHandle />
         {/* header */}
         <div style={{ padding: '22px 24px', borderBottom: '1px solid #f0efec' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>

@@ -368,7 +368,7 @@ function NewsCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def
         </div>
         <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 11, color: '#a8a69b', flex: '0 0 auto' }}>{fmtTime(e.date)}</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '92px 1fr' }}>
         <div style={labelCellBase}><span style={cellLabel}>Forecast</span></div>
         <div style={{ ...valueCellBase, alignItems: 'baseline', gap: 5 }}>
           <span style={{ fontWeight: 800, fontSize: 12, color: v.muted ? '#a8a69b' : '#1a1813' }}>{v.main}</span>
