@@ -170,7 +170,8 @@ encoded in the component and no longer surprising.
   `tdplan_drawer_w` (default **534**, clamp 360…min(96vw,1000)); `<DrawerResizeHandle/>` is the
   drop-in left-edge grip (drags the parent fixed drawer's width directly, commits to the store
   on mouseup). Wired into the plan, open-position (`PositionsTable`), recent-trade
-  (`PositionHistoryTable`), and journal (`Journal`) drawers — all share one width. The plan
+  (`PositionHistoryTable`), journal (`Journal`), AND the workbook **news drawer**
+  (`PlanPage.tsx`, "Economic calendar") — all share one width. The plan
   drawer's companion **stage panel tracks the width** (className `tp-plan-stage`; `right`/`width`
   derived from `drawerW`, and the handle live-syncs it via `querySelector` during the drag).
 - **News drawer**: Upcoming card Forecast label column widened **72→92px** (`NewsCard` in

@@ -8,6 +8,7 @@ import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, useCalendarArchive, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
 import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
 import { planActions } from '@/lib/plan-store';
+import { DrawerResizeHandle, useDrawerWidth } from './DrawerResize';
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 // Editorial serif (workbook headline / rule) + mono (checklist count / diagram ticks).
@@ -632,6 +633,7 @@ export function PlanPage() {
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [finished, setFinished] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
+  const drawerW = useDrawerWidth();
   const [newsTab, setNewsTab] = useState<'upcoming' | 'released'>('upcoming');
   const [showAll, setShowAll] = useState(false);
   const [newsQuery, setNewsQuery] = useState('');
@@ -784,7 +786,8 @@ export function PlanPage() {
       {newsOpen && (
         <>
           <div onClick={() => setNewsOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(20,20,12,0.35)', zIndex: 60, animation: 'pkFade .2s both' }} />
-          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 440, maxWidth: '92vw', background: '#fbfaf8', zIndex: 61, boxShadow: '-12px 0 40px rgba(20,20,12,0.16)', display: 'flex', flexDirection: 'column', animation: 'pkSlideIn .28s cubic-bezier(.2,.8,.3,1) both', fontFamily: FONT }}>
+          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: drawerW, maxWidth: '96vw', background: '#fbfaf8', zIndex: 61, boxShadow: '-12px 0 40px rgba(20,20,12,0.16)', display: 'flex', flexDirection: 'column', animation: 'pkSlideIn .28s cubic-bezier(.2,.8,.3,1) both', fontFamily: FONT }}>
+            <DrawerResizeHandle />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px', borderBottom: '1px solid #efedea', background: '#fff', flex: '0 0 auto' }}>
               <span style={{ width: 32, height: 32, borderRadius: 9, background: '#fbe7cb', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9821f" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
