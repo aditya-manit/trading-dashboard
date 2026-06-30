@@ -288,17 +288,22 @@ The data/route/metrics/daily-store from handoff 31 are unchanged (see below).
   Cursor split: band-drag = grab/grabbing (`lh-dragging`), handle resize = ns-resize (`lh-dragging-ns`).
   Colorbar gradient is now **theme-aware** via the `--cbar` CSS var (light magenta→cream / dark cream→dark).
   The old footer (legend + Apify caption) was **removed** — chart + profile run full height.
-- **TODO (idea, deferred — needs accumulated daily history):** overlay the **CoG trajectory** on the
-  heatmap instead of today's single flat line. Plan:
-  - **One canonical daily CoG series** (the 24h-window `lcg`, already captured into `heatmap_metrics_daily`
-    via cron + page-load; `useHeatmapHistory`). Do NOT capture per-interval — that'd be 5× the Actor runs/day.
-  - **Overlay = clip that series to the chart's visible x-window**, map each day's CoG to its x-fraction by
-    timestamp, connect as a line. This degrades gracefully across ALL intervals with ONE code path:
-    on **24h** only ~1 point falls in-window → renders as today's flat line (current behavior); on
-    **1w/2w/1mo/3mo** many points fall in → a trajectory showing the gravity migrating up/down over time.
-  - History retention raised to `DAYS=100` in `/api/heatmap/metrics` (covers the 3mo interval + buffer);
-    rows persist forever in Postgres regardless — this only caps the read.
-  - Revisit once the daily capture has enough points (started 2026-06-23, ~1/day).
+- **CoG trajectory overlay (BUILT, 2026-06-30):** the daily center-of-gravity path is drawn on the
+  heatmap canvas — a purple polyline + per-day dots, color-tied to the CoG marker/stat.
+  - **Source = canonical 24h `lcg` series** (`useHeatmapHistory(symbol,'24h')` → `cogHist`, the real
+    `heatmap_metrics_daily` rows; ONE daily series regardless of the interval shown — shares the SWR
+    cache with the trend `hist` on 24h). NOT captured per-interval (would be 5× the Actor runs/day).
+  - `cogPts` memo maps each day → a **time-fraction** across the chart's candle range by timestamp
+    (`Date.parse(day+'T12:00:00Z')` midpoint); days **older than the chart window are dropped** (no
+    overlay in the no-data region — NO extrapolation), today's midpoint past the last candle is pinned
+    to the "now" edge. `drawAll` maps `f→x` live (so it tracks zoom/pan) + `lcg→y` via the shared price
+    scale. Added `cogPts` to `drawAll` deps.
+  - **Degrades across ALL intervals, one code path:** 24h window → ~1 point in-window → a single dot at
+    now; 1w/2w → the real trajectory (e.g. CoG drifting 63k→59k over the week); 1mo/3mo → only the
+    recent ~N days plot at the right edge, the rest of the chart has no line until more days accrue.
+  - Shares the price-axis band clip (points outside the band-zoomed range clip off, same as candles).
+  - **Data note:** the early "yesterday≈today" preview seed is gone — all daily rows are now distinct
+    real cron captures (no duplicate pair); the line is built from actual data only.
 - **Resilience:** `fetchHeatmapData` retries transient upstream failures up to 3× (1.2s backoff) —
   the CoinGlass Actor intermittently returns 400 / 502 / run-failed / empty; a retry usually
   succeeds. Validation errors (bad symbol/model/interval) are NOT retried.

@@ -101,6 +101,9 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
   const prof = useMemo(() => (prep ? computeProfile(data as HeatmapData) : null), [prep, data]);
   const metrics = useMemo(() => (prep ? computeHeatmapMetrics(data) : null), [prep, data]);
   const { data: hist, mutate: mutateHist } = useHeatmapHistory(symbol, interval);
+  // Canonical 24h CoG series for the trajectory overlay (one daily series, mapped
+  // onto whatever interval is shown). Shares the SWR cache with `hist` on 24h.
+  const { data: cogHist } = useHeatmapHistory(symbol, '24h');
 
   useEffect(() => {
     if (!metrics) return;
@@ -122,6 +125,28 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
     if (metrics.strongest) out.push({ short: 'WALL', price: metrics.strongest.peakPrice, line: 'rgba(43,108,232,0.9)', color: '#2b6ce8' });
     return out;
   }, [metrics, dark]);
+
+  // CoG trajectory points: each daily lcg mapped to a time-fraction (0..1) across
+  // the chart's candle range by timestamp. Days older than the chart window are
+  // dropped (no overlay where there's no chart); today (noon) just past the last
+  // candle is pinned to the "now" edge. View-independent — drawAll maps f→x live.
+  const cogPts = useMemo(() => {
+    if (!prep) return [] as { f: number; price: number }[];
+    const cs = prep.cs, n = cs.length;
+    if (n < 2) return [];
+    const t0 = +cs[0][0], t1 = +cs[n - 1][0], span = t1 - t0;
+    if (!(span > 0)) return [];
+    const out: { f: number; price: number }[] = [];
+    for (const r of cogHist?.history || []) {
+      const dayTs = Date.parse(r.day + 'T12:00:00Z') / 1000; // day midpoint
+      if (!isFinite(dayTs) || !isFinite(r.lcg)) continue;
+      let f = (dayTs - t0) / span;
+      if (f < -0.0001) continue;     // older than the chart → no data region, skip
+      if (f > 1) f = 1;             // today's midpoint past "now" → pin to right edge
+      out.push({ f, price: r.lcg });
+    }
+    return out.sort((a, b) => a.f - b.f);
+  }, [prep, cogHist]);
 
   // ---- view (zoom/pan) ----
   const viewRef = useRef<View | null>(null);
@@ -194,6 +219,21 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
         const last = +cs[n - 1][4]; ctx.strokeStyle = P.lastLine; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, yP(last)); ctx.lineTo(W, yP(last)); ctx.stroke(); ctx.setLineDash([]);
         const vis = marks.filter((m) => m.price >= V.p0 && m.price <= V.p1);
         vis.forEach((m) => { const y = yP(m.price); ctx.strokeStyle = m.line; ctx.setLineDash([6, 4]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); });
+        // CoG trajectory — the real daily center-of-gravity path. Only spans the
+        // days we actually have (no extrapolation into the no-data region); on a
+        // 24h window only ~1 point falls in, so it degrades to a single dot at now.
+        if (cogPts.length) {
+          ctx.setLineDash([]); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+          const xF = (f: number) => (f - V.x0) / spx * W;
+          const halo = theme === 'dark' ? 'rgba(10,6,19,0.85)' : 'rgba(255,255,255,0.9)';
+          if (cogPts.length > 1) {
+            ctx.beginPath();
+            cogPts.forEach((pt, i) => { const x = xF(pt.f), y = yP(pt.price); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+            ctx.strokeStyle = halo; ctx.lineWidth = 4; ctx.stroke();
+            ctx.strokeStyle = 'rgba(124,92,255,0.95)'; ctx.lineWidth = 1.8; ctx.stroke();
+          }
+          cogPts.forEach((pt, i) => { const x = xF(pt.f), y = yP(pt.price), last = i === cogPts.length - 1; ctx.beginPath(); ctx.arc(x, y, last ? 3.6 : 2.4, 0, Math.PI * 2); ctx.fillStyle = '#7c5cff'; ctx.fill(); ctx.lineWidth = 1.4; ctx.strokeStyle = theme === 'dark' ? '#0a0613' : '#fff'; ctx.stroke(); });
+        }
         ctx.setLineDash([]); ctx.font = '700 9px ' + MONO; ctx.textBaseline = 'middle';
         const usedX: Record<number, number> = {};
         vis.forEach((m) => { const y = yP(m.price), tw = ctx.measureText(m.short).width, pad = 7, bh = 15, bw = tw + pad * 2, yk = Math.round(y / 8), bx = usedX[yk] != null ? usedX[yk] : 5; usedX[yk] = bx + bw + 4; const by = y - bh / 2; ctx.fillStyle = m.color; if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 3); ctx.fill(); } else ctx.fillRect(bx, by, bw, bh); ctx.fillStyle = '#fff'; ctx.fillText(m.short, bx + pad, y + 0.5); });
@@ -219,7 +259,7 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
         ctx.strokeStyle = P.profCross; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, priceY); ctx.lineTo(W, priceY); ctx.stroke(); ctx.setLineDash([]);
       }
     }
-  }, [theme, prep, prof, marks, profHover, getView, band]);
+  }, [theme, prep, prof, marks, profHover, getView, band, cogPts]);
 
   const drawRef = useRef(drawAll); drawRef.current = drawAll;
   // redraw on data/theme/marks changes AND on every view mutation (tick), since
