@@ -170,6 +170,14 @@ export const planActions = {
     if (state.remote) { const np = plans.find((p) => p.id === id); if (np) void apiPostPlan(np); }
     else write(PLAN_KEYS.board, plans);
   },
+  // Archive / unarchive a plan (stays in its column; hidden unless the column's
+  // "show archived" toggle is on).
+  archivePlan(id: string, val: boolean) {
+    const plans = state.plans.map((p) => (p.id === id ? { ...p, archived: val } : p));
+    set({ plans });
+    if (state.remote) { const np = plans.find((p) => p.id === id); if (np) void apiPostPlan(np); }
+    else write(PLAN_KEYS.board, plans);
+  },
   // Set a plan's expected date (board card / drawer calendar). Carries the date
   // into the editor snapshot only when one already exists (never fabricates a
   // partial draft — that would blank the card's math); auto-arms if it's today.

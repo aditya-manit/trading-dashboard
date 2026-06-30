@@ -27,13 +27,15 @@ const money = (v: number) => (isFinite(v) ? tpMoney(v, v < 1000 ? 2 : 0) : '—'
 
 // Board card — the 'ac' variant the design actually renders: margin donut +
 // coin/name/dir/lev + entry, over big Risk·equity / Reward·equity numbers + bar.
-function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
+function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => void; tradeState?: 'executed' | 'closed' | null }) {
   const [hover, setHover] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const dragAt = useRef(0);
   const rel = relDateLabel(p.tradeDate);
+  const archived = !!p.archived;
+  const ts = tradeState ? ({ executed: { ink: '#1f9d55', tint: '#f3faf6', dot: '#1f9d55', label: 'Executed', sub: 'trade taken' }, closed: { ink: '#6f6a60', tint: '#faf9f7', dot: '#9a958a', label: 'Closed', sub: 'no trade taken' } } as const)[tradeState] : null;
   const long = p.dir === 'long', col = long ? '#1f9d55' : '#df5338';
   const d = planToDraft(p), c = tpCompute(d);
   const tp1 = c.rrList[0], rr = c.primaryR;
@@ -48,9 +50,16 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
       onDragEnd={() => setDragging(false)}
       onClick={() => { if (Date.now() - dragAt.current > 250) onOpen(p); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative', background: '#fff', border: '1px solid #efedea', borderRadius: 14, overflow: 'hidden', cursor: dragging ? 'grabbing' : 'pointer', display: 'flex', flexDirection: 'column', opacity: dragging ? 0.45 : 1, boxShadow: dragging ? '0 12px 28px rgba(20,20,12,0.16)' : hover ? '0 6px 18px rgba(20,18,12,0.08)' : '0 1px 3px rgba(20,20,12,0.04)', transition: 'box-shadow .15s, opacity .12s' }}>
-      {/* direction bookmark (top-left triangle) */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: 36, height: 36, background: col, clipPath: 'polygon(0 0,100% 0,0 100%)', zIndex: 3 }} />
+      style={{ position: 'relative', background: '#fff', border: archived ? '1.5px dotted #c4c0b6' : '1px solid #efedea', borderRadius: 14, overflow: menuOpen ? 'visible' : 'hidden', zIndex: menuOpen ? 20 : undefined, cursor: dragging ? 'grabbing' : 'pointer', display: 'flex', flexDirection: 'column', opacity: dragging ? 0.45 : 1, boxShadow: dragging ? '0 12px 28px rgba(20,20,12,0.16)' : hover ? '0 6px 18px rgba(20,18,12,0.08)' : '0 1px 3px rgba(20,20,12,0.04)', transition: 'box-shadow .15s, opacity .12s' }}>
+      {/* direction bookmark (top-left triangle) — replaced by the ARCHIVED tag when archived */}
+      {archived ? (
+        <span style={{ position: 'absolute', top: 8, left: 0, zIndex: 6, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px 3px 13px', borderRadius: '0 99px 99px 0', background: '#efede9', boxShadow: '0 1px 2px rgba(20,20,12,0.06)' }}>
+          <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#8a857b" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><rect x={3} y={4} width={18} height={4} rx={1} /><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" /></svg>
+          <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#8a857b' }}>Archived</span>
+        </span>
+      ) : (
+        <div style={{ position: 'absolute', top: 0, left: 0, width: 36, height: 36, background: col, clipPath: 'polygon(0 0,100% 0,0 100%)', zIndex: 3 }} />
+      )}
       {/* corner: kebab (hover) over the always-on date trigger */}
       <div style={{ position: 'absolute', top: 8, right: 11, zIndex: 6, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
         <button title="Plan actions" onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
@@ -79,6 +88,9 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
             </MenuItem>
             <MenuItem label="Duplicate" onClick={() => { setMenuOpen(false); planActions.duplicatePlan(p.id); }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x={9} y={9} width={13} height={13} rx={2} /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+            </MenuItem>
+            <MenuItem label={archived ? 'Unarchive' : 'Archive'} onClick={() => { setMenuOpen(false); planActions.archivePlan(p.id, !archived); }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x={3} y={4} width={18} height={4} rx={1} /><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" /><path d="M10 12h4" /></svg>
             </MenuItem>
             <div style={{ height: 1, background: '#f1f0ed', margin: '4px 6px' }} />
             <MenuItem label="Delete" danger onClick={() => { setMenuOpen(false); planActions.deletePlan(p.id); }}>
@@ -120,6 +132,14 @@ function BoardCard({ p, onOpen }: { p: Plan; onOpen: (p: Plan) => void }) {
           </div>
         </div>
       </div>
+      {/* triggered: executed (trade linked) / closed (no trade) */}
+      {ts ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 15px', borderTop: '1px solid #f3f2ef', background: ts.tint }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: ts.dot, flex: '0 0 auto' }} />
+          <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: ts.ink }}>{ts.label}</span>
+          <span style={{ fontWeight: 600, fontSize: 9.5, color: '#b3aea2' }}>{'· ' + ts.sub}</span>
+        </div>
+      ) : null}
       {/* score */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', alignItems: 'center', padding: '11px 15px 12px', borderTop: '1px solid #f3f2ef' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -172,10 +192,33 @@ function EmptyLane({ e }: { e: EmptyCfg }) {
   );
 }
 
+// Per-column accent for the archive toggle pill + the "all archived" empty title.
+const ARCH: Record<Status, { ink: string; tint: string; ring: string; emptyTitle: string }> = {
+  idea: { ink: '#e8920f', tint: '#fbf2e3', ring: '#f0e2c4', emptyTitle: 'All ideas archived' },
+  armed: { ink: '#7c5cff', tint: '#f3f0ff', ring: '#ddd0f7', emptyTitle: 'All armed archived' },
+  triggered: { ink: '#1f9d55', tint: '#f3faf6', ring: '#cfe6da', emptyTitle: 'All triggered are archived' },
+};
+
+function ArchiveToggle({ st, count, active, onToggle }: { st: Status; count: number; active: boolean; onToggle: () => void }) {
+  if (!count) return null;
+  const { ink, tint, ring } = ARCH[st];
+  return (
+    <button onClick={onToggle} title={active ? 'Hide archived plans' : 'Show archived plans'}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', border: '1px solid ' + (active ? ring : '#e7e5df'), background: active ? tint : '#fff', borderRadius: 99, padding: '4px 11px', boxShadow: '0 1px 2px rgba(20,20,12,0.04)', transition: 'all .14s' }}>
+      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={active ? ink : '#9a958a'} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><rect x={3} y={4} width={18} height={4} rx={1} /><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" /><path d="M10 12h4" /></svg>
+      <span style={{ fontWeight: 700, fontSize: 10.5, letterSpacing: '-0.005em', color: active ? ink : '#7c7668' }}>{(active ? 'Hide' : 'Show') + ' archived'}</span>
+      <span style={{ fontWeight: 800, fontSize: 10, color: '#fff', background: active ? ink : '#b3aea2', borderRadius: 99, padding: '1px 6px', minWidth: 16, textAlign: 'center' }}>{count}</span>
+    </button>
+  );
+}
+
 export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
   const store = usePlanStore();
   const [overCol, setOverCol] = useState<Status | null>(null);
+  const [showArchived, setShowArchived] = useState<Partial<Record<Status, boolean>>>({});
   const plans = store.plans;
+  // a triggered plan linked to a real trade is "executed", else "closed"
+  const linkedPlanIds = new Set(Object.values(store.links));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -203,19 +246,26 @@ export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: 16, alignItems: 'stretch' }}>
         {LANES.map((lane) => {
-          const items = plans.filter((p) => p.status === lane.key);
+          const all = plans.filter((p) => p.status === lane.key);
+          const archivedCount = all.filter((p) => p.archived).length;
+          const showArch = !!showArchived[lane.key];
+          const items = showArch ? all : all.filter((p) => !p.archived);
           const isOver = overCol === lane.key;
+          const emptyCfg = archivedCount && !showArch ? { ...lane.empty, title: ARCH[lane.key].emptyTitle } : lane.empty;
           return (
             <div key={lane.key} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 12 }}>
               {/* lane glow halo */}
               <div style={{ position: 'absolute', top: 30, left: '50%', transform: 'translateX(-50%)', width: '84%', height: 170, borderRadius: '50%', background: lane.glow, filter: 'blur(58px)', opacity: lane.glowOp, pointerEvents: 'none', zIndex: 0 }} />
               {/* number-led header */}
-              <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 11, padding: '0 6px' }}>
-                <span style={{ fontWeight: 800, fontSize: 34, lineHeight: 0.85, letterSpacing: '-0.03em', color: lane.num, fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#1a1813' }}>{lane.label}</span>
-                  <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b' }}>{lane.caption}</span>
+              <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 11, padding: '0 6px', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                  <span style={{ fontWeight: 800, fontSize: 34, lineHeight: 0.85, letterSpacing: '-0.03em', color: lane.num, fontVariantNumeric: 'tabular-nums' }}>{all.length}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#1a1813' }}>{lane.label}</span>
+                    <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b' }}>{lane.caption}</span>
+                  </div>
                 </div>
+                <ArchiveToggle st={lane.key} count={archivedCount} active={showArch} onToggle={() => setShowArchived((s) => ({ ...s, [lane.key]: !s[lane.key] }))} />
               </div>
               {/* drop zone */}
               <div
@@ -223,7 +273,7 @@ export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
                 onDragLeave={() => setOverCol((s) => (s === lane.key ? null : s))}
                 onDrop={(e) => { e.preventDefault(); setOverCol(null); const id = (window as unknown as { __tpDrag?: string }).__tpDrag; if (id) planActions.movePlan(id, lane.key); }}
                 style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 11, flex: 1, minHeight: 88, borderRadius: 14, padding: 6, transition: 'background .12s, box-shadow .12s', background: isOver ? lane.drop.tint : 'transparent', boxShadow: isOver ? 'inset 0 0 0 2px ' + lane.drop.ring : 'inset 0 0 0 1px transparent' }}>
-                {items.length === 0 ? <EmptyLane e={lane.empty} /> : items.map((p) => <BoardCard key={p.id} p={p} onOpen={onOpen} />)}
+                {items.length === 0 ? <EmptyLane e={emptyCfg} /> : items.map((p) => <BoardCard key={p.id} p={p} onOpen={onOpen} tradeState={lane.key === 'triggered' ? (linkedPlanIds.has(p.id) ? 'executed' : 'closed') : null} />)}
               </div>
             </div>
           );

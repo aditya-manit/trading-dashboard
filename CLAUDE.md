@@ -135,6 +135,30 @@ This is the source of truth for component-level styling decisions that aren't
 obvious from the code. Keep it current; delete entries once they're plainly
 encoded in the component and no longer surprising.
 
+### Plans board + Heatmap chrome — handoff 41
+- **Archive workflow** (`Board.tsx`, `plan-model.ts`, `plan-store.ts`): `Plan.archived?:boolean`
+  + `planActions.archivePlan(id,val)`. Kebab menu gained **Archive / Unarchive** (between
+  Duplicate and the Delete separator). Archived cards: **dotted border** `1.5px dotted #c4c0b6`,
+  the direction bookmark is **replaced by an ARCHIVED tab** (top-left rounded-right grey pill),
+  card stays plain white (full color — grey/paper looks were tried + reverted). Per-column
+  `splitCol`: archived plans are **hidden unless that column's `Show/Hide archived (N)` toggle**
+  is on (board-local `showArchived` state, not persisted; the toggle pill — `ArchiveToggle`,
+  per-column accent in `ARCH` — only appears when `archivedCount>0`). Lane **count = all.length**
+  (archived included). Empty state title swaps to "All ideas/armed/triggered archived" when a
+  column is all-archived + hidden.
+- **Executed / Closed** (triggered cards only): a row under the head — **Executed · trade taken**
+  (green) when a plan id is in `store.links` values, else **Closed · no trade taken** (grey).
+  Computed in `Board` (`linkedPlanIds`), passed to `BoardCard` as `tradeState`.
+- **Kebab crop fix**: the card root is `overflow: menuOpen ? 'visible' : 'hidden'` +
+  `zIndex: menuOpen ? 20` so the menu can spill past a short card instead of being clipped.
+- **Heatmap chrome** (`HeatmapPage.tsx`, handoff 41 — quieter/warmer so the chart stays the
+  focus): the Symbol/Model/Interval bar is **rebuilt unified-toolbar style** (`Controls`): three
+  **separate connected pills** (gap 8), each = an inline group label (`--glabel` bg, border-right)
+  + tabs; **active tab = purple dot + `--navink`/`--navactive`**, inactive = muted, **no dot**.
+  New CSS vars: `--pagebg` (warm off-white `#faf6ef` light / `#0b0913` dark — the `.lhx` wrapper
+  bg switched `var(--bg)`→`var(--pagebg)`) and `--glabel`; **`--border`/`--divider` warmed from
+  lavender to neutral grey** (`#e8e3da`/`#f1ede6`) in BOTH themes. `--bg` stays the canvas bg.
+
 ### Plan funnel — handoff 40 (expected dates, kebab, resizable drawers)
 - **Model** (`lib/plan-model.ts`): `PlanDraft`/`Plan` gained `tradeDate` (ISO yyyy-mm-dd);
   `PlanDraft` also `trailPeriod`/`bankPct`/`bankTarget` (the management-rule slots). `TP_BLANK`

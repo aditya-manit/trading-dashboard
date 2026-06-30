@@ -320,7 +320,7 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
   const errMsg = data?.error;
 
   return (
-    <div className="lhx" data-theme={theme} style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', fontFamily: SANS, color: 'var(--ink)', overflow: 'hidden' }}>
+    <div className="lhx" data-theme={theme} style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--pagebg)', fontFamily: SANS, color: 'var(--ink)', overflow: 'hidden' }}>
       <style>{LH_CSS}</style>
 
       {/* header */}
@@ -441,8 +441,8 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
 const iconBtn: React.CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, padding: 0, flex: '0 0 auto', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, color: '#7c5cff', boxShadow: '0 1px 2px rgba(20,20,12,0.04)' };
 
 const LH_CSS = `
-.lhx{--bg:#e9e8e4;--panel:#ffffff;--ink:#1a1813;--muted:#9b988d;--faint:#a8a296;--border:#e7dffa;--divider:#f0ecfa;--navactive:#f1ecfb;--navink:#5b46c9;--dotidle:#d8d3ca;--tagbg:#1a1813;--tagink:#ffffff;--cross:rgba(40,36,28,0.32);--halo:#ffffff;--cbar:linear-gradient(180deg,#78145a,#bc2856,#e4523c,#f68c30,#fac854,#fce8a0,#faf8fc);}
-.lhx[data-theme=dark]{--bg:#0b0913;--panel:#13101c;--ink:#f3eeff;--muted:#8b8699;--faint:#615c75;--border:rgba(255,255,255,0.09);--divider:rgba(255,255,255,0.08);--navactive:rgba(255,255,255,0.10);--navink:#cbb8ff;--dotidle:rgba(255,255,255,0.22);--tagbg:#e7e3f0;--tagink:#0a0613;--cross:rgba(255,255,255,0.24);--halo:#0a0613;--cbar:linear-gradient(180deg,#fcffb4,#f9c946,#f0801a,#bb3754,#701c60,#2a1248,#0a0613);}
+.lhx{--bg:#e9e8e4;--pagebg:#faf6ef;--panel:#ffffff;--ink:#1a1813;--muted:#9b988d;--faint:#a8a296;--border:#e8e3da;--divider:#f1ede6;--glabel:#f4f2ed;--navactive:#f1ecfb;--navink:#5b46c9;--dotidle:#d8d3ca;--tagbg:#1a1813;--tagink:#ffffff;--cross:rgba(40,36,28,0.32);--halo:#ffffff;--cbar:linear-gradient(180deg,#78145a,#bc2856,#e4523c,#f68c30,#fac854,#fce8a0,#faf8fc);}
+.lhx[data-theme=dark]{--bg:#0b0913;--pagebg:#0b0913;--panel:#13101c;--ink:#f3eeff;--muted:#8b8699;--faint:#615c75;--border:rgba(255,255,255,0.09);--divider:rgba(255,255,255,0.08);--glabel:rgba(255,255,255,0.05);--navactive:rgba(255,255,255,0.10);--navink:#cbb8ff;--dotidle:rgba(255,255,255,0.22);--tagbg:#e7e3f0;--tagink:#0a0613;--cross:rgba(255,255,255,0.24);--halo:#0a0613;--cbar:linear-gradient(180deg,#fcffb4,#f9c946,#f0801a,#bb3754,#701c60,#2a1248,#0a0613);}
 @keyframes lhspin{to{transform:rotate(360deg);}}
 @keyframes lhwave{0%,100%{opacity:.22;transform:scaleX(.86);}50%{opacity:1;transform:scaleX(1);}}
 @keyframes lhglow{0%,100%{opacity:.55;}50%{opacity:1;}}
@@ -453,26 +453,29 @@ body.lh-dragging-ns,body.lh-dragging-ns *{cursor:ns-resize !important;}
 `;
 
 function Controls({ symbol, model, interval, onSym, onModel, onInterval }: { symbol: HeatSymbol; model: HeatModel; interval: HeatInterval; onSym: (v: HeatSymbol) => void; onModel: (v: HeatModel) => void; onInterval: (v: HeatInterval) => void }) {
-  const btnRow = <T extends string>(opts: readonly T[], val: T, on: (v: T) => void, mono: boolean, fmt?: (o: T) => string) => (
-    <div style={{ display: 'inline-flex', gap: 2 }}>
-      {opts.map((o) => { const active = o === val; return (
-        <button key={o} onClick={() => on(o)} style={{ cursor: 'pointer', border: 'none', borderRadius: 7, padding: '5px 10px 5px 8px', display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: mono ? MONO : SANS, fontWeight: active ? 800 : 700, fontSize: 11, whiteSpace: 'nowrap', color: active ? 'var(--navink)' : 'var(--muted)', background: active ? 'var(--navactive)' : 'transparent', transition: 'all .14s' }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', flex: '0 0 auto', background: active ? '#7c5cff' : 'var(--dotidle)' }} />{fmt ? fmt(o) : o}
-        </button>
-      ); })}
-    </div>
-  );
-  const cell = (label: string, body: React.ReactNode, last?: boolean) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px', borderRight: last ? 'none' : '1px solid var(--divider)' }}>
-      <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>{label}</span>
-      {body}
+  // Unified-toolbar style: each group is its own connected pill (inline group
+  // label + tabs). Active tab = purple dot + navink/navactive; inactive = muted,
+  // no dot. (handoff 41 — quieter, warmer chrome so the chart stays the focus.)
+  const cellBtn = <T extends string>(o: T, val: T, on: (v: T) => void, mono: boolean, first: boolean, fmt?: (o: T) => string) => {
+    const onState = o === val;
+    return (
+      <button key={o} onClick={() => on(o)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: mono ? MONO : SANS, fontWeight: onState ? 800 : 600, fontSize: mono ? 11 : 11.5, padding: '7px 11px', border: 'none', borderLeft: first ? 'none' : '1px solid var(--border)', cursor: 'pointer', whiteSpace: 'nowrap', color: onState ? 'var(--navink)' : 'var(--muted)', background: onState ? 'var(--navactive)' : 'transparent', transition: 'background .15s, color .15s' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#7c5cff', flex: '0 0 auto', display: onState ? 'block' : 'none' }} />
+        {fmt ? fmt(o) : o}
+      </button>
+    );
+  };
+  const section = <T extends string>(label: string, opts: readonly T[], val: T, on: (v: T) => void, mono: boolean, fmt?: (o: T) => string) => (
+    <div style={{ display: 'inline-flex', alignItems: 'stretch', border: '1px solid var(--border)', borderRadius: 999, background: 'var(--panel)', overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', padding: '0 11px', background: 'var(--glabel)', borderRight: '1px solid var(--border)', fontFamily: SANS, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{label}</div>
+      {opts.map((o, i) => cellBtn(o, val, on, mono, i === 0, fmt))}
     </div>
   );
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'stretch', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
-      {cell('Symbol', btnRow(SYMBOLS, symbol, onSym, false))}
-      {cell('Model', btnRow(MODELS, model, onModel, false, (o) => 'Model ' + o.slice(5)))}
-      {cell('Interval', btnRow(INTERVALS, interval, onInterval, true), true)}
+    <div style={{ display: 'inline-flex', alignItems: 'stretch', gap: 8 }}>
+      {section('Symbol', SYMBOLS, symbol, onSym, false)}
+      {section('Model', MODELS, model, onModel, false, (o) => 'Model ' + o.slice(5))}
+      {section('Interval', INTERVALS, interval, onInterval, true)}
     </div>
   );
 }

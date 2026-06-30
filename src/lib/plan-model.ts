@@ -64,6 +64,7 @@ export interface Plan {
   chart?: string;
   draft?: PlanDraft;
   tradeDate?: string; // expected trade date (ISO yyyy-mm-dd)
+  archived?: boolean; // hidden from its column unless "show archived" is on
 }
 
 // Account equity used for % sizing. Mirrors the dashboard header; the Editor can
