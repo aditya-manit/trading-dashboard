@@ -20,7 +20,7 @@ const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true' && process.env.NODE_EN
 // /api/keepalive is hit by the Vercel cron (no user session) — it guards itself
 // with CRON_SECRET, so it's safe to let past the owner gate.
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/signout', '/api/keepalive'];
-const MFA_MAX_AGE_S = 24 * 3600; // re-prompt for the 2FA code every 24h
+const MFA_MAX_AGE_S = 7 * 24 * 3600; // re-prompt for the 2FA code every 7 days
 
 // Decode a JWT payload (no verification — getUser() already validated it).
 function decodeJwt(token: string): { aal?: string; amr?: { method: string; timestamp: number }[] } {

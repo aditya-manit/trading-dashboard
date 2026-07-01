@@ -8,7 +8,7 @@ const AUTH_ENABLED = !!(
   OWNER_EMAIL
 );
 
-const MFA_MAX_AGE_S = 24 * 3600; // must match proxy.ts
+const MFA_MAX_AGE_S = 7 * 24 * 3600; // must match proxy.ts
 const deny = () => NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
 // True if the session is AAL2 with a TOTP verification in the last 24h.
