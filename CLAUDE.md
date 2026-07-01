@@ -318,8 +318,15 @@ The data/route/metrics/daily-store from handoff 31 are unchanged (see below).
     so `X(t) = VW·(t/N − x0)/(x1−x0)` maps through the heatmap's `view.x0/x1` (0..1 time fracs). Zoom/pan
     the heatmap → the strip rescales to the same window (re-renders via the shared `tick`/`bump`); columns
     outside the window clip on the SVG. X-labels come from the visible candle timestamps (`fmtShort`).
-  - **Hover** (local state): vertical guide + dot on the total line + tooltip (time, total, per-tier rows).
-    Legend column (tier swatches). Only **time** zoom drives it (the vertical band-pass doesn't).
+  - **Hover is SHARED across both charts** (`syncFrac` state in `HeatmapPage` = candle time-fraction 0..1):
+    hovering EITHER the heatmap or the strip draws the time-guide on the other (the heatmap's `onHover`
+    sets it; the strip's overlay sets it via `onSync`). The strip's guide/dot/tooltip are positioned in %
+    (no px measure) and driven by `syncFrac`, so they appear when the heatmap is hovered too; the heatmap
+    draws a matching `--cross` vertical guide when the hover originates from the strip (`!hover`). Tooltip
+    (time, total, per-tier rows) is **not clipped** — the chart container overflow is visible; only the
+    `<svg>` clips the area (so the tall 6-row tooltip shows fully). Strip **height 150**. Legend column
+    (tier swatches). Only **time** zoom drives it (the vertical band-pass doesn't). Cross-chart hover-sync
+    + the taller strip are net-new (NOT in the handoff-42 dc.html, which had height 108 + independent hovers).
 - **Resilience:** `fetchHeatmapData` retries transient upstream failures up to 3× (1.2s backoff) —
   the CoinGlass Actor intermittently returns 400 / 502 / run-failed / empty; a retry usually
   succeeds. Validation errors (bad symbol/model/interval) are NOT retried.

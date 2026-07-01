@@ -191,6 +191,9 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
   const cbarRef = useRef<HTMLDivElement | null>(null);
   const [hover, setHover] = useState<HoverState | null>(null);
   const [profHover, setProfHover] = useState<ProfHover | null>(null);
+  // shared time-crosshair: candle time-fraction (0..1) under the cursor on EITHER
+  // the heatmap or the load strip, so hovering one draws the guide on the other.
+  const [syncFrac, setSyncFrac] = useState<number | null>(null);
   // band-pass on liquidation intensity (fraction of max): cells outside [lo,hi]
   // are hidden; price axis fits to the visible band. Defaults to 50–100%.
   const [band, setBand] = useState({ lo: 0.5, hi: 1 });
@@ -347,6 +350,7 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
     const yi = Math.max(0, Math.min(Y - 1, Math.round((price - ya[0]) / dp)));
     const lev = lkp.get(xi * 100000 + yi) || 0, ci = Math.max(0, Math.min(cs.length - 1, Math.round(f * (cs.length - 1))));
     setHover({ x: mx, y: my, w: r.width, h: r.height, price, lev, ts: +cs[ci][0] });
+    setSyncFrac(f);
   };
   const onProfHover = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!prep) return; const V = getView(); if (!V) return;
@@ -427,14 +431,14 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
       {metrics && <div style={{ padding: '12px 16px 4px', flex: '0 0 auto' }}><StatsStrip m={metrics} trend={trend} dark={dark} showLoad={showLoad} onToggleLoad={() => setShowLoad((v) => !v)} /></div>}
 
       {/* leverage-load-over-time strip — toggled from the stats cell; x-axis tracks the heatmap time zoom */}
-      {load && showLoad && prep && <div style={{ padding: '0 16px', flex: '0 0 auto' }}><LevLoadStrip load={load} dark={dark} getView={getView} cs={prep.cs} /></div>}
+      {load && showLoad && prep && <div style={{ padding: '0 16px', flex: '0 0 auto' }}><LevLoadStrip load={load} dark={dark} getView={getView} cs={prep.cs} syncFrac={syncFrac} onSync={setSyncFrac} /></div>}
 
       {/* main */}
       <div style={{ flex: 1, display: 'flex', gap: 14, padding: '14px 16px', minHeight: 0 }}>
         <div style={{ flex: 1, position: 'relative', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', minWidth: 0 }}>
           {prep ? (
             <>
-              <div ref={plotRef} onMouseMove={onHover} onMouseLeave={() => setHover(null)} onDoubleClick={resetView} style={{ position: 'absolute', left: 58, top: 14, right: 64, bottom: 30, overflow: 'visible', cursor: 'crosshair', zIndex: 8 }}>
+              <div ref={plotRef} onMouseMove={onHover} onMouseLeave={() => { setHover(null); setSyncFrac(null); }} onDoubleClick={resetView} style={{ position: 'absolute', left: 58, top: 14, right: 64, bottom: 30, overflow: 'visible', cursor: 'crosshair', zIndex: 8 }}>
                 <canvas ref={setHeat} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', borderRadius: 8 }} />
                 {isZoomed() && (
                   <button onClick={resetView} className="lh-rst" title="Reset zoom" style={{ position: 'absolute', left: 8, top: 8, zIndex: 5, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', height: 28, padding: '0 8px', background: 'rgba(26,24,19,0.84)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, color: '#f3f0ff' }}>
@@ -443,6 +447,11 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
                   </button>
                 )}
                 {hover && <Crosshair hv={hover} />}
+                {!hover && showLoad && syncFrac != null && (() => {
+                  const V = getView(); if (!V) return null;
+                  const lp = (syncFrac - V.x0) / ((V.x1 - V.x0) || 1) * 100;
+                  return lp >= 0 && lp <= 100 ? <div style={{ position: 'absolute', left: `${lp}%`, top: 0, bottom: 0, width: 1, background: 'var(--cross)', pointerEvents: 'none', zIndex: 5 }} /> : null;
+                })()}
               </div>
               <div style={{ position: 'absolute', left: 10, top: 14, width: 44, bottom: 30, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                 <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 9.5, color: 'var(--muted)', marginBottom: 6, whiteSpace: 'nowrap' }}>{(prep.max / 1e6).toFixed(2)}M</span>
@@ -594,8 +603,7 @@ function StatsStrip({ m, trend, dark, showLoad, onToggleLoad }: { m: NonNullable
 // Leverage-load-over-time strip: stacked-by-tier area over the same time-column
 // axis as the heatmap. X maps through the heatmap's view (x0..x1), so it tracks
 // the heatmap's time zoom/pan 1:1; points outside the window clip on the SVG.
-function LevLoadStrip({ load, dark, getView, cs }: { load: LoadSeries; dark: boolean; getView: () => View; cs: HeatmapData['price_candlesticks'] }) {
-  const [hv, setHv] = useState<{ i: number; x: number; w: number; h: number } | null>(null);
+function LevLoadStrip({ load, dark, getView, cs, syncFrac, onSync }: { load: LoadSeries; dark: boolean; getView: () => View; cs: HeatmapData['price_candlesticks']; syncFrac: number | null; onSync: (f: number | null) => void }) {
   const V = getView();
   const x0 = V ? V.x0 : 0, x1 = V ? V.x1 : 1, span = (x1 - x0) || 1;
   const N = load.maxT, VW = 1000, VH = 100, padT = 7, padB = 15, plotH = VH - padT - padB;
@@ -617,13 +625,18 @@ function LevLoadStrip({ load, dark, getView, cs }: { load: LoadSeries; dark: boo
   const xlabs = [x0, (x0 + x1) / 2, x1].map(tsAt).map(fmtShort);
   const shadow = '0 0 3px var(--halo),0 0 3px var(--halo),0 0 3px var(--halo)';
   const ylab = (top: string, txt: string) => <span style={{ position: 'absolute', left: 4, top, transform: 'translateY(-50%)', fontFamily: MONO, fontWeight: 600, fontSize: 8.5, color: 'var(--muted)', pointerEvents: 'none', textShadow: shadow }}>{txt}</span>;
+  // hover driven by the SHARED syncFrac (set by this strip OR the heatmap), so the
+  // guide/dot/tooltip appear here even when you're hovering the heatmap. Positioned
+  // in % (no px measure needed), flips left near the right edge; tooltip is NOT
+  // clipped (chart container overflow is visible; only the SVG clips the area).
   const hk: React.ReactNode[] = [];
-  if (hv && hv.i >= 0 && hv.i <= N) {
-    const i = hv.i, totAt = load.series[i], dotY = (Y(totAt) / VH) * hv.h;
-    hk.push(<div key="g" style={{ position: 'absolute', left: hv.x, top: 0, bottom: 0, width: 1, background: 'var(--cross)', pointerEvents: 'none', zIndex: 5 }} />);
-    hk.push(<div key="d" style={{ position: 'absolute', left: hv.x - 3.5, top: dotY - 3.5, width: 7, height: 7, borderRadius: '50%', background: 'var(--ink)', border: '1.5px solid var(--panel)', pointerEvents: 'none', zIndex: 6 }} />);
+  const leftPct = syncFrac != null ? (syncFrac - x0) / span * 100 : -1;
+  if (syncFrac != null && leftPct >= 0 && leftPct <= 100) {
+    const i = Math.max(0, Math.min(N, Math.round(syncFrac * N))), totAt = load.series[i], flip = leftPct > 60;
+    hk.push(<div key="g" style={{ position: 'absolute', left: `${leftPct}%`, top: 0, bottom: 0, width: 1, background: 'var(--cross)', pointerEvents: 'none', zIndex: 5 }} />);
+    hk.push(<div key="d" style={{ position: 'absolute', left: `${leftPct}%`, top: `${Y(totAt)}%`, width: 7, height: 7, transform: 'translate(-50%,-50%)', borderRadius: '50%', background: 'var(--ink)', border: '1.5px solid var(--panel)', pointerEvents: 'none', zIndex: 6 }} />);
     hk.push(
-      <div key="c" style={{ position: 'absolute', top: 2, left: hv.x > hv.w - 150 ? hv.x - 146 : hv.x + 12, width: 134, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 22px -8px rgba(20,20,12,0.4)', padding: '7px 9px', zIndex: 6, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div key="c" style={{ position: 'absolute', top: 2, left: `${leftPct}%`, transform: flip ? 'translateX(calc(-100% - 12px))' : 'translateX(12px)', width: 134, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 22px -8px rgba(20,20,12,0.4)', padding: '7px 9px', zIndex: 6, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, paddingBottom: 4, borderBottom: '1px solid var(--divider)' }}>
           <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 9.5, color: 'var(--muted)' }}>{fmtShort(tsAt(i / N))}</span>
           <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 12.5, color: 'var(--ink)' }}>{fmtUsd(totAt)}</span>
@@ -640,12 +653,12 @@ function LevLoadStrip({ load, dark, getView, cs }: { load: LoadSeries; dark: boo
   }
   const onMove = (e: React.MouseEvent) => {
     const r = e.currentTarget.getBoundingClientRect(), fx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-    setHv({ i: Math.round((x0 + fx * span) * N), x: e.clientX - r.left, w: r.width, h: r.height });
+    onSync(x0 + fx * span);
   };
   return (
-    <div style={{ display: 'flex', alignItems: 'stretch', gap: 14, height: 108, padding: '10px 16px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 14, marginTop: 8, boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
-      <div style={{ position: 'relative', flex: 1, minWidth: 0, alignSelf: 'stretch', overflow: 'hidden' }}>
-        <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}>
+    <div style={{ display: 'flex', alignItems: 'stretch', gap: 14, height: 150, padding: '10px 16px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 14, marginTop: 8, boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
+      <div style={{ position: 'relative', flex: 1, minWidth: 0, alignSelf: 'stretch' }}>
+        <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', overflow: 'hidden' }}>
           <line x1={0} x2={VW} y1={gridY} y2={gridY} stroke="var(--divider)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           {bands}
         </svg>
@@ -654,7 +667,7 @@ function LevLoadStrip({ load, dark, getView, cs }: { load: LoadSeries; dark: boo
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 1, display: 'flex', justifyContent: 'space-between', padding: '0 2px', pointerEvents: 'none' }}>
           {xlabs.map((t, i) => <span key={i} style={{ fontFamily: MONO, fontWeight: 600, fontSize: 8.5, color: 'var(--muted)', textShadow: shadow }}>{t}</span>)}
         </div>
-        <div onMouseMove={onMove} onMouseLeave={() => setHv(null)} style={{ position: 'absolute', inset: 0, cursor: 'crosshair', zIndex: 4 }} />
+        <div onMouseMove={onMove} onMouseLeave={() => onSync(null)} style={{ position: 'absolute', inset: 0, cursor: 'crosshair', zIndex: 4 }} />
         {hk}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto', paddingLeft: 4, justifyContent: 'center' }}>
