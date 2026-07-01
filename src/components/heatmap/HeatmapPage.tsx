@@ -84,6 +84,36 @@ function prepare(d: HeatmapData): Prepared | null {
   return { Y: ya.length, X: Math.max(X, cs.length), max, ya, cs, lkp, dat };
 }
 
+// Leverage-load-over-time: for each time column, sum the liquidation value per
+// leverage tier (tier = 1 / (% distance from live price), snapped to the real
+// BTC ladder). Same time-column axis as the heatmap candles, so the strip can
+// track the heatmap's time zoom directly.
+interface LoadSeries { maxT: number; series: number[]; tierSeries: Record<number, number[]>; order: number[]; total: number; peakTotal: number; price: number }
+function computeLoadSeries(d: HeatmapData): LoadSeries | null {
+  const ld = d.liquidation_leverage_data, ya = d.y_axis, cs = d.price_candlesticks;
+  if (!ld?.length || !ya?.length || !cs?.length) return null;
+  const price = +cs[cs.length - 1][4];
+  const STD = [125, 100, 75, 50, 25, 20, 10, 5];
+  const snap = (L: number) => { let b = STD[0]; for (const s of STD) if (Math.abs(s - L) < Math.abs(b - L)) b = s; return b; };
+  let maxT = 0; for (const r of ld) if (r[0] > maxT) maxT = r[0];
+  const series = new Array(maxT + 1).fill(0) as number[]; const tierSeries: Record<number, number[]> = {};
+  for (const [t, yi, v] of ld) {
+    const p = ya[yi]; if (p == null) continue;
+    const L = 1 / (Math.abs(p - price) / price || 1e-9), tier = snap(L);
+    series[t] += v; (tierSeries[tier] ||= new Array(maxT + 1).fill(0))[t] += v;
+  }
+  let peakT = 0; for (let t = 0; t <= maxT; t++) if (series[t] > series[peakT]) peakT = t;
+  const order = [125, 100, 75, 50, 25, 20].filter((t) => tierSeries[t]);
+  return { maxT, series, tierSeries, order, total: series[maxT], peakTotal: series[peakT], price };
+}
+// per-tier purple shades (theme-aware) — deepest = highest leverage
+function loadCol(t: number, dark: boolean): string {
+  const m: Record<number, string> = dark
+    ? { 125: '#8f74f5', 100: '#a08bff', 75: '#b0a0ff', 50: '#c0b3ff', 25: '#d0c6ff', 20: '#e6e0ff' }
+    : { 125: '#5b46c9', 100: '#7659e6', 75: '#8f74f5', 50: '#a892ff', 25: '#c3b3ff', 20: '#ddd4ff' };
+  return m[t] || '#7c5cff';
+}
+
 interface HoverState { x: number; y: number; w: number; h: number; price: number; lev: number; ts: number }
 interface ProfHover { x: number; y: number; w: number; h: number; j: number; price: number }
 
@@ -100,6 +130,8 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
   const prep = useMemo(() => (data && !data.error && data.configured !== false ? prepare(data) : null), [data]);
   const prof = useMemo(() => (prep ? computeProfile(data as HeatmapData) : null), [prep, data]);
   const metrics = useMemo(() => (prep ? computeHeatmapMetrics(data) : null), [prep, data]);
+  const load = useMemo(() => (prep ? computeLoadSeries(data as HeatmapData) : null), [prep, data]);
+  const [showLoad, setShowLoad] = useState(false);
   const { data: hist, mutate: mutateHist } = useHeatmapHistory(symbol, interval);
   // Canonical 24h CoG series for the trajectory overlay (one daily series, mapped
   // onto whatever interval is shown). Shares the SWR cache with `hist` on 24h.
@@ -392,7 +424,10 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
       </div>
 
       {/* stats strip */}
-      {metrics && <div style={{ padding: '12px 16px 4px', flex: '0 0 auto' }}><StatsStrip m={metrics} trend={trend} dark={dark} /></div>}
+      {metrics && <div style={{ padding: '12px 16px 4px', flex: '0 0 auto' }}><StatsStrip m={metrics} trend={trend} dark={dark} showLoad={showLoad} onToggleLoad={() => setShowLoad((v) => !v)} /></div>}
+
+      {/* leverage-load-over-time strip — toggled from the stats cell; x-axis tracks the heatmap time zoom */}
+      {load && showLoad && prep && <div style={{ padding: '0 16px', flex: '0 0 auto' }}><LevLoadStrip load={load} dark={dark} getView={getView} cs={prep.cs} /></div>}
 
       {/* main */}
       <div style={{ flex: 1, display: 'flex', gap: 14, padding: '14px 16px', minHeight: 0 }}>
@@ -520,7 +555,7 @@ function Controls({ symbol, model, interval, onSym, onModel, onInterval }: { sym
   );
 }
 
-function StatsStrip({ m, trend, dark }: { m: NonNullable<ReturnType<typeof computeHeatmapMetrics>>; trend: { tllSeries: number[]; gapSeries: number[]; tllPrev: number | null; gapPrev: number | null }; dark: boolean }) {
+function StatsStrip({ m, trend, dark, showLoad, onToggleLoad }: { m: NonNullable<ReturnType<typeof computeHeatmapMetrics>>; trend: { tllSeries: number[]; gapSeries: number[]; tllPrev: number | null; gapPrev: number | null }; dark: boolean; showLoad: boolean; onToggleLoad: () => void }) {
   const GRN = '#1f9d55', RED = '#df5338', PUR = '#7c5cff', MUT = 'var(--muted)';
   // dot colors mirror the chart's marker lines (CoG / MAG↑ / MAG↓ / WALL)
   const MAGDN = dark ? '#ff6b9d' : '#d6336c', WALL = '#2b6ce8';
@@ -542,7 +577,93 @@ function StatsStrip({ m, trend, dark }: { m: NonNullable<ReturnType<typeof compu
       {cell('Nearest magnet ↑', m.nearestAbove ? <>{bigA('↑', GRN, fmtPrice(m.nearestAbove.peakPrice))}{sm(fmtVal(m.nearestAbove.peak), PUR)}{sm('+' + m.nearestAbove.dist.toFixed(2) + '%', GRN)}</> : big('—'), GRN)}
       {cell('Nearest magnet ↓', m.nearestBelow ? <>{bigA('↓', RED, fmtPrice(m.nearestBelow.peakPrice))}{sm(fmtVal(m.nearestBelow.peak), PUR)}{sm('−' + m.nearestBelow.dist.toFixed(2) + '%', RED)}</> : big('—'), MAGDN)}
       {cell('Strongest wall', m.strongest ? <>{big(fmtPrice(m.strongest.peakPrice))}{sm(fmtVal(m.strongest.mass), PUR)}{sm(Math.round(m.strongest.share * 100) + '%', MUT)}{sm(`[${fmtPrice(m.strongest.lo)}–${fmtPrice(m.strongest.hi)}]`, 'var(--faint)')}</> : big('—'), WALL)}
-      {cell('Leverage load · σ', <>{big(fmtVal(m.totalFuel))}<FuelDelta cur={m.totalFuel} prev={trend.tllPrev} /><Spark data={trend.tllSeries} color="#ef9512" />{sm('σ ' + m.sigma.toFixed(1) + '%', MUT)}</>, '#ef9512', true)}
+      <div onClick={onToggleLoad} title={showLoad ? 'Hide load-over-time chart' : 'Show load-over-time chart'} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '13px 20px', flex: '1 1 0', minWidth: 0, cursor: 'pointer', background: showLoad ? 'var(--navactive)' : 'transparent', transition: 'background .15s' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {label('Leverage load · σ', '#ef9512')}
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', marginLeft: 'auto', transform: showLoad ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}><path d="m6 9 6 6 6-6" /></svg>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 2 }}>
+          {big(fmtVal(m.totalFuel))}<FuelDelta cur={m.totalFuel} prev={trend.tllPrev} /><Spark data={trend.tllSeries} color="#ef9512" />{sm('σ ' + m.sigma.toFixed(1) + '%', MUT)}
+          <span style={{ fontFamily: SANS, fontWeight: 700, fontSize: 9.5, color: '#7c5cff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{showLoad ? 'Chart open' : 'View chart'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Leverage-load-over-time strip: stacked-by-tier area over the same time-column
+// axis as the heatmap. X maps through the heatmap's view (x0..x1), so it tracks
+// the heatmap's time zoom/pan 1:1; points outside the window clip on the SVG.
+function LevLoadStrip({ load, dark, getView, cs }: { load: LoadSeries; dark: boolean; getView: () => View; cs: HeatmapData['price_candlesticks'] }) {
+  const [hv, setHv] = useState<{ i: number; x: number; w: number; h: number } | null>(null);
+  const V = getView();
+  const x0 = V ? V.x0 : 0, x1 = V ? V.x1 : 1, span = (x1 - x0) || 1;
+  const N = load.maxT, VW = 1000, VH = 100, padT = 7, padB = 15, plotH = VH - padT - padB;
+  const niceMax = Math.ceil(Math.max(...load.series) / 2e8) * 2e8 || 1;
+  const X = (t: number) => VW * (t / N - x0) / span;
+  const Y = (v: number) => padT + plotH * (1 - v / niceMax);
+  const order = load.order.slice().reverse();            // deepest tier at the bottom
+  const cum = new Array(N + 1).fill(0) as number[];
+  const bands = order.map((tier) => {
+    const arr = load.tierSeries[tier], topB: number[] = [], botB: number[] = [];
+    for (let t = 0; t <= N; t++) { botB.push(cum[t]); cum[t] += arr[t] || 0; topB.push(cum[t]); }
+    let p = 'M' + X(0).toFixed(1) + ',' + Y(topB[0]).toFixed(1);
+    for (let t = 1; t <= N; t++) p += ' L' + X(t).toFixed(1) + ',' + Y(topB[t]).toFixed(1);
+    for (let t = N; t >= 0; t--) p += ' L' + X(t).toFixed(1) + ',' + Y(botB[t]).toFixed(1);
+    return <path key={tier} d={p + ' Z'} fill={loadCol(tier, dark)} stroke="var(--panel)" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />;
+  });
+  const gridY = Y(niceMax / 2);
+  const tsAt = (frac: number) => +cs[Math.max(0, Math.min(cs.length - 1, Math.round(frac * (cs.length - 1))))][0];
+  const xlabs = [x0, (x0 + x1) / 2, x1].map(tsAt).map(fmtShort);
+  const shadow = '0 0 3px var(--halo),0 0 3px var(--halo),0 0 3px var(--halo)';
+  const ylab = (top: string, txt: string) => <span style={{ position: 'absolute', left: 4, top, transform: 'translateY(-50%)', fontFamily: MONO, fontWeight: 600, fontSize: 8.5, color: 'var(--muted)', pointerEvents: 'none', textShadow: shadow }}>{txt}</span>;
+  const hk: React.ReactNode[] = [];
+  if (hv && hv.i >= 0 && hv.i <= N) {
+    const i = hv.i, totAt = load.series[i], dotY = (Y(totAt) / VH) * hv.h;
+    hk.push(<div key="g" style={{ position: 'absolute', left: hv.x, top: 0, bottom: 0, width: 1, background: 'var(--cross)', pointerEvents: 'none', zIndex: 5 }} />);
+    hk.push(<div key="d" style={{ position: 'absolute', left: hv.x - 3.5, top: dotY - 3.5, width: 7, height: 7, borderRadius: '50%', background: 'var(--ink)', border: '1.5px solid var(--panel)', pointerEvents: 'none', zIndex: 6 }} />);
+    hk.push(
+      <div key="c" style={{ position: 'absolute', top: 2, left: hv.x > hv.w - 150 ? hv.x - 146 : hv.x + 12, width: 134, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 22px -8px rgba(20,20,12,0.4)', padding: '7px 9px', zIndex: 6, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, paddingBottom: 4, borderBottom: '1px solid var(--divider)' }}>
+          <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 9.5, color: 'var(--muted)' }}>{fmtShort(tsAt(i / N))}</span>
+          <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 12.5, color: 'var(--ink)' }}>{fmtUsd(totAt)}</span>
+        </div>
+        {load.order.map((t) => (
+          <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ width: 7, height: 7, borderRadius: 2, background: loadCol(t, dark), flex: '0 0 auto' }} />
+            <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10, color: 'var(--muted)', width: 28 }}>{t}×</span>
+            <span style={{ marginLeft: 'auto', fontFamily: MONO, fontWeight: 700, fontSize: 10, color: 'var(--ink)' }}>{fmtUsd(load.tierSeries[t][i] || 0)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const onMove = (e: React.MouseEvent) => {
+    const r = e.currentTarget.getBoundingClientRect(), fx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    setHv({ i: Math.round((x0 + fx * span) * N), x: e.clientX - r.left, w: r.width, h: r.height });
+  };
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', gap: 14, height: 108, padding: '10px 16px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 14, marginTop: 8, boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
+      <div style={{ position: 'relative', flex: 1, minWidth: 0, alignSelf: 'stretch', overflow: 'hidden' }}>
+        <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}>
+          <line x1={0} x2={VW} y1={gridY} y2={gridY} stroke="var(--divider)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          {bands}
+        </svg>
+        {ylab('9%', fmtUsd(niceMax))}
+        {ylab('50%', fmtUsd(niceMax / 2))}
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 1, display: 'flex', justifyContent: 'space-between', padding: '0 2px', pointerEvents: 'none' }}>
+          {xlabs.map((t, i) => <span key={i} style={{ fontFamily: MONO, fontWeight: 600, fontSize: 8.5, color: 'var(--muted)', textShadow: shadow }}>{t}</span>)}
+        </div>
+        <div onMouseMove={onMove} onMouseLeave={() => setHv(null)} style={{ position: 'absolute', inset: 0, cursor: 'crosshair', zIndex: 4 }} />
+        {hk}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto', paddingLeft: 4, justifyContent: 'center' }}>
+        {load.order.map((t) => (
+          <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: MONO, fontWeight: 700, fontSize: 10, color: 'var(--muted)' }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: loadCol(t, dark) }} />{t}×
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

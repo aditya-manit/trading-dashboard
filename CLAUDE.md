@@ -304,6 +304,22 @@ The data/route/metrics/daily-store from handoff 31 are unchanged (see below).
   - Shares the price-axis band clip (points outside the band-zoomed range clip off, same as candles).
   - **Data note:** the early "yesterday≈today" preview seed is gone — all daily rows are now distinct
     real cron captures (no duplicate pair); the line is built from actual data only.
+- **Leverage-load-over-time strip (BUILT, handoff 42, 2026-07-01):** a **stacked-by-tier area chart of
+  the intraday liquidation load**, ported from `Liquidation Heatmap (light).dc.html`. Sits between the
+  stats strip and the heatmap; **toggled** from the "Leverage load · σ" stats cell (now clickable —
+  chevron rotates, `--navactive` bg when open, "View chart" / "Chart open" text; the existing daily
+  TLL sparkline + FuelDelta stay in the cell). **Default closed** so the heatmap keeps full height.
+  - `computeLoadSeries(d)` (`HeatmapPage.tsx`, module-level like `computeProfile`): per time-column,
+    sums `liquidation_leverage_data` value by **leverage tier** — tier = `1/(|p−price|/price)` snapped to
+    the real BTC ladder `[125,100,75,50,25,20,10,5]`. Returns `{series, tierSeries, order, total, peakTotal}`.
+    `loadCol(tier, dark)` = theme-aware purple shades (deepest = highest leverage).
+  - **X-axis LINKED to the heatmap time zoom:** the load time-columns are the **same axis as the candles**
+    (verified: `liquidation_leverage_data` has exactly `price_candlesticks.length` columns, 1:1 by index),
+    so `X(t) = VW·(t/N − x0)/(x1−x0)` maps through the heatmap's `view.x0/x1` (0..1 time fracs). Zoom/pan
+    the heatmap → the strip rescales to the same window (re-renders via the shared `tick`/`bump`); columns
+    outside the window clip on the SVG. X-labels come from the visible candle timestamps (`fmtShort`).
+  - **Hover** (local state): vertical guide + dot on the total line + tooltip (time, total, per-tier rows).
+    Legend column (tier swatches). Only **time** zoom drives it (the vertical band-pass doesn't).
 - **Resilience:** `fetchHeatmapData` retries transient upstream failures up to 3× (1.2s backoff) —
   the CoinGlass Actor intermittently returns 400 / 502 / run-failed / empty; a retry usually
   succeeds. Validation errors (bad symbol/model/interval) are NOT retried.
