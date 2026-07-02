@@ -26,9 +26,44 @@ const SIZE_MODES: { v: SizeMode; label: string; unit: string; hint: string }[] =
 ];
 
 const card: CSSProperties = { background: '#fff', border: '1px solid #efedf3', borderRadius: 18, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden' };
-const cardHead: CSSProperties = { display: 'flex', alignItems: 'center', gap: 11, padding: '15px 20px', borderBottom: '1px solid #f4f3f0' };
-const num = (n: string) => <span style={{ fontWeight: 800, fontSize: 15, color: PURP, letterSpacing: '-0.01em' }}>{n}</span>;
-const ttl = (t: string) => <span style={{ fontWeight: 800, fontSize: 13.5, color: '#1a1813', letterSpacing: '-0.01em' }}>{t}</span>;
+
+// ── collapsible-section scaffolding (Theory: thesis/chart · Setup: identity/levels/sizing/leverage) ──
+type SecKey = 'thesis' | 'chart' | 'identity' | 'levels' | 'sizing' | 'leverage';
+const ALL_OPEN: Record<SecKey, boolean> = { thesis: true, chart: true, identity: true, levels: true, sizing: true, leverage: true };
+// chevron that rotates when open (dc.html `tpchev`)
+const Chev = ({ open, color = '#b3b0a6' }: { open: boolean; color?: string }) => (
+  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s ease', flex: '0 0 auto' }}><path d="m6 9 6 6 6-6" /></svg>
+);
+// clickable section header: title + (optional) right slot (collapsed summary / control) + chevron
+function SecHead({ title, open, onToggle, right, collapsedRight }: { title: string; open: boolean; onToggle: () => void; right?: React.ReactNode; collapsedRight?: React.ReactNode }) {
+  return (
+    <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 18px', cursor: 'pointer' }}>
+      <span style={{ fontWeight: 800, fontSize: 13.5, color: '#1a1813', letterSpacing: '-0.01em' }}>{title}</span>
+      <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 9 }} onClick={(e) => e.stopPropagation()}>
+        {open ? right : (collapsedRight ? <span style={{ fontWeight: 700, fontSize: 12, color: '#897f70' }}>{collapsedRight}</span> : null)}
+        <span onClick={onToggle} style={{ display: 'inline-flex' }}><Chev open={open} /></span>
+      </span>
+    </div>
+  );
+}
+// gradient group header (Theory purple / Setup green) with expand-all toggle
+function GroupHead({ label, color, gradient, border, allOpen, onToggleAll }: { label: string; color: string; gradient: string; border: string; allOpen: boolean; onToggleAll: () => void }) {
+  return (
+    <div onClick={onToggleAll} title={allOpen ? 'Collapse all' : 'Expand all'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '14px 18px', background: gradient, borderBottom: `1px solid ${border}`, borderRadius: '20px 20px 0 0', cursor: 'pointer' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span style={{ width: 7, height: 7, borderRadius: 2, background: color }} /><span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.15em', textTransform: 'uppercase', color }}>{label}</span></span>
+      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ transform: allOpen ? 'rotate(180deg)' : 'none', transition: 'transform .18s ease' }}><polyline points="6 9 12 15 18 9" /></svg>
+    </div>
+  );
+}
+// the group wrapper: rounded white sheet with a soft colour glow behind it
+function GroupSheet({ glow, children }: { glow: string; children: React.ReactNode }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ position: 'absolute', top: 120, left: '50%', transform: 'translateX(-50%)', width: '82%', height: 170, borderRadius: '50%', background: glow, filter: 'blur(56px)', opacity: glow === '#7c5cff' ? 0.06 : 0.05, pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'relative', zIndex: 1, background: '#fff', border: '1px solid #efedf3', borderRadius: 20, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden' }}>{children}</div>
+    </div>
+  );
+}
 
 // ── Identity (instrument / direction / conviction spec-tables) ──────────────
 function IdentitySection({ d, btcMark }: { d: PlanDraft; btcMark?: number }) {
@@ -315,6 +350,17 @@ export function Editor() {
   const levFillPct = ((levVal - 1) / 19) * 100;
   const sizePctVal = Math.min(100, Math.max(0, tpNum(d.sizeVal) || 0));
 
+  // collapsible sections + expand-all per group (persisted)
+  const [secOpen, setSecOpen] = useState<Record<SecKey, boolean>>(() => {
+    try { const s = localStorage.getItem('tdplan_ed_open'); if (s) return { ...ALL_OPEN, ...JSON.parse(s) }; } catch { /* ignore */ }
+    return ALL_OPEN;
+  });
+  useEffect(() => { try { localStorage.setItem('tdplan_ed_open', JSON.stringify(secOpen)); } catch { /* ignore */ } }, [secOpen]);
+  const toggleSec = (k: SecKey) => setSecOpen((o) => ({ ...o, [k]: !o[k] }));
+  const setGroup = (keys: SecKey[], v: boolean) => setSecOpen((o) => { const n = { ...o }; keys.forEach((k) => (n[k] = v)); return n; });
+  const theoryAllOpen = secOpen.thesis && secOpen.chart;
+  const setupAllOpen = secOpen.identity && secOpen.levels && secOpen.sizing && secOpen.leverage;
+
   const save = () => {
     if (!c.valid) return;
     const name = d.name.trim();
@@ -344,40 +390,40 @@ export function Editor() {
         </div>
       </div>
 
-      {/* idea: thesis + chart */}
-      <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'stretch' }}>
-          <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid #f0efec' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 22px', borderBottom: '1px solid #f4f3f0' }}>
-              {num('1')}
-              <input value={d.name} onChange={(e) => planActions.setDraft({ name: e.target.value })} placeholder={tpAutoName(d)} style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontWeight: 800, fontSize: 17, letterSpacing: '-0.015em', color: '#1a1813', padding: '9px 0' }} />
-              <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#c4c2b8', flex: '0 0 auto' }}>Name · optional</span>
-              <ExpectedDate d={d} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 14, alignItems: 'start' }}>
+        {/* THEORY group — name/date + thesis + chart, collapsible under a purple gradient header */}
+        <GroupSheet glow="#7c5cff">
+          <GroupHead label="Theory" color="#7c5cff" gradient="linear-gradient(180deg,#ffffff 0%,#faf8ff 45%,#ece5fb 100%)" border="#e6ddfb" allOpen={theoryAllOpen} onToggleAll={() => setGroup(['thesis', 'chart'], !theoryAllOpen)} />
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, padding: '9px 18px', borderBottom: '1px solid #f3f1f7' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, gap: 5 }}>
+              <input value={d.name} onChange={(e) => planActions.setDraft({ name: e.target.value })} placeholder={tpAutoName(d)} style={{ width: '100%', minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: '#1a1813', padding: 0 }} />
+              <span style={{ height: 2, width: '100%', background: 'linear-gradient(90deg,#c9bcff,rgba(201,188,255,0))', borderRadius: 2 }} />
             </div>
-            <Thesis d={d} />
+            <ExpectedDate d={d} />
           </div>
-          <div style={{ flex: '0 0 37%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '13px 18px', borderBottom: '1px solid #f4f3f0' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 7, background: '#f2f0ec' }}><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x={3} y={3} width={18} height={18} rx={2} /><circle cx={8.5} cy={8.5} r={1.6} /><path d="m21 15-5-5L5 21" /></svg></span>
-              <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.03em', textTransform: 'uppercase', color: '#1a1813' }}>Chart</span>
-              <span style={{ fontWeight: 600, fontSize: 10.5, color: '#bdbbb1', marginLeft: 'auto' }}>optional</span>
-            </div>
-            <div style={{ flex: 1 }}><ChartUpload d={d} onFull={setFull} /></div>
+          <SecHead title="Thesis" open={secOpen.thesis} onToggle={() => toggleSec('thesis')} collapsedRight="Rationale · Trigger · Invalidation · Target" />
+          {secOpen.thesis && <Thesis d={d} />}
+          <div style={{ borderTop: '1px solid #f0efec' }}>
+            <SecHead title="Chart" open={secOpen.chart} onToggle={() => toggleSec('chart')} collapsedRight="optional" />
+            {secOpen.chart && <div style={{ flex: 1 }}><ChartUpload d={d} onFull={setFull} /></div>}
           </div>
-        </div>
-      </div>
+        </GroupSheet>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.32fr 1fr', gap: 20, alignItems: 'start' }}>
-        {/* LEFT inputs */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={card}><div style={cardHead}>{num('2')}{ttl('Identity')}</div><IdentitySection d={d} btcMark={btcMark} /></div>
+        {/* SETUP group — identity / levels / sizing / leverage, collapsible under a green gradient header */}
+        <GroupSheet glow="#1f9d55">
+          <GroupHead label="Setup" color="#1f9d55" gradient="linear-gradient(180deg,#ffffff 0%,#f6fbf8 45%,#e2f3ea 100%)" border="#cfeadb" allOpen={setupAllOpen} onToggleAll={() => setGroup(['identity', 'levels', 'sizing', 'leverage'], !setupAllOpen)} />
 
-          <div style={card}>
-            <div style={{ ...cardHead, justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>{num('3')}{ttl('Levels')}</div>
-              <Seg opts={[{ v: 'price', label: 'Single price' }, { v: 'zone', label: 'Zone' }]} cur={d.entryMode} onPick={(v) => planActions.setDraft({ entryMode: v as 'price' | 'zone' })} accent="#23211b" />
-            </div>
-            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ borderBottom: '1px solid #f3f1f7' }}>
+            <SecHead title="Identity" open={secOpen.identity} onToggle={() => toggleSec('identity')} collapsedRight={`${d.sym} ${d.dir}`} />
+            {secOpen.identity && <IdentitySection d={d} btcMark={btcMark} />}
+          </div>
+
+          <div style={{ borderBottom: '1px solid #f3f1f7' }}>
+            <SecHead title="Levels" open={secOpen.levels} onToggle={() => toggleSec('levels')}
+              right={<Seg opts={[{ v: 'price', label: 'Single price' }, { v: 'zone', label: 'Zone' }]} cur={d.entryMode} onPick={(v) => planActions.setDraft({ entryMode: v as 'price' | 'zone' })} accent="#23211b" />}
+              collapsedRight={d.entry || d.ez1 ? 'set' : '—'} />
+            {secOpen.levels && (
+            <div style={{ padding: '4px 18px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               {d.entryMode === 'zone' ? (
                 <Field label="Entry zone" labelColor="#7c5cff"><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ flex: 1 }}><PriceInput value={d.ez1} onChange={(v) => planActions.setDraft({ ez1: v })} placeholder="from" /></div><span style={{ fontWeight: 800, fontSize: 14, color: '#cbc9c0' }}>–</span><div style={{ flex: 1 }}><PriceInput value={d.ez2} onChange={(v) => planActions.setDraft({ ez2: v })} placeholder="to" /></div></div></Field>
               ) : (
@@ -388,20 +434,22 @@ export function Editor() {
                 <div style={{ display: 'flex', gap: 9 }}>
                   {(['t1', 't2', 't3'] as const).map((k, i) => (
                     <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-                      <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', color: i === 0 ? '#5aa97a' : '#bdbbb1', paddingLeft: 2 }}>{'TP' + (i + 1)}{i > 0 ? ' · optional' : ''}</span>
+                      <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', color: i === 0 ? '#5aa97a' : '#bdbbb1', paddingLeft: 2 }}>{i === 0 ? 'TP1 · Bank' : i === 1 ? 'TP2 · Donchian trail' : 'TP3 · optional'}</span>
                       <PriceInput value={d[k]} onChange={(v) => planActions.setDraft({ [k]: v } as Partial<PlanDraft>)} placeholder="0.00" accent="#1f9d55" tint={i === 0 ? '#d9ecdf' : '#eceae5'} bg={i === 0 ? '#fbfdfb' : '#fff'} />
                     </div>
                   ))}
                 </div>
               </Field>
-              {/* check the stop/targets against the live liquidation clusters */}
               <HeatmapLaunchCard variant="row" symbol={d.sym as HeatSymbol} title="Check your stop against the real clusters" sub="Is it beyond the sweep, not inside it?" />
             </div>
+            )}
           </div>
 
           {/* sizing */}
-          <div style={card}>
-            <div style={cardHead}>{num('4')}{ttl('Sizing')}<span style={{ fontWeight: 600, fontSize: 11, color: '#b3b0a6', marginLeft: 'auto' }}>size by the unit you think in</span></div>
+          <div style={{ borderBottom: '1px solid #f3f1f7' }}>
+            <SecHead title="Sizing" open={secOpen.sizing} onToggle={() => toggleSec('sizing')} collapsedRight={c.hasQty ? tpMoney(c.margin, 0) : 'size it'} />
+            {secOpen.sizing && (
+            <>
             <div style={{ borderTop: '1px solid #f1f0ed', borderBottom: '1px solid #f1f0ed', display: 'grid', gridTemplateColumns: 'repeat(5,1fr)' }}>
               {SIZE_MODES.map((m, i) => { const a = m.v === d.sizeMode;
                 const val = m.v === 'qty' ? (c.hasQty ? c.qty.toLocaleString('en-US', { maximumFractionDigits: c.qty < 1 ? 4 : 2 }) : '—')
@@ -432,12 +480,15 @@ export function Editor() {
                 ) : null}
               </div>
             </div>
+            </>
+            )}
           </div>
 
           {/* leverage */}
-          <div style={card}>
-            <div style={cardHead}>{num('5')}{ttl('Leverage')}</div>
-            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 13 }}>
+          <div>
+            <SecHead title="Leverage" open={secOpen.leverage} onToggle={() => toggleSec('leverage')} collapsedRight={`${d.lev}×`} />
+            {secOpen.leverage && (
+            <div style={{ padding: '13px 18px', display: 'flex', flexDirection: 'column', gap: 13 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <button onClick={() => planActions.setDraft({ lev: Math.max(1, levVal - 1) })} style={stepBtn}>−</button>
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, boxSizing: 'border-box', padding: '12px 14px', border: '1.5px solid #ededea', borderRadius: 11, background: '#fff' }}>
@@ -451,11 +502,13 @@ export function Editor() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.05em', color: '#c4c2b8' }}><span>1×</span><span>20×</span></div>
               </div>
             </div>
+            )}
           </div>
-        </div>
+        </GroupSheet>
+      </div>
 
-        {/* RIGHT live math + diagram + save */}
-        <div style={{ position: 'sticky', top: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* live math + risk/reward map — full width below the groups */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 14, alignItems: 'start' }}>
           <div style={{ ...card, border: '1px solid #f5f4f1', borderRadius: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '14px 18px', borderBottom: '1px solid #f4f3f0', background: '#fcfbff' }}>
               <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7c5cff' }}>Live math</span>
@@ -478,29 +531,33 @@ export function Editor() {
             <div style={{ padding: '16px 18px' }}><RrDiagram c={c} d={d} /></div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {c.valid ? (
-              <span onClick={save}
-                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(124,92,255,0.4)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(124,92,255,0.08)'; }}
-                style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 11, cursor: 'pointer', background: 'linear-gradient(180deg,#f7f3ff,#efe7ff)', border: '1px solid #e3d8fb', borderRadius: 12, padding: '11px 12px 11px 18px', boxShadow: '0 1px 2px rgba(124,92,255,0.08)', transition: 'box-shadow .2s ease' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}><span style={{ fontWeight: 800, fontSize: 14.5, color: '#5a3ff0', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>{editing ? 'Update plan' : 'Save to Plans'}</span><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#5a3ff0', background: '#fff', border: '1px solid #e3d8fb', padding: '3px 8px', borderRadius: 99 }}>{editing ? editing.status : 'Ideas'}</span></span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 27, height: 27, borderRadius: 99, background: 'linear-gradient(150deg,#9d82ff,#7c5cff)', boxShadow: '0 3px 9px -2px rgba(124,92,255,0.6)', flex: '0 0 auto' }}><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span>
-              </span>
-            ) : (
-              <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#f4f3f0', borderRadius: 12, padding: 14 }}>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#b3b0a6" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={10} /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-                <span style={{ fontWeight: 800, fontSize: 13.5, color: '#b3b0a6' }}>{c.levBlocked ? 'Leverage above 10× — bring it down to save' : c.sizeBlocked ? 'Size above 70% — bring it down to save' : 'Set entry, stop, a target & size to save'}</span>
-              </span>
-            )}
-            <button onClick={() => planActions.clearDraft()}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#df5338'; e.currentTarget.style.borderColor = '#f2ddd6'; e.currentTarget.style.background = '#fdfbfa'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = '#9b988d'; e.currentTarget.style.borderColor = '#ededea'; e.currentTarget.style.background = '#fff'; }}
-              style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 18px 13px 15px', borderRadius: 12, border: '1px solid #ededea', background: '#fff', color: '#9b988d', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', transition: 'color .15s, border-color .15s, background .15s' }}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" /><path d="M22 21H7" /><path d="m5 11 9 9" /></svg>Clear
-            </button>
-          </div>
-        </div>
+      </div>
+
+      {/* footer — execute-manually note + save + clear (z-index above the group glows) */}
+      <div style={{ padding: '2px 4px 0', position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', rowGap: 10 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 600, fontSize: 11.5, color: '#b3aea2' }}>You&rsquo;ll execute manually on<svg width={17} height={17} viewBox="0 0 24 24" fill="#131722" style={{ flex: '0 0 auto' }}><path d="M3 7.3h7.1v9.3H6.85V11.5H3z" /><circle cx={13.3} cy={9.1} r={2} /><path d="M16.6 7.3h4.5l-4 9.3h-4.2z" /></svg>TradingView.</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {c.valid ? (
+            <span onClick={save}
+              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(124,92,255,0.4)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(124,92,255,0.08)'; }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 11, cursor: 'pointer', background: 'linear-gradient(180deg,#f7f3ff,#efe7ff)', border: '1px solid #e3d8fb', borderRadius: 12, padding: '11px 12px 11px 18px', boxShadow: '0 1px 2px rgba(124,92,255,0.08)', transition: 'box-shadow .2s ease' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}><span style={{ fontWeight: 800, fontSize: 14.5, color: '#5a3ff0', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>{editing ? 'Update plan' : 'Save to Plans'}</span><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#5a3ff0', background: '#fff', border: '1px solid #e3d8fb', padding: '3px 8px', borderRadius: 99 }}>{editing ? editing.status : 'Ideas'}</span></span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 27, height: 27, borderRadius: 99, background: 'linear-gradient(150deg,#9d82ff,#7c5cff)', boxShadow: '0 3px 9px -2px rgba(124,92,255,0.6)', flex: '0 0 auto' }}><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span>
+            </span>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#f4f3f0', borderRadius: 12, padding: '12px 16px' }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#b3b0a6" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={10} /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+              <span style={{ fontWeight: 800, fontSize: 13, color: '#b3b0a6' }}>{c.levBlocked ? 'Leverage above 10× — bring it down' : c.sizeBlocked ? 'Size above 70% — bring it down' : 'Set entry, stop, a target & size to save'}</span>
+            </span>
+          )}
+          <button onClick={() => planActions.clearDraft()}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#df5338'; e.currentTarget.style.borderColor = '#f2ddd6'; e.currentTarget.style.background = '#fdfbfa'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#9b988d'; e.currentTarget.style.borderColor = '#ededea'; e.currentTarget.style.background = '#fff'; }}
+            style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 18px 13px 15px', borderRadius: 12, border: '1px solid #ededea', background: '#fff', color: '#9b988d', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', transition: 'color .15s, border-color .15s, background .15s' }}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" /><path d="M22 21H7" /><path d="m5 11 9 9" /></svg>Clear
+          </button>
+        </span>
       </div>
 
       {full ? <div onClick={() => setFull(null)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(14,13,11,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, boxSizing: 'border-box', cursor: 'zoom-out' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={full} alt="" style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', borderRadius: 10 }} /></div> : null}
