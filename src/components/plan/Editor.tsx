@@ -12,9 +12,9 @@ import { usePositions } from '@/hooks/usePositions';
 import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { HeatmapLaunchCard } from '@/components/heatmap/HeatmapLaunchCard';
 import type { HeatSymbol } from '@/hooks/useHeatmap';
-import { LiveMath } from './LiveMath';
 import { RrDiagram } from './RrDiagram';
 import { MiniCalendar, CalIcon } from './MiniCalendar';
+import { CoinIcon } from './coins';
 
 const PURP = '#7c5cff';
 const SIZE_MODES: { v: SizeMode; label: string; unit: string; hint: string }[] = [
@@ -308,6 +308,100 @@ function ChartUpload({ d, onFull }: { d: PlanDraft; onFull: (src: string) => voi
 }
 const tool: CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'inherit', fontWeight: 800, fontSize: 10.5, padding: '6px 9px', borderRadius: 8, border: 'none', background: 'rgba(20,18,12,0.6)', color: '#fff', backdropFilter: 'blur(5px)' };
 
+// ── top equity strip (ported from dc.html `tp4aStrip`): Risk · Reward·plan · R:R · Position · Margin · Stop-vs-liq ──
+function EquityStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
+  const GREEN = '#1f9d55', RED = '#df5338', ORANGE = '#ff7a00', INK = '#1a1813';
+  const MO = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
+  const money = (v: number, dec = 0) => (isFinite(v) ? tpMoney(v, dec) : '—');
+  const tgt = c.rrList[0], rewardUSD = tgt ? tgt.rewardUSD : NaN, pr = c.primaryR;
+  const bpRaw = parseFloat(String(d.bankPct ?? '').replace(/[^0-9.]/g, ''));
+  const bankPct = isFinite(bpRaw) && bpRaw > 0 ? Math.min(100, bpRaw) : 100;
+  const partial = bankPct < 100;
+  const bankedReward = isFinite(rewardUSD) ? (rewardUSD * bankPct) / 100 : NaN;
+  const tgt2 = c.rrList[1], reward2Full = tgt2 ? tgt2.rewardUSD : NaN, runnerPct = 100 - bankPct;
+  const tp1Reward = partial ? bankedReward : rewardUSD;
+  const tp2Reward = partial && isFinite(reward2Full) ? (reward2Full * runnerPct) / 100 : NaN;
+  const hasReward = isFinite(tp1Reward) || isFinite(tp2Reward);
+  const totalReward = (isFinite(tp1Reward) ? tp1Reward : 0) + (isFinite(tp2Reward) ? tp2Reward : 0);
+  const planRewardBase = partial ? totalReward : rewardUSD;
+  const planR = isFinite(planRewardBase) && isFinite(c.riskUSD) && c.riskUSD > 0 ? planRewardBase / c.riskUSD : pr;
+  const tp1R = isFinite(tp1Reward) && isFinite(c.riskUSD) && c.riskUSD > 0 ? tp1Reward / c.riskUSD : NaN;
+  const rrStr = isFinite(planR) ? planR.toFixed(2) : '—';
+  const rrColor = !isFinite(planR) ? '#b3b0a6' : planR >= 2.5 ? GREEN : planR >= 1.5 ? '#c9821f' : RED;
+  const rrVerd = !isFinite(planR) ? 'Set levels' : planR >= 2.5 ? 'Strong edge' : planR >= 1.5 ? 'Fair edge' : 'Thin edge';
+
+  const lbl = (t: string, col?: string) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: 10.5, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#a29b8c' }}>{col ? <span style={{ width: 7, height: 7, borderRadius: '50%', background: col, flex: '0 0 auto' }} /> : null}{t}</span>;
+  const sub = (txt: string, col = '#b6a99e') => <span style={{ fontFamily: MO, fontWeight: 700, fontSize: 11, color: col, marginTop: 4 }}>{txt}</span>;
+  const cellS = (flex: number, last?: boolean): CSSProperties => ({ flex, minWidth: 0, padding: '11px 20px', borderRight: last ? 'none' : '1px solid #f1eff5', display: 'flex', flexDirection: 'column' });
+  const moveIcon = (col: string, upDir: boolean) => <svg width={12} height={12} viewBox="0 0 16 16" fill="none" stroke={col} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><path d={upDir ? 'M2 11L6 7.5L9 9L14 4' : 'M2 5L6 8.5L9 7L14 12'} /><path d={upDir ? 'M10 4H14V8' : 'M10 12H14V8'} /></svg>;
+  const eqIcon = (col: string) => <svg width={12} height={12} viewBox="0 0 16 16" fill={col} style={{ flex: '0 0 auto' }}><rect x={1} y={3.5} width={14} height={9} rx={1.6} /><circle cx={8} cy={8} r={1.9} fill="#fff" /><circle cx={3.4} cy={8} r={0.7} fill="#fff" /><circle cx={12.6} cy={8} r={0.7} fill="#fff" /></svg>;
+  const bignum = (txt: string, col: string) => <span style={{ fontFamily: MO, fontWeight: 800, fontSize: 23, letterSpacing: '-0.025em', color: col, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', lineHeight: 1 }}>{txt}</span>;
+  const rightStack = (rows: React.ReactNode[]) => <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flex: '0 0 auto' }}>{rows.map((r, i) => (r ? <span key={i} style={{ display: 'contents' }}>{r}</span> : null))}</div>;
+  const pctChip = (icon: React.ReactNode, txt: string, col: string) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{icon}<span style={{ fontFamily: MO, fontWeight: 700, fontSize: 12, color: col, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{txt}</span></span>;
+
+  const finalMove = tgt2 && isFinite(tgt2.distPct) ? tgt2.distPct : tgt && isFinite(tgt.distPct) ? tgt.distPct : NaN;
+  const rewEqPct = isFinite(totalReward) && isFinite(c.Q) && c.Q > 0 ? (totalReward / c.Q) * 100 : NaN;
+  const tp1v = isFinite(tp1Reward) ? tp1Reward : 0, tp2v = isFinite(tp2Reward) ? tp2Reward : 0, denom = tp1v + tp2v;
+  const tp1Share = denom > 0 ? tp1v / denom : 1, tp2Share = denom > 0 ? tp2v / denom : 0, tp1Pct = Math.round(tp1Share * 100);
+  const splitLegend = (l: string, amt: string, r: string, amt2: string) => (
+    <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start', minWidth: 0 }}><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#a8a294', whiteSpace: 'nowrap' }}>{l}</span><span style={{ fontFamily: MO, fontWeight: 700, fontSize: 12.5, color: '#3f7355', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{amt}</span></div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end', minWidth: 0 }}><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#a8a294', whiteSpace: 'nowrap' }}>{r}</span><span style={{ fontFamily: MO, fontWeight: 700, fontSize: 12.5, color: '#3f7355', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{amt2}</span></div>
+    </div>
+  );
+  const splitBar = (s1: number, s2: number) => <div style={{ display: 'flex', gap: 3, height: 8, marginTop: 7 }}><div style={{ flexBasis: (s1 * 100).toFixed(2) + '%', background: GREEN, borderRadius: 99 }} />{s2 > 0 ? <div style={{ flexBasis: (s2 * 100).toFixed(2) + '%', background: '#57c98a', borderRadius: 99 }} /> : null}</div>;
+
+  // stop-vs-liq geometry
+  const price = c.mkt.mark;
+  const liqDist = isFinite(c.liq) ? (Math.abs(price - c.liq) / price) * 100 : NaN;
+  const stopDist = isFinite(c.S) ? (Math.abs(price - c.S) / price) * 100 : NaN;
+  const cushion = isFinite(liqDist) && isFinite(stopDist) && stopDist > 0 ? liqDist / stopDist : NaN;
+  const verd = !isFinite(cushion) ? { t: '—', c: '#b3b0a6' } : cushion >= 3 ? { t: 'Clear of liq', c: GREEN } : cushion >= 1.5 ? { t: 'Near liq', c: '#c9821f' } : { t: 'Close to liq', c: RED };
+  const stopPos = isFinite(liqDist) && isFinite(stopDist) && liqDist > 0 ? Math.max(6, Math.min(94, (1 - stopDist / liqDist) * 100)) : 50;
+  const tdot = (left: number, col: string) => <span style={{ position: 'absolute', left: left + '%', top: '50%', width: 12, height: 12, borderRadius: '50%', background: '#fff', border: '3px solid ' + col, transform: 'translate(-50%,-50%)', boxShadow: '0 1px 3px rgba(20,20,12,0.25)' }} />;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', background: '#fff', border: '1px solid #efedf3', borderRadius: 18, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden', position: 'relative', zIndex: 6 }}>
+      {/* Risk */}
+      <div style={cellS(1.15)}>{lbl('Risk', RED)}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginTop: 6 }}>{bignum(isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : '—', RED)}{rightStack([
+          isFinite(c.distStopPct) ? pctChip(moveIcon('#c56a5a', !c.isLong), c.distStopPct.toFixed(2) + '%', '#c56a5a') : null,
+          isFinite(c.riskPct) ? pctChip(eqIcon('#7c5cff'), c.riskPct.toFixed(2) + '%', '#7c5cff') : null,
+        ])}</div>
+      </div>
+      {/* Reward · plan */}
+      <div style={cellS(partial ? 1.8 : 1.7)}>{lbl(partial ? 'Reward · plan' : 'Reward · TP1', GREEN)}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginTop: 6 }}>{bignum(hasReward ? '+' + money(partial ? totalReward : rewardUSD) : '—', GREEN)}{rightStack([
+          isFinite(finalMove) ? pctChip(moveIcon('#4f9e6f', c.isLong), finalMove.toFixed(2) + '%', '#4f9e6f') : null,
+          isFinite(rewEqPct) ? pctChip(eqIcon('#7c5cff'), rewEqPct.toFixed(2) + '%', '#7c5cff') : null,
+        ])}</div>
+        {partial ? <>{splitBar(tp1Share, tp2Share)}{splitLegend('TP1 · banked · ' + tp1Pct + '%', isFinite(tp1Reward) ? '+' + money(tp1Reward) : '—', 'TP2 · runner · ' + (100 - tp1Pct) + '%', isFinite(tp2Reward) ? '+' + money(tp2Reward) : '—')}</> : null}
+      </div>
+      {/* R:R */}
+      <div style={cellS(1)}>{lbl('R : R')}
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginTop: 6 }}><span style={{ fontFamily: MO, fontWeight: 800, fontSize: 23, letterSpacing: '-0.025em', color: rrColor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{rrStr}</span><span style={{ fontFamily: MO, fontWeight: 700, fontSize: 11, color: rrColor, whiteSpace: 'nowrap', flex: '0 0 auto' }}>{rrVerd}</span></div>
+        {partial && isFinite(tp1R) ? (() => { const tp2R = isFinite(tp2Reward) && isFinite(c.riskUSD) && c.riskUSD > 0 ? tp2Reward / c.riskUSD : NaN; const r1 = isFinite(tp1R) ? tp1R : 0, r2 = isFinite(tp2R) ? tp2R : 0, rDen = r1 + r2, rS1 = rDen > 0 ? r1 / rDen : 1, rS2 = rDen > 0 ? r2 / rDen : 0; return <>{splitBar(rS1, rS2)}{splitLegend('TP1', isFinite(tp1R) ? tp1R.toFixed(2) : '—', 'TP2', isFinite(tp2R) ? tp2R.toFixed(2) : '—')}</>; })() : null}
+      </div>
+      {/* Position */}
+      <div style={cellS(0.8)}>{lbl('Position', '#7c5cff')}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}><span style={{ fontFamily: MO, fontWeight: 800, fontSize: 23, letterSpacing: '-0.025em', color: INK, fontVariantNumeric: 'tabular-nums' }}>{isFinite(c.qty) ? c.qty.toFixed(c.qty < 10 ? 3 : 2) : '—'}</span><CoinIcon sym={d.sym} /></span>
+        {sub(isFinite(c.notional) ? 'Notional · ' + money(c.notional) : '—')}
+      </div>
+      {/* Margin */}
+      <div style={cellS(1.4)}>{lbl('Margin', '#7c5cff')}
+        <span style={{ fontFamily: MO, fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: INK, marginTop: 7, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{isFinite(c.margin) ? money(c.margin) : '—'}<span style={{ color: '#7c5cff' }}>{isFinite(c.marginPct) ? ' · ' + c.marginPct.toFixed(0) + '%' : ''}</span></span>
+        <span style={{ height: 8, borderRadius: 99, background: '#f0efeb', overflow: 'hidden', display: 'block', marginTop: 8 }}><span style={{ display: 'block', height: '100%', width: Math.max(0, Math.min(100, c.marginPct || 0)) + '%', background: '#7c5cff', borderRadius: 99 }} /></span>
+      </div>
+      {/* Stop vs liq */}
+      <div style={cellS(1.6, true)}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>{lbl('Stop vs liq', ORANGE)}<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: verd.c, fontWeight: 800, fontSize: 10 }}>{verd.t}</span></div>
+        <div style={{ position: 'relative', height: 9, borderRadius: 99, background: ORANGE, marginTop: 11 }}><div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '9%', background: RED, borderRadius: '0 99px 99px 0' }} />{tdot(2, ORANGE)}{tdot(stopPos, RED)}{tdot(99, '#7c5cff')}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 7, fontFamily: MO, fontWeight: 700, fontSize: 10.5 }}><span style={{ color: ORANGE }}>LIQ {isFinite(c.liq) ? money(c.liq) : '—'}</span><span style={{ color: RED }}>STOP {isFinite(c.S) ? money(c.S) : '—'}</span><span style={{ color: '#7c5cff' }}>{money(price)}</span></div>
+      </div>
+    </div>
+  );
+}
+
 export function Editor() {
   const store = usePlanStore();
   const d = store.draft;
@@ -389,6 +483,9 @@ export function Editor() {
           <span style={{ fontWeight: 600, fontSize: 11, color: '#b3b0a6' }}>Equity {tpMoney(equity, 0)}{acctLabel ? ` · ${acctLabel}` : ''}</span>
         </div>
       </div>
+
+      {/* top equity strip — live math condensed into Risk/Reward/R:R/Position/Margin/Stop-vs-liq */}
+      <EquityStrip c={c} d={d} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 14, alignItems: 'start' }}>
         {/* THEORY group — name/date + thesis + chart, collapsible under a purple gradient header */}
@@ -507,30 +604,19 @@ export function Editor() {
         </GroupSheet>
       </div>
 
-      {/* live math + risk/reward map — full width below the groups */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 14, alignItems: 'start' }}>
-          <div style={{ ...card, border: '1px solid #f5f4f1', borderRadius: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '14px 18px', borderBottom: '1px solid #f4f3f0', background: '#fcfbff' }}>
-              <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7c5cff' }}>Live math</span>
-              <span style={{ fontWeight: 600, fontSize: 10.5, color: '#b3b0a6' }}>auto from your inputs</span>
-            </div>
-            {c.dirErr ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '14px 18px 0', background: '#fdf2ee', border: '1px solid #f6d9cf', borderRadius: 10, padding: '10px 12px' }}>
-                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#df5338" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={10} /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-                <span style={{ fontWeight: 700, fontSize: 12, color: '#a33f28', lineHeight: 1.4 }}>{c.dirErr}</span>
-              </div>
-            ) : null}
-            <LiveMath c={c} d={d} />
+      {/* risk / reward map — the visual price ladder (the numbers live in the strip above) */}
+      <div style={{ ...card, border: '1px solid #f5f4f1', borderRadius: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '14px 18px', borderBottom: '1px solid #f4f3f0', background: '#fcfbff' }}>
+          <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7c5cff' }}>Risk / reward map</span>
+          <span style={{ fontWeight: 600, fontSize: 10.5, color: '#b3b0a6' }}>entry · stop · targets</span>
+        </div>
+        {c.dirErr ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '14px 18px 0', background: '#fdf2ee', border: '1px solid #f6d9cf', borderRadius: 10, padding: '10px 12px' }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#df5338" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={10} /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+            <span style={{ fontWeight: 700, fontSize: 12, color: '#a33f28', lineHeight: 1.4 }}>{c.dirErr}</span>
           </div>
-
-          <div style={{ ...card, border: '1px solid #f5f4f1', borderRadius: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '14px 18px', borderBottom: '1px solid #f4f3f0', background: '#fcfbff' }}>
-              <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7c5cff' }}>Risk / reward map</span>
-              <span style={{ fontWeight: 600, fontSize: 10.5, color: '#b3b0a6' }}>entry · stop · targets</span>
-            </div>
-            <div style={{ padding: '16px 18px' }}><RrDiagram c={c} d={d} /></div>
-          </div>
-
+        ) : null}
+        <div style={{ padding: '16px 18px' }}><RrDiagram c={c} d={d} /></div>
       </div>
 
       {/* footer — execute-manually note + save + clear (z-index above the group glows) */}
