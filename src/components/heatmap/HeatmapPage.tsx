@@ -57,7 +57,7 @@ interface View { x0: number; x1: number; p0: number; p1: number }
 // Standing liquidation book = the latest time column (not summed across time, which
 // double-counts persistent levels + re-counts consumed liquidity). Split shorts
 // (above price) / longs (below) with cumulative curves outward from price.
-interface Profile { tot: number[]; total: number; maxT: number; peak: number; peakPrice: number; last: number; chg: number; priceJ: number; cum: number[]; shortTotal: number; longTotal: number; maxCum: number }
+interface Profile { tot: number[]; total: number; maxT: number; peak: number; peakPrice: number; last: number; chg: number; priceJ: number; cum: number[]; shortTotal: number; longTotal: number; maxCum: number; peakAboveJ: number; peakBelowJ: number }
 function computeProfile(d: HeatmapData): Profile | null {
   const ya = d.y_axis, ld = d.liquidation_leverage_data, cs = d.price_candlesticks;
   if (!ya?.length || !ld?.length || !cs?.length) return null;
@@ -71,7 +71,9 @@ function computeProfile(d: HeatmapData): Profile | null {
   const cum = new Array(Y).fill(0);
   let shortTotal = 0; for (let j = priceJ + 1; j < Y; j++) { shortTotal += tot[j]; cum[j] = shortTotal; }
   let longTotal = 0; for (let j = priceJ - 1; j >= 0; j--) { longTotal += tot[j]; cum[j] = longTotal; }
-  return { tot, total, maxT, peak, peakPrice: ya[peak], last, chg: (last - first) / first * 100, priceJ, cum, shortTotal, longTotal, maxCum: Math.max(shortTotal, longTotal, 1) };
+  let peakAboveJ = -1; for (let j = priceJ + 1; j < Y; j++) if (peakAboveJ < 0 || tot[j] > tot[peakAboveJ]) peakAboveJ = j;
+  let peakBelowJ = -1; for (let j = priceJ - 1; j >= 0; j--) if (peakBelowJ < 0 || tot[j] > tot[peakBelowJ]) peakBelowJ = j;
+  return { tot, total, maxT, peak, peakPrice: ya[peak], last, chg: (last - first) / first * 100, priceJ, cum, shortTotal, longTotal, maxCum: Math.max(shortTotal, longTotal, 1), peakAboveJ, peakBelowJ };
 }
 
 interface Mark { short: string; price: number; line: string; color: string }
@@ -187,8 +189,13 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
   const heatRef = useRef<HTMLCanvasElement | null>(null);
   const profRef = useRef<HTMLCanvasElement | null>(null);
   const plotRef = useRef<HTMLDivElement | null>(null);
+  const profPanelRef = useRef<HTMLDivElement | null>(null);
   const paxRef = useRef<HTMLDivElement | null>(null);
   const cbarRef = useRef<HTMLDivElement | null>(null);
+  // profile canvas is pinned to the SAME top/bottom as the heatmap plot area so a
+  // price level draws at the same screen height in both (stays aligned when the
+  // load strip opens or the window resizes). top/bot = px offsets within the panel.
+  const [profAlign, setProfAlign] = useState({ top: 84, bot: 30 });
   const [hover, setHover] = useState<HoverState | null>(null);
   const [profHover, setProfHover] = useState<ProfHover | null>(null);
   // shared time-crosshair: candle time-fraction (0..1) under the cursor on EITHER
@@ -305,6 +312,25 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
     const ro = new ResizeObserver(() => drawRef.current()); ro.observe(host);
     return () => ro.disconnect();
   }, [prep]);
+  // measure: pin the profile canvas to the exact top/bottom of the heatmap plot,
+  // re-measuring when data loads, the load strip toggles, or anything resizes.
+  useEffect(() => {
+    const measure = () => {
+      const plot = plotRef.current, panel = profPanelRef.current;
+      if (!plot || !panel) return;
+      const a = plot.getBoundingClientRect(), p = panel.getBoundingClientRect();
+      if (!a.height || !p.height) return;
+      const top = Math.max(0, Math.round(a.top - p.top)), bot = Math.max(0, Math.round(p.bottom - a.bottom));
+      setProfAlign((cur) => (cur.top !== top || cur.bot !== bot ? { top, bot } : cur));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (plotRef.current) ro.observe(plotRef.current);
+    if (profPanelRef.current) ro.observe(profPanelRef.current);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, [prep, showLoad]);
+  useEffect(() => { drawRef.current(); }, [profAlign]);
 
   // wheel / pan attached once to the canvas
   const setHeat = useCallback((el: HTMLCanvasElement | null) => {
@@ -427,15 +453,16 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
         </div>
       </div>
 
-      {/* stats strip */}
-      {metrics && <div style={{ padding: '12px 16px 4px', flex: '0 0 auto' }}><StatsStrip m={metrics} trend={trend} dark={dark} showLoad={showLoad} onToggleLoad={() => setShowLoad((v) => !v)} /></div>}
-
-      {/* leverage-load-over-time strip — toggled from the stats cell; x-axis tracks the heatmap time zoom */}
-      {load && showLoad && prep && <div style={{ padding: '0 16px', flex: '0 0 auto' }}><LevLoadStrip load={load} dark={dark} getView={getView} cs={prep.cs} syncFrac={syncFrac} onSync={setSyncFrac} /></div>}
-
-      {/* main */}
+      {/* main = LEFT COLUMN (stats + load + heatmap, so the stats bar sits only above the
+          chart) | PROFILE panel (full height on the right) */}
       <div style={{ flex: 1, display: 'flex', gap: 14, padding: '14px 16px', minHeight: 0 }}>
-        <div style={{ flex: 1, position: 'relative', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
+          {/* stats strip */}
+          {metrics && <div style={{ flex: '0 0 auto' }}><StatsStrip m={metrics} trend={trend} dark={dark} showLoad={showLoad} onToggleLoad={() => setShowLoad((v) => !v)} /></div>}
+          {/* leverage-load-over-time strip — toggled from the stats cell; x-axis tracks the heatmap time zoom */}
+          {load && showLoad && prep && <div style={{ flex: '0 0 auto' }}><LevLoadStrip load={load} dark={dark} getView={getView} cs={prep.cs} syncFrac={syncFrac} onSync={setSyncFrac} /></div>}
+          {/* heatmap panel */}
+          <div style={{ flex: 1, position: 'relative', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', minWidth: 0, minHeight: 0 }}>
           {prep ? (
             <>
               <div ref={plotRef} onMouseMove={onHover} onMouseLeave={() => { setHover(null); setSyncFrac(null); }} onDoubleClick={resetView} style={{ position: 'absolute', left: 58, top: 14, right: 64, bottom: 30, overflow: 'visible', cursor: 'crosshair', zIndex: 8 }}>
@@ -489,12 +516,16 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
           ) : (
             <Overlay state={notConfigured ? 'config' : errMsg ? 'error' : isLoading ? 'loading' : 'empty'} msg={errMsg} onRetry={() => mutate()} />
           )}
+          </div>
         </div>
 
-        {/* liquidity-by-price profile */}
-        {prof && (
-          <div style={{ flex: '0 0 220px', position: 'relative', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
-            <div onMouseMove={onProfHover} onMouseLeave={() => setProfHover(null)} style={{ position: 'absolute', left: 14, top: 14, right: 14, bottom: 30, overflow: 'visible' }}>
+        {/* liquidity-by-price profile — full height, pinned to the heatmap plot */}
+        {prof && prep && (
+          <div ref={profPanelRef} style={{ flex: '0 0 220px', position: 'relative', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+            {/* peak above / below — in the reclaimed top space (peaks moved off the chart) */}
+            <div style={{ position: 'absolute', left: 16, right: 14, top: 14, pointerEvents: 'none' }}><ProfPeakHead prof={prof} ya={prep.ya} /></div>
+            {/* liquidity bars — vertically aligned to the heatmap plot area */}
+            <div onMouseMove={onProfHover} onMouseLeave={() => setProfHover(null)} style={{ position: 'absolute', left: 14, top: profAlign.top, right: 14, bottom: profAlign.bot, overflow: 'visible' }}>
               <canvas ref={profRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
               {profHover && (
                 <div style={{ pointerEvents: 'none' }}>
@@ -504,17 +535,9 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
                   <div style={{ position: 'absolute', right: 0, top: profHover.y, transform: 'translateY(-50%)', fontFamily: MONO, fontWeight: 700, fontSize: 9.5, color: 'var(--tagink)', background: 'var(--tagbg)', borderRadius: 3, padding: '1px 4px', whiteSpace: 'nowrap' }}>{fmtUsd(prof.tot[profHover.j])}</div>
                 </div>
               )}
-              <div style={{ position: 'absolute', left: 0, top: -2, pointerEvents: 'none' }}>
-                <span style={{ display: 'block', fontWeight: 800, fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', textShadow: '0 0 4px var(--halo),0 0 4px var(--halo),0 1px 3px var(--halo)' }}>Liquidation map · now</span>
-                <ProfHead prof={prof} hover={profHover} />
-              </div>
             </div>
-            <div style={{ position: 'absolute', left: 14, right: 14, bottom: 6, height: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%' }}>
-                <ProfLegendItem c="#1f9d55" arrow="▲" label="SHORTS" val={fmtUsd(prof.shortTotal)} />
-                <ProfLegendItem c="#df5338" arrow="▼" label="LONGS" val={fmtUsd(prof.longTotal)} />
-              </div>
-            </div>
+            {/* legend — SHORTS/LONGS totals at rest, cumulative reading on hover */}
+            <div style={{ position: 'absolute', left: 14, right: 14, bottom: 6, height: 20 }}><ProfLegend prof={prof} hover={profHover} /></div>
           </div>
         )}
       </div>
@@ -746,32 +769,54 @@ function Crosshair({ hv }: { hv: HoverState }) {
   );
 }
 
-function ProfHead({ prof, hover }: { prof: Profile; hover: ProfHover | null }) {
-  const wrap = (kids: React.ReactNode) => <div style={{ marginTop: 4, height: 34, display: 'flex', flexDirection: 'column', gap: 3, fontVariantNumeric: 'tabular-nums', textShadow: '0 0 4px var(--halo),0 0 4px var(--halo),0 1px 3px var(--halo)' }}>{kids}</div>;
-  if (hover) {
-    const side = hover.j > prof.priceJ ? 'short' : hover.j < prof.priceJ ? 'long' : null;
-    const sc = side === 'short' ? '#1f9d55' : side === 'long' ? '#df5338' : 'var(--muted)';
-    const slab = side === 'short' ? 'Short cum' : side === 'long' ? 'Long cum' : 'At price';
-    return wrap(<>
-      <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>${fmtPrice(hover.price)}</span>
-      <div style={{ display: 'flex', gap: 9, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10.5, color: '#7c5cff' }}>Liq {fmtUsd(prof.tot[hover.j])}</span>
-        {side && <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10.5, color: sc }}>{slab} {fmtUsd(prof.cum[hover.j])}</span>}
+// Peak-above / Peak-below header (dc.html profHeadEl) — sits in the reclaimed top
+// space of the (now full-height) profile panel, matching the stats-bar language.
+function ProfPeakHead({ prof, ya }: { prof: Profile; ya: number[] }) {
+  const row = (dir: string, arrow: string, color: string, j: number) => {
+    const has = j >= 0;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <span style={{ fontWeight: 800, fontSize: 7.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>{'Peak ' + dir}</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em', color: 'var(--ink)', display: 'inline-flex', alignItems: 'baseline', gap: 5 }}><span style={{ color, fontSize: 10 }}>{arrow}</span>{has ? '$' + Math.round(ya[j]).toLocaleString('en-US') : '—'}</span>
+          {has ? <span style={{ marginLeft: 'auto', fontFamily: MONO, fontWeight: 700, fontSize: 13.5, color }}>{fmtUsd(prof.tot[j])}</span> : null}
+        </div>
       </div>
-    </>);
-  }
-  return wrap(<div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-    <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.05em', color: '#ef9512' }}>PEAK</span>
-    <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>${fmtPrice(prof.peakPrice)}</span>
-  </div>);
+    );
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontVariantNumeric: 'tabular-nums' }}>
+      {row('above', '▲', '#1f9d55', prof.peakAboveJ)}
+      <div style={{ height: 1, background: 'var(--divider)' }} />
+      {row('below', '▼', '#df5338', prof.peakBelowJ)}
+    </div>
+  );
 }
 
-function ProfLegendItem({ c, arrow, label, val }: { c: string; arrow: string; label: string; val: string }) {
-  return (
+// Bottom legend (dc.html profLegendEl) — SHORTS/LONGS totals at rest; on hover it
+// swaps to the cumulative-line value at that price, colour-coded (green above / red below).
+function ProfLegend({ prof, hover }: { prof: Profile; hover: ProfHover | null }) {
+  if (hover && hover.j !== prof.priceJ) {
+    const short = hover.j > prof.priceJ, c = short ? '#1f9d55' : '#df5338';
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: '100%' }}>
+        <span style={{ color: c, fontSize: 9 }}>{short ? '▲' : '▼'}</span>
+        <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: c }}>{fmtUsd(prof.cum[hover.j])}</span>
+        <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, color: 'var(--muted)' }}>${fmtPrice(hover.price)}</span>
+      </div>
+    );
+  }
+  const item = (c: string, arrow: string, label: string, val: string) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
       <span style={{ color: c, fontSize: 8.5 }}>{arrow}</span>
       <span style={{ fontWeight: 700, fontSize: 9, letterSpacing: '0.04em', color: 'var(--muted)' }}>{label}</span>
       <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10, color: 'var(--ink)' }}>{val}</span>
+    </div>
+  );
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%' }}>
+      {item('#1f9d55', '▲', 'SHORTS', fmtUsd(prof.shortTotal))}
+      {item('#df5338', '▼', 'LONGS', fmtUsd(prof.longTotal))}
     </div>
   );
 }
