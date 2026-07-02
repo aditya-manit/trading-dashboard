@@ -11,7 +11,7 @@ const jakarta = Plus_Jakarta_Sans({
 // Editorial serif (workbook headline / rule) + mono (diagram tick labels).
 const newsreader = Newsreader({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-news',
 });
 

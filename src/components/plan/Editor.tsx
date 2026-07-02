@@ -379,7 +379,7 @@ export function Editor() {
             </div>
             <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               {d.entryMode === 'zone' ? (
-                <Field label="Entry zone"><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ flex: 1 }}><PriceInput value={d.ez1} onChange={(v) => planActions.setDraft({ ez1: v })} placeholder="from" /></div><span style={{ fontWeight: 800, fontSize: 14, color: '#cbc9c0' }}>–</span><div style={{ flex: 1 }}><PriceInput value={d.ez2} onChange={(v) => planActions.setDraft({ ez2: v })} placeholder="to" /></div></div></Field>
+                <Field label="Entry zone" labelColor="#7c5cff"><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ flex: 1 }}><PriceInput value={d.ez1} onChange={(v) => planActions.setDraft({ ez1: v })} placeholder="from" /></div><span style={{ fontWeight: 800, fontSize: 14, color: '#cbc9c0' }}>–</span><div style={{ flex: 1 }}><PriceInput value={d.ez2} onChange={(v) => planActions.setDraft({ ez2: v })} placeholder="to" /></div></div></Field>
               ) : (
                 <Field label="Entry price"><PriceInput value={d.entry} onChange={(v) => planActions.setDraft({ entry: v })} placeholder="0.00" /></Field>
               )}
