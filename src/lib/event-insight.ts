@@ -154,6 +154,7 @@ Reply with ONLY a JSON array — no prose, no code fences — one object per inp
 
 Rules:
 - 2 to 3 assets; ALWAYS include BTC and its likely direction under that scenario.
+- The scenario is ALWAYS the currency-BULLISH / hawkish one, which is RISK-OFF for BTC: BTC → down, the event's own currency → up. For a LABOR / data release the STRONG reading is the bullish one — LOW unemployment, HIGH NFP, HOT wages → hawkish → BTC down. Do NOT read "low unemployment" as risk-on.
 - Symbols <=6 chars; use the event currency code where relevant.`;
 
 const PRINTS_SYSTEM = `You find the 2 MOST RECENT *already-completed* occurrence dates of ONE recurring economic release (same country/currency AND same release), for a BTC trader's calendar.
@@ -176,6 +177,26 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>
     while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx]); }
   }));
   return out;
+}
+
+// The tier-1 reaction is, by construction, the currency-BULLISH (hawkish/strong)
+// outcome — which for a BTC perp trader is textbook RISK-OFF. Enforce that
+// deterministically so a model slip can't invert a card: BTC → down, stocks → down,
+// the event's own currency → up. (Fixes e.g. Unemployment Rate, where the model read
+// "low unemployment" as risk-on and showed BTC↑/USD↓/stocks↑; the correct hawkish read
+// is BTC↓/USD↑/stocks↓, matching the Earnings/NFP siblings.) Applied at read time so
+// it also corrects already-cached wrong values without a cache wipe.
+function normalizeReaction(country: string, r: Reaction): Reaction {
+  const ccy = country.toUpperCase();
+  return {
+    ...r,
+    assets: r.assets.map((a) => {
+      const sym = a.sym.toUpperCase();
+      if (sym === 'BTC' || sym === 'STOCKS') return { ...a, dir: 'down' as AssetDir };
+      if (sym === ccy) return { ...a, dir: 'up' as AssetDir };
+      return a;
+    }),
+  };
 }
 
 // Tier 1 — reactions for ALL relevant events (one batched call, no web search).
@@ -227,7 +248,7 @@ export async function enrichReactions(
     await saveCache();
   }
 
-  for (const k of uniq.keys()) { const v = reactionCache.get(k); if (v) result[k] = v; }
+  for (const k of uniq.keys()) { const v = reactionCache.get(k); if (v) result[k] = normalizeReaction(uniq.get(k)!.country, v); }
   return result;
 }
 
