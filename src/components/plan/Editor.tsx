@@ -158,7 +158,7 @@ function ThesisField({ f, i, d }: { f: ThesisFieldDef; i: number; d: PlanDraft }
     }
   };
   return (
-    <div style={{ padding: '15px 18px', borderRight: i % 2 === 0 ? '1px solid #f0efec' : 'none', borderBottom: i < 2 ? '1px solid #f0efec' : 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
+    <div style={{ padding: '13px 18px', borderBottom: i < 3 ? '1px solid #f3f1f7' : 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 10.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#1a1813' }}>
           <span style={{ fontWeight: 800, fontSize: 9, color: f.nc, fontVariantNumeric: 'tabular-nums' }}>{f.n}</span>
@@ -168,13 +168,13 @@ function ThesisField({ f, i, d }: { f: ThesisFieldDef; i: number; d: PlanDraft }
       </div>
       {f.k === 'targetNote' ? <TargetRule d={d} /> : (
         <textarea value={String(d[f.k] ?? '')} onChange={(e) => planActions.setDraft({ [f.k]: e.target.value } as Partial<PlanDraft>)} onKeyDown={onTab} onFocus={() => setFoc(true)} onBlur={() => setFoc(false)} placeholder={f.ph}
-          style={{ width: '100%', boxSizing: 'border-box', minHeight: 82, resize: 'vertical', padding: '9px 11px', border: 'none', borderRadius: 10, background: foc ? f.tint : 'transparent', fontFamily: 'inherit', fontWeight: 600, fontSize: 13, color: '#1a1813', outline: 'none', lineHeight: 1.6, transition: 'background .15s' }} />
+          style={{ width: '100%', boxSizing: 'border-box', minHeight: 54, resize: 'vertical', padding: '8px 11px', border: 'none', borderRadius: 10, background: foc ? f.tint : 'transparent', fontFamily: 'inherit', fontWeight: 600, fontSize: 13.5, color: '#26221c', outline: 'none', lineHeight: 1.62, transition: 'background .15s' }} />
       )}
     </div>
   );
 }
 function Thesis({ d }: { d: PlanDraft }) {
-  return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', flex: 1 }}>{THESIS_FIELDS.map((f, i) => <ThesisField key={f.k} f={f} i={i} d={d} />)}</div>;
+  return <div style={{ display: 'flex', flexDirection: 'column' }}>{THESIS_FIELDS.map((f, i) => <ThesisField key={f.k} f={f} i={i} d={d} />)}</div>;
 }
 
 // ── Management rule strip (Target / exit) — tappable colored slots ──────────
@@ -308,6 +308,50 @@ function ChartUpload({ d, onFull }: { d: PlanDraft; onFull: (src: string) => voi
 }
 const tool: CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'inherit', fontWeight: 800, fontSize: 10.5, padding: '6px 9px', borderRadius: 8, border: 'none', background: 'rgba(20,18,12,0.6)', color: '#fff', backdropFilter: 'blur(5px)' };
 
+// ── collapsed-section summaries (match dc.html tp*SummaryEl exactly) ──
+const CONV_META: Record<string, { n: number; c: string }> = { low: { n: 1, c: '#9a958a' }, med: { n: 2, c: '#c9821f' }, high: { n: 3, c: '#7c5cff' } };
+const COIN_C: Record<string, string> = { BTC: '#f7931a', ETH: '#627eea', SOL: '#14b88a' };
+const COIN_G: Record<string, string> = { BTC: '₿', ETH: 'Ξ', SOL: '◎' };
+function IdentitySummary({ d }: { d: PlanDraft }) {
+  const cv = CONV_META[d.conv] || CONV_META.med, dc = d.dir === 'short' ? '#df5338' : '#1f9d55';
+  const sep = <span style={{ color: '#cbc7bd' }}>·</span>;
+  const arrow = <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={dc} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}>{d.dir === 'short' ? <><path d="M22 17 13.5 8.5l-5 5L2 7" /><path d="M16 17h6v-6" /></> : <><path d="M22 7 13.5 15.5l-5-5L2 17" /><path d="M16 7h6v6" /></>}</svg>;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 12 }}>
+      <span style={{ width: 15, height: 15, borderRadius: '50%', background: COIN_C[d.sym] || '#7c5cff', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 9, flex: '0 0 auto' }}>{COIN_G[d.sym] || (d.sym || 'B')[0]}</span>
+      <span style={{ color: '#6f6a60' }}>{d.sym}</span>{sep}{arrow}<span style={{ color: dc }}>{d.dir === 'short' ? 'Short' : 'Long'}</span>{sep}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>{[0, 1, 2].map((i) => <span key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i < cv.n ? cv.c : '#e2ded4' }} />)}</span>
+    </span>
+  );
+}
+function SizeSummary({ d }: { d: PlanDraft }) {
+  const u = ({ qty: d.sym, margin: 'USD', marginpct: '% of equity', riskusd: 'USD risk', riskpct: '% risk' } as Record<string, string>)[d.sizeMode] || '';
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 12 }}>
+      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.2} style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={9} /><path d="M12 3a9 9 0 0 1 9 9h-9z" fill="#7c5cff" stroke="none" /></svg>
+      <span style={{ color: '#7c5cff' }}>{d.sizeVal || '—'}</span><span style={{ color: '#9a958a' }}>{' ' + u}</span>
+    </span>
+  );
+}
+function LevSummary({ d }: { d: PlanDraft }) {
+  const L = tpNum(String(d.lev)) || 5, col = L > 10 ? '#df5338' : L > 5 ? '#c9821f' : '#1f9d55';
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 12, color: col }}><svg width={12} height={12} viewBox="0 0 24 24" fill={col} stroke="none" style={{ flex: '0 0 auto' }}><path d="M13 2 3 14h7l-1 8 10-12h-7z" /></svg><span>{L + '×'}</span></span>;
+}
+function LevelsSummary({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
+  const arw = <span style={{ color: '#cbc7bd' }}>{' → '}</span>;
+  const entry = d.entryMode === 'zone' ? (d.ez1 || '?') + '–' + (d.ez2 || '?') : d.entry || '—';
+  const fmtP = (p: number) => '$' + p.toLocaleString('en-US', { maximumFractionDigits: p < 10 ? 4 : p < 1000 ? 2 : 0 });
+  const stopEl = d.stop ? <span style={{ color: '#df5338' }}>{d.stop}</span> : isFinite(c.liq) ? <span style={{ color: '#c9821f', display: 'inline-flex', alignItems: 'baseline', gap: 3 }}>{fmtP(c.liq)}<span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.04em', color: '#d9a94f' }}>LIQ</span></span> : <span style={{ color: '#cbc7bd' }}>—</span>;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.2} strokeLinecap="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={8} /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+      <span style={{ color: '#7c5cff' }}>{entry}</span>{arw}{stopEl}
+      {d.t1 ? <>{arw}<span style={{ color: '#1f9d55' }}>{d.t1}</span></> : null}
+      {d.t2 ? <>{arw}<span style={{ color: '#1f9d55' }}>{d.t2}</span></> : null}
+    </span>
+  );
+}
+
 // ── top equity strip (ported from dc.html `tp4aStrip`): Risk · Reward·plan · R:R · Position · Margin · Stop-vs-liq ──
 function EquityStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
   const GREEN = '#1f9d55', RED = '#df5338', ORANGE = '#ff7a00', INK = '#1a1813';
@@ -414,8 +458,6 @@ export function Editor() {
   const equity = parseFloat(account?.total || '') || TP_EQUITY;
   const btcPos = (positions || []).find((p) => p.contract === 'BTC_USDT' && p.size !== 0);
   const btcMark = parseFloat(btcPos?.mark_price || '') || (candles && candles.length ? parseFloat(candles[candles.length - 1].c) : NaN) || undefined;
-  const userId = btcPos?.user || (positions || [])[0]?.user;
-  const acctLabel = userId ? `CX-${String(userId).slice(-4)}` : '';
 
   const c = tpCompute(d, equity, d.sym === 'BTC' ? btcMark : undefined);
   const [full, setFull] = useState<string | null>(null);
@@ -475,12 +517,7 @@ export function Editor() {
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>{editing ? 'Cancel edit' : 'Back to workbook'}
           </span>
           <span style={{ fontWeight: 800, fontSize: 29, letterSpacing: '-0.025em', color: '#1a1813', lineHeight: 1.08 }}>{editing ? 'Edit plan.' : 'Plan this trade.'}</span>
-          <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>{editing ? `Updating ${TP_MARKETS[d.sym].label}…` : 'State the idea, set the levels, size it, and let the math check your risk before you commit.'}</span>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end', paddingBottom: 3 }}>
-          <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>{TP_MARKETS[d.sym].label} · mark</span>
-          <span style={{ fontWeight: 800, fontSize: 20, color: '#1a1813', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{tpMoney(c.mkt.mark, c.mkt.mark < 1000 ? 2 : 0)}</span>
-          <span style={{ fontWeight: 600, fontSize: 11, color: '#b3b0a6' }}>Equity {tpMoney(equity, 0)}{acctLabel ? ` · ${acctLabel}` : ''}</span>
+          <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>{editing ? `Updating ${TP_MARKETS[d.sym].label} ${d.dir} — change levels, size, leverage or thesis.` : 'State the idea, set the levels, size it, and let the math check your risk before you commit.'}</span>
         </div>
       </div>
 
@@ -511,14 +548,14 @@ export function Editor() {
           <GroupHead label="Setup" color="#1f9d55" gradient="linear-gradient(180deg,#ffffff 0%,#f6fbf8 45%,#e2f3ea 100%)" border="#cfeadb" allOpen={setupAllOpen} onToggleAll={() => setGroup(['identity', 'levels', 'sizing', 'leverage'], !setupAllOpen)} />
 
           <div style={{ borderBottom: '1px solid #f3f1f7' }}>
-            <SecHead title="Identity" open={secOpen.identity} onToggle={() => toggleSec('identity')} collapsedRight={`${d.sym} ${d.dir}`} />
+            <SecHead title="Identity" open={secOpen.identity} onToggle={() => toggleSec('identity')} collapsedRight={<IdentitySummary d={d} />} />
             {secOpen.identity && <IdentitySection d={d} btcMark={btcMark} />}
           </div>
 
           <div style={{ borderBottom: '1px solid #f3f1f7' }}>
             <SecHead title="Levels" open={secOpen.levels} onToggle={() => toggleSec('levels')}
               right={<Seg opts={[{ v: 'price', label: 'Single price' }, { v: 'zone', label: 'Zone' }]} cur={d.entryMode} onPick={(v) => planActions.setDraft({ entryMode: v as 'price' | 'zone' })} accent="#23211b" />}
-              collapsedRight={d.entry || d.ez1 ? 'set' : '—'} />
+              collapsedRight={<LevelsSummary d={d} c={c} />} />
             {secOpen.levels && (
             <div style={{ padding: '4px 18px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               {d.entryMode === 'zone' ? (
@@ -544,7 +581,7 @@ export function Editor() {
 
           {/* sizing */}
           <div style={{ borderBottom: '1px solid #f3f1f7' }}>
-            <SecHead title="Sizing" open={secOpen.sizing} onToggle={() => toggleSec('sizing')} collapsedRight={c.hasQty ? tpMoney(c.margin, 0) : 'size it'} />
+            <SecHead title="Sizing" open={secOpen.sizing} onToggle={() => toggleSec('sizing')} collapsedRight={<SizeSummary d={d} />} />
             {secOpen.sizing && (
             <>
             <div style={{ borderTop: '1px solid #f1f0ed', borderBottom: '1px solid #f1f0ed', display: 'grid', gridTemplateColumns: 'repeat(5,1fr)' }}>
@@ -583,7 +620,7 @@ export function Editor() {
 
           {/* leverage */}
           <div>
-            <SecHead title="Leverage" open={secOpen.leverage} onToggle={() => toggleSec('leverage')} collapsedRight={`${d.lev}×`} />
+            <SecHead title="Leverage" open={secOpen.leverage} onToggle={() => toggleSec('leverage')} collapsedRight={<LevSummary d={d} />} />
             {secOpen.leverage && (
             <div style={{ padding: '13px 18px', display: 'flex', flexDirection: 'column', gap: 13 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
