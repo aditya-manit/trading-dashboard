@@ -308,6 +308,79 @@ function ChartUpload({ d, onFull }: { d: PlanDraft; onFull: (src: string) => voi
 }
 const tool: CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'inherit', fontWeight: 800, fontSize: 10.5, padding: '6px 9px', borderRadius: 8, border: 'none', background: 'rgba(20,18,12,0.6)', color: '#fff', backdropFilter: 'blur(5px)' };
 
+// ── inline TP widgets (TP1 · Bank% · preset menu · TP2 · Donchian-trail period · preset menu), ported from dc.html ──
+const MONOF = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
+const BANK_PRESETS = ['50', '60', '70', '75', '80', '100'];
+const PER_PRESETS = ['12h', '1d', '2d', '3d', '1w'];
+function PresetMenu({ title, opts, cur, fmt, onPick, accent, accentBg, onClose }: { title: string; opts: string[]; cur: string; fmt: (v: string) => string; onPick: (v: string) => void; accent: string; accentBg: string; onClose: () => void }) {
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
+      <div style={{ position: 'absolute', top: 'calc(100% + 7px)', right: 0, zIndex: 61, background: '#fff', border: '1px solid #ece9e3', borderRadius: 11, boxShadow: '0 14px 34px -10px rgba(30,20,10,.26)', padding: 5, minWidth: 138, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#b3aea2', padding: '4px 9px 5px' }}>{title}</div>
+        {opts.map((o) => { const active = String(cur) === String(o); return (
+          <button key={o} onClick={() => onPick(o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, border: 'none', background: active ? accentBg : 'transparent', borderRadius: 7, padding: '7px 9px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+            <span style={{ fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: active ? accent : '#3a352c' }}>{fmt(o)}</span>
+            {active ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg> : null}
+          </button>
+        ); })}
+      </div>
+    </>
+  );
+}
+function TargetInputs({ d }: { d: PlanDraft }) {
+  const [bankMenu, setBankMenu] = useState(false);
+  const [perMenu, setPerMenu] = useState(false);
+  const period = d.trailPeriod || '', pct = d.bankPct == null ? '70' : d.bankPct, target = d.bankTarget == null ? '100k' : d.bankTarget;
+  const setPct = (v: string) => { const n = String(v).replace(/[^0-9]/g, '').slice(0, 3); planActions.setDraft({ bankPct: n, targetNote: composeNote(n, period, target) }); };
+  const setPer = (v: string) => planActions.setDraft({ trailPeriod: v, targetNote: composeNote(pct, v, target) });
+  const priceInput = (k: 't1' | 't2', border: string, bg: string) => (
+    <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+      <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, fontSize: 14, color: '#cbc9c0' }}>$</span>
+      <input value={d[k]} onChange={(e) => planActions.setDraft({ [k]: e.target.value.replace(/,/g, '') } as Partial<PlanDraft>)} inputMode="decimal" placeholder="0.00" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 26px', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', color: '#1a1813', outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
+    </div>
+  );
+  const chevBtn = (onClick: () => void, col: string) => <button onClick={onClick} aria-label="presets" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', padding: '2px 0 2px 2px', margin: 0, cursor: 'pointer', color: col }}><svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></button>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+      <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#1f9d55' }}>Targets</span>
+      <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+        {/* TP1 · Bank */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'flex', alignItems: 'center', minHeight: 17, fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', color: '#5aa97a', paddingLeft: 2 }}>TP1 · Bank</span>
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid #e3f0e9', borderRadius: 12, background: '#fbfdfb', overflow: 'hidden' }}>
+              {priceInput('t1', '#e3f0e9', '#fbfdfb')}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3, borderLeft: '1px solid #e3f0e9', background: '#fdf2e8', padding: '0 6px 0 9px' }}>
+                <svg width={11} height={11} viewBox="0 0 24 24" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={9} fill="none" stroke="#e07b2f" strokeWidth={2.2} /><path d="M12 12 L12 3 A9 9 0 0 1 18.9 17.8 Z" fill="#e07b2f" /></svg>
+                <input value={pct} onChange={(e) => setPct(e.target.value)} inputMode="numeric" placeholder="70" style={{ width: 20, textAlign: 'right', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 13, color: '#e07b2f', outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
+                <span style={{ fontWeight: 800, fontSize: 13, color: '#e07b2f' }}>%</span>
+                {chevBtn(() => { setBankMenu((v) => !v); setPerMenu(false); }, '#e07b2f')}
+              </div>
+            </div>
+            {bankMenu ? <PresetMenu title="Bank %" opts={BANK_PRESETS} cur={pct} fmt={(v) => v + '%'} onPick={(v) => { setPct(v); setBankMenu(false); }} accent="#e07b2f" accentBg="#fdf2e8" onClose={() => setBankMenu(false)} /> : null}
+          </div>
+        </div>
+        {/* TP2 · Donchian trail */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'flex', alignItems: 'center', minHeight: 17, fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', color: '#5aa97a', paddingLeft: 2 }}>TP2 · Donchian trail</span>
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid #eeece8', borderRadius: 12, background: '#fff', overflow: 'hidden' }}>
+              {priceInput('t2', '#eeece8', '#fff')}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3, borderLeft: '1px solid #eeece8', background: '#f4f1fb', padding: '0 6px 0 9px' }}>
+                <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l3 2" /></svg>
+                <input value={period} onChange={(e) => setPer(e.target.value)} placeholder="1d" style={{ width: 24, textAlign: 'center', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: '#7c5cff', outline: 'none' }} />
+                {chevBtn(() => { setPerMenu((v) => !v); setBankMenu(false); }, '#7c5cff')}
+              </div>
+            </div>
+            {perMenu ? <PresetMenu title="Trail timeframe" opts={PER_PRESETS} cur={period} fmt={(v) => v} onPick={(v) => { setPer(v); setPerMenu(false); }} accent="#7c5cff" accentBg="#f4f1fb" onClose={() => setPerMenu(false)} /> : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── collapsed-section summaries (match dc.html tp*SummaryEl exactly) ──
 const CONV_META: Record<string, { n: number; c: string }> = { low: { n: 1, c: '#9a958a' }, med: { n: 2, c: '#c9821f' }, high: { n: 3, c: '#7c5cff' } };
 const COIN_C: Record<string, string> = { BTC: '#f7931a', ETH: '#627eea', SOL: '#14b88a' };
@@ -564,16 +637,7 @@ export function Editor() {
                 <Field label="Entry price"><PriceInput value={d.entry} onChange={(v) => planActions.setDraft({ entry: v })} placeholder="0.00" /></Field>
               )}
               <Field label="Stop loss" labelColor="#df5338" hint="blank = ride to liq"><PriceInput value={d.stop} onChange={(v) => planActions.setDraft({ stop: v })} placeholder="0.00" accent="#df5338" tint="#f2ddd6" bg="#fffcfb" /></Field>
-              <Field label="Targets" labelColor="#1f9d55">
-                <div style={{ display: 'flex', gap: 9 }}>
-                  {(['t1', 't2', 't3'] as const).map((k, i) => (
-                    <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-                      <span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', color: i === 0 ? '#5aa97a' : '#bdbbb1', paddingLeft: 2 }}>{i === 0 ? 'TP1 · Bank' : i === 1 ? 'TP2 · Donchian trail' : 'TP3 · optional'}</span>
-                      <PriceInput value={d[k]} onChange={(v) => planActions.setDraft({ [k]: v } as Partial<PlanDraft>)} placeholder="0.00" accent="#1f9d55" tint={i === 0 ? '#d9ecdf' : '#eceae5'} bg={i === 0 ? '#fbfdfb' : '#fff'} />
-                    </div>
-                  ))}
-                </div>
-              </Field>
+              <TargetInputs d={d} />
               <HeatmapLaunchCard variant="row" symbol={d.sym as HeatSymbol} title="Check your stop against the real clusters" sub="Is it beyond the sweep, not inside it?" />
             </div>
             )}
