@@ -12,7 +12,6 @@ import { usePositions } from '@/hooks/usePositions';
 import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { HeatmapLaunchCard } from '@/components/heatmap/HeatmapLaunchCard';
 import type { HeatSymbol } from '@/hooks/useHeatmap';
-import { RrDiagram } from './RrDiagram';
 import { MiniCalendar, CalIcon } from './MiniCalendar';
 import { CoinIcon } from './coins';
 
@@ -29,7 +28,7 @@ const card: CSSProperties = { background: '#fff', border: '1px solid #efedf3', b
 
 // ── collapsible-section scaffolding (Theory: thesis/chart · Setup: identity/levels/sizing/leverage) ──
 type SecKey = 'thesis' | 'chart' | 'identity' | 'levels' | 'sizing' | 'leverage';
-const ALL_OPEN: Record<SecKey, boolean> = { thesis: true, chart: true, identity: true, levels: true, sizing: true, leverage: true };
+const SEC_DEFAULT: Record<SecKey, boolean> = { thesis: false, chart: false, identity: false, levels: true, sizing: false, leverage: false };
 // chevron that rotates when open (dc.html `tpchev`)
 const Chev = ({ open, color = '#b3b0a6' }: { open: boolean; color?: string }) => (
   <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s ease', flex: '0 0 auto' }}><path d="m6 9 6 6 6-6" /></svg>
@@ -425,6 +424,26 @@ function LevelsSummary({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute>
   );
 }
 
+// Thesis collapsed chips — per-field dot+label, coloured when filled, grey when empty (dc.html tpThesisChips)
+function ThesisChips({ d }: { d: PlanDraft }) {
+  const fields: [keyof PlanDraft, string, string][] = [['rationale', 'Rationale', '#7c5cff'], ['trigger', 'Trigger', '#1f9d55'], ['invalidation', 'Invalidation', '#df5338'], ['targetNote', 'Target', '#c9821f']];
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+      {fields.map(([k, label, color]) => { const filled = String(d[k] ?? '').trim().length > 0; return (
+        <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 700, fontSize: 11, letterSpacing: '-0.005em', color: filled ? color : '#c4c1b8' }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: filled ? color : '#dcd9d0', flex: '0 0 auto' }} />{label}
+        </span>
+      ); })}
+    </span>
+  );
+}
+// Chart collapsed chip — a 30×20 thumbnail when attached, else a camera icon + "None" (dc.html tpChartChip)
+function ChartChip({ d }: { d: PlanDraft }) {
+  const src = String(d.chart ?? '');
+  if (src.length > 0) return <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ width: 30, height: 20, borderRadius: 4, overflow: 'hidden', border: '1px solid #e7e4ee', background: '#f3f1f7', backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' }} /></span>;
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 700, fontSize: 11, color: '#c4c1b8' }}><svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#c4c1b8" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" /><circle cx={12} cy={13} r={3} /></svg>None</span>;
+}
+
 // ── top equity strip (ported from dc.html `tp4aStrip`): Risk · Reward·plan · R:R · Position · Margin · Stop-vs-liq ──
 function EquityStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
   const GREEN = '#1f9d55', RED = '#df5338', ORANGE = '#ff7a00', INK = '#1a1813';
@@ -561,8 +580,8 @@ export function Editor() {
 
   // collapsible sections + expand-all per group (persisted)
   const [secOpen, setSecOpen] = useState<Record<SecKey, boolean>>(() => {
-    try { const s = localStorage.getItem('tdplan_ed_open'); if (s) return { ...ALL_OPEN, ...JSON.parse(s) }; } catch { /* ignore */ }
-    return ALL_OPEN;
+    try { const s = localStorage.getItem('tdplan_ed_open'); if (s) return { ...SEC_DEFAULT, ...JSON.parse(s) }; } catch { /* ignore */ }
+    return SEC_DEFAULT;
   });
   useEffect(() => { try { localStorage.setItem('tdplan_ed_open', JSON.stringify(secOpen)); } catch { /* ignore */ } }, [secOpen]);
   const toggleSec = (k: SecKey) => setSecOpen((o) => ({ ...o, [k]: !o[k] }));
@@ -590,7 +609,7 @@ export function Editor() {
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>{editing ? 'Cancel edit' : 'Back to workbook'}
           </span>
           <span style={{ fontWeight: 800, fontSize: 29, letterSpacing: '-0.025em', color: '#1a1813', lineHeight: 1.08 }}>{editing ? 'Edit plan.' : 'Plan this trade.'}</span>
-          <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>{editing ? `Updating ${TP_MARKETS[d.sym].label} ${d.dir} — change levels, size, leverage or thesis.` : 'State the idea, set the levels, size it, and let the math check your risk before you commit.'}</span>
+          <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>{editing ? `Updating ${TP_MARKETS[d.sym].label} ${d.dir} — change levels, size, leverage or thesis.` : 'Lock the specifics — levels, size, leverage, thesis. You’ll still execute manually on TradingView.'}</span>
         </div>
       </div>
 
@@ -608,10 +627,10 @@ export function Editor() {
             </div>
             <ExpectedDate d={d} />
           </div>
-          <SecHead title="Thesis" open={secOpen.thesis} onToggle={() => toggleSec('thesis')} collapsedRight="Rationale · Trigger · Invalidation · Target" />
+          <SecHead title="Thesis" open={secOpen.thesis} onToggle={() => toggleSec('thesis')} collapsedRight={<ThesisChips d={d} />} />
           {secOpen.thesis && <Thesis d={d} />}
           <div style={{ borderTop: '1px solid #f0efec' }}>
-            <SecHead title="Chart" open={secOpen.chart} onToggle={() => toggleSec('chart')} collapsedRight="optional" />
+            <SecHead title="Chart" open={secOpen.chart} onToggle={() => toggleSec('chart')} collapsedRight={<ChartChip d={d} />} />
             {secOpen.chart && <div style={{ flex: 1 }}><ChartUpload d={d} onFull={setFull} /></div>}
           </div>
         </GroupSheet>
@@ -703,21 +722,6 @@ export function Editor() {
             )}
           </div>
         </GroupSheet>
-      </div>
-
-      {/* risk / reward map — the visual price ladder (the numbers live in the strip above) */}
-      <div style={{ ...card, border: '1px solid #f5f4f1', borderRadius: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '14px 18px', borderBottom: '1px solid #f4f3f0', background: '#fcfbff' }}>
-          <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7c5cff' }}>Risk / reward map</span>
-          <span style={{ fontWeight: 600, fontSize: 10.5, color: '#b3b0a6' }}>entry · stop · targets</span>
-        </div>
-        {c.dirErr ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '14px 18px 0', background: '#fdf2ee', border: '1px solid #f6d9cf', borderRadius: 10, padding: '10px 12px' }}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#df5338" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={10} /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-            <span style={{ fontWeight: 700, fontSize: 12, color: '#a33f28', lineHeight: 1.4 }}>{c.dirErr}</span>
-          </div>
-        ) : null}
-        <div style={{ padding: '16px 18px' }}><RrDiagram c={c} d={d} /></div>
       </div>
 
       {/* footer — execute-manually note + save + clear (z-index above the group glows) */}
