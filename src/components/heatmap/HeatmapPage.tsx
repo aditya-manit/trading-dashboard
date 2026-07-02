@@ -293,7 +293,14 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
         ctx.fillStyle = 'rgba(42,209,127,0.055)'; ctx.fillRect(0, 0, W, priceY);
         ctx.fillStyle = 'rgba(240,72,102,0.055)'; ctx.fillRect(0, priceY, W, H - priceY);
         const hj = profHover ? profHover.j : -1;
-        for (let j = 0; j < Y; j++) { const p = ya[j]; if (p < V.p0 - dp || p > V.p1 + dp) continue; const v = a.tot[j] / a.maxT, y = yP(p) - ch / 2; if (j === hj) { ctx.fillStyle = P.rowHi; ctx.fillRect(0, y - 0.5, W, ch + 1); } if (v < 0.004) continue; const c = ramped(P.ramp, Math.pow(v, 0.7)), len = Math.max(1.5, v * (W - 2)); ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; ctx.fillRect(0, y, len, ch); }
+        // band-filtered per-level totals: the BARS only count clusters whose intensity (val/max)
+        // is within the colorbar band [lo,hi]. The cumulative lines, SHORTS/LONGS totals and the
+        // peak readouts stay on the FULL book (they use prof.cum / prof.maxCum / prof.tot).
+        const bl = band.lo, bh = band.hi, mx = D.max, ld = D.dat;
+        let lastX = 0; for (const r of ld) if (r[0] > lastX) lastX = r[0];
+        const totB = new Array(Y).fill(0);
+        for (const r of ld) { if (r[0] !== lastX) continue; const u = r[2] / mx; if (u < bl || u > bh) continue; totB[r[1]] += r[2]; }
+        for (let j = 0; j < Y; j++) { const p = ya[j]; if (p < V.p0 - dp || p > V.p1 + dp) continue; const v = totB[j] / a.maxT, y = yP(p) - ch / 2; if (j === hj) { ctx.fillStyle = P.rowHi; ctx.fillRect(0, y - 0.5, W, ch + 1); } if (v < 0.004) continue; const c = ramped(P.ramp, Math.pow(v, 0.7)), len = Math.max(1.5, v * (W - 2)); ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; ctx.fillRect(0, y, len, ch); }
         const xc = (cv: number) => cv / a.maxCum * (W - 2);
         ctx.lineWidth = 2.6; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(0, priceY); for (let j = a.priceJ + 1; j < Y; j++) ctx.lineTo(xc(a.cum[j]), yP(ya[j])); ctx.strokeStyle = P.up; ctx.stroke();
