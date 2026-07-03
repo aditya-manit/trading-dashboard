@@ -36,7 +36,7 @@ const Chev = ({ open, color = '#b3b0a6' }: { open: boolean; color?: string }) =>
 // clickable section header: title + (optional) right slot (collapsed summary / control) + chevron
 function SecHead({ title, open, onToggle, right, collapsedRight }: { title: string; open: boolean; onToggle: () => void; right?: React.ReactNode; collapsedRight?: React.ReactNode }) {
   return (
-    <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 18px', cursor: 'pointer' }}>
+    <div onClick={onToggle} className="tpsec-hd" style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 18px', cursor: 'pointer' }}>
       <span style={{ fontWeight: 800, fontSize: 13.5, color: '#1a1813', letterSpacing: '-0.01em' }}>{title}</span>
       <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 9 }} onClick={(e) => e.stopPropagation()}>
         {open ? right : (collapsedRight ? <span style={{ fontWeight: 700, fontSize: 12, color: '#897f70' }}>{collapsedRight}</span> : null)}
@@ -600,7 +600,7 @@ export function Editor() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
-      <style>{`.tp-range{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;outline:none;cursor:pointer}.tp-range::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;box-shadow:0 1px 3px rgba(20,20,12,.18);cursor:pointer}.tp-range::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;cursor:pointer}`}</style>
+      <style>{`.tpsec-hd{transition:background .15s}.tpsec-hd:hover{background:#faf9f7}.tp-range{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;outline:none;cursor:pointer}.tp-range::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;box-shadow:0 1px 3px rgba(20,20,12,.18);cursor:pointer}.tp-range::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;cursor:pointer}`}</style>
 
       {/* header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap', padding: '6px 2px 0' }}>
