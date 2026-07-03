@@ -791,11 +791,11 @@ function Crosshair({ hv }: { hv: HoverState }) {
 // Peak-above / Peak-below header (dc.html profHeadEl) — sits in the reclaimed top
 // space of the (now full-height) profile panel, matching the stats-bar language.
 function ProfPeakHead({ prof, ya }: { prof: Profile; ya: number[] }) {
-  const row = (dir: string, arrow: string, color: string, j: number) => {
+  const row = (dir: string, arrow: string, color: string, j: number, tip: React.ReactNode) => {
     const has = j >= 0;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <span style={{ fontWeight: 800, fontSize: 7.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>{'Peak ' + dir}</span>
+        <HoverTip tip={tip} width={258} style={{ pointerEvents: 'auto', alignSelf: 'flex-start' }}><span style={{ fontWeight: 800, fontSize: 7.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)', borderBottom: '1px dotted var(--faint)', paddingBottom: 1 }}>{'Peak ' + dir}</span></HoverTip>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em', color: 'var(--ink)', display: 'inline-flex', alignItems: 'baseline', gap: 5 }}><span style={{ color, fontSize: 10 }}>{arrow}</span>{has ? '$' + Math.round(ya[j]).toLocaleString('en-US') : '—'}</span>
           {has ? <span style={{ marginLeft: 'auto', fontFamily: MONO, fontWeight: 700, fontSize: 13.5, color }}>{fmtUsd(prof.tot[j])}</span> : null}
@@ -803,11 +803,13 @@ function ProfPeakHead({ prof, ya }: { prof: Profile; ya: number[] }) {
       </div>
     );
   };
+  const tipAbove = <span>The price level with the <b>most liquidations stacked above</b> the current price in the standing book (the latest column) — the single tallest bar on the <b>short side</b> (green). Shows that price and its total size.</span>;
+  const tipBelow = <span>The price level with the <b>most liquidations stacked below</b> the current price — the single tallest bar on the <b>long side</b> (red). Shows that price and its total size.</span>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontVariantNumeric: 'tabular-nums' }}>
-      {row('above', '▲', '#1f9d55', prof.peakAboveJ)}
+      {row('above', '▲', '#1f9d55', prof.peakAboveJ, tipAbove)}
       <div style={{ height: 1, background: 'var(--divider)' }} />
-      {row('below', '▼', '#df5338', prof.peakBelowJ)}
+      {row('below', '▼', '#df5338', prof.peakBelowJ, tipBelow)}
     </div>
   );
 }
