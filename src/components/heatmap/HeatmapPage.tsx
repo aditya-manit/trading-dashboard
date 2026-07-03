@@ -698,8 +698,11 @@ function LevLoadStrip({ load, dark, getView, cs, syncFrac, onSync }: { load: Loa
     onSync(x0 + fx * span);
   };
   return (
-    <div style={{ display: 'flex', alignItems: 'stretch', gap: 14, height: 150, padding: '10px 16px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 14, marginTop: 8, boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
-      <div style={{ position: 'relative', flex: 1, minWidth: 0, alignSelf: 'stretch' }}>
+    <div style={{ position: 'relative', height: 150, padding: '10px 0', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 14, marginTop: 8, boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
+      {/* plot region — pinned to the SAME left:58 / right:64 insets as the heatmap plot
+          (both panels share the column width), so the time axis and the shared hover
+          guide line up vertically across both charts instead of shifting. */}
+      <div style={{ position: 'absolute', left: 58, top: 10, right: 64, bottom: 10, overflow: 'visible' }}>
         <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', overflow: 'hidden' }}>
           <line x1={0} x2={VW} y1={gridY} y2={gridY} stroke="var(--divider)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           {bands}
@@ -712,7 +715,9 @@ function LevLoadStrip({ load, dark, getView, cs, syncFrac, onSync }: { load: Loa
         <div onMouseMove={onMove} onMouseLeave={() => onSync(null)} style={{ position: 'absolute', inset: 0, cursor: 'crosshair', zIndex: 4 }} />
         {hk}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto', paddingLeft: 4, justifyContent: 'center' }}>
+      {/* tier legend — sits in the right gutter (the heatmap's price-axis column), so it
+          no longer eats into the plot width and throw the alignment off. */}
+      <div style={{ position: 'absolute', right: 8, top: 10, bottom: 10, width: 50, display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center', alignItems: 'flex-start', pointerEvents: 'none' }}>
         {load.order.map((t) => (
           <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: MONO, fontWeight: 700, fontSize: 10, color: 'var(--muted)' }}>
             <span style={{ width: 9, height: 9, borderRadius: 2, background: loadCol(t, dark) }} />{t}×
