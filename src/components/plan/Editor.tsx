@@ -35,9 +35,9 @@ const Chev = ({ open, color = '#b3b0a6' }: { open: boolean; color?: string }) =>
   <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s ease', flex: '0 0 auto' }}><path d="m6 9 6 6 6-6" /></svg>
 );
 // clickable section header: title + (optional) right slot (collapsed summary / control) + chevron
-function SecHead({ title, open, onToggle, right, collapsedRight }: { title: string; open: boolean; onToggle: () => void; right?: React.ReactNode; collapsedRight?: React.ReactNode }) {
+function SecHead({ title, open, onToggle, right, collapsedRight, fixedH }: { title: string; open: boolean; onToggle: () => void; right?: React.ReactNode; collapsedRight?: React.ReactNode; fixedH?: boolean }) {
   return (
-    <div onClick={onToggle} className="tpsec-hd" style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 18px', cursor: 'pointer' }}>
+    <div onClick={onToggle} className="tpsec-hd" style={{ display: 'flex', alignItems: 'center', gap: 11, cursor: 'pointer', ...(fixedH ? { height: 41, boxSizing: 'border-box', padding: '0 18px' } : { padding: '12px 18px' }) }}>
       <span style={{ fontWeight: 800, fontSize: 13.5, color: '#1a1813', letterSpacing: '-0.01em' }}>{title}</span>
       <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 9 }} onClick={(e) => e.stopPropagation()}>
         {open ? right : (collapsedRight ? <span style={{ fontWeight: 700, fontSize: 12, color: '#897f70' }}>{collapsedRight}</span> : null)}
@@ -612,7 +612,15 @@ export function Editor() {
     return SEC_DEFAULT;
   });
   useEffect(() => { try { localStorage.setItem('tdplan_ed_open', JSON.stringify(secOpen)); } catch { /* ignore */ } }, [secOpen]);
-  const toggleSec = (k: SecKey) => setSecOpen((o) => ({ ...o, [k]: !o[k] }));
+  // exclusive accordion (dc.html tpAcc): clicking a subsection closes every sibling in
+  // its group and toggles the clicked one — only one open per column at a time.
+  const toggleSec = (k: SecKey) => setSecOpen((o) => {
+    const group: SecKey[] = k === 'thesis' || k === 'chart' ? ['thesis', 'chart'] : ['identity', 'levels', 'sizing', 'leverage'];
+    const wasOpen = o[k], n = { ...o };
+    group.forEach((g) => (n[g] = false));
+    n[k] = !wasOpen;
+    return n;
+  });
   const setGroup = (keys: SecKey[], v: boolean) => setSecOpen((o) => { const n = { ...o }; keys.forEach((k) => (n[k] = v)); return n; });
   const theoryAllOpen = secOpen.thesis && secOpen.chart;
   const setupAllOpen = secOpen.identity && secOpen.levels && secOpen.sizing && secOpen.leverage;
@@ -673,7 +681,7 @@ export function Editor() {
           </div>
 
           <div style={{ borderBottom: '1px solid #f3f1f7' }}>
-            <SecHead title="Levels" open={secOpen.levels} onToggle={() => toggleSec('levels')}
+            <SecHead title="Levels" open={secOpen.levels} onToggle={() => toggleSec('levels')} fixedH
               right={<Seg opts={[{ v: 'price', label: 'Single price' }, { v: 'zone', label: 'Zone' }]} cur={d.entryMode} onPick={(v) => planActions.setDraft({ entryMode: v as 'price' | 'zone' })} accent="#23211b" />}
               collapsedRight={<LevelsSummary d={d} c={c} />} />
             {secOpen.levels && (
