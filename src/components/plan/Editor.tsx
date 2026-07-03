@@ -318,11 +318,13 @@ const tool: CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignIt
 const MONOF = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
 const BANK_PRESETS = ['50', '60', '70', '75', '80', '100'];
 const PER_PRESETS = ['12h', '1d', '2d', '3d', '1w'];
-function PresetMenu({ title, opts, cur, fmt, onPick, accent, accentBg, onClose }: { title: string; opts: string[]; cur: string; fmt: (v: string) => string; onPick: (v: string) => void; accent: string; accentBg: string; onClose: () => void }) {
-  return (
+// Portaled to <body> — the Setup group has overflow:hidden (rounded corners) which
+// would otherwise clip the dropdown. Anchored below-right of the chevron via `pos`.
+function PresetMenu({ title, opts, cur, fmt, onPick, accent, accentBg, onClose, pos }: { title: string; opts: string[]; cur: string; fmt: (v: string) => string; onPick: (v: string) => void; accent: string; accentBg: string; onClose: () => void; pos: { top: number; right: number } }) {
+  return createPortal(
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
-      <div style={{ position: 'absolute', top: 'calc(100% + 7px)', right: 0, zIndex: 61, background: '#fff', border: '1px solid #ece9e3', borderRadius: 11, boxShadow: '0 14px 34px -10px rgba(30,20,10,.26)', padding: 5, minWidth: 138, display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200 }} />
+      <div style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 201, background: '#fff', border: '1px solid #ece9e3', borderRadius: 11, boxShadow: '0 14px 34px -10px rgba(30,20,10,.26)', padding: 5, minWidth: 138, display: 'flex', flexDirection: 'column', gap: 1 }}>
         <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#b3aea2', padding: '4px 9px 5px' }}>{title}</div>
         {opts.map((o) => { const active = String(cur) === String(o); return (
           <button key={o} onClick={() => onPick(o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, border: 'none', background: active ? accentBg : 'transparent', borderRadius: 7, padding: '7px 9px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
@@ -331,22 +333,41 @@ function PresetMenu({ title, opts, cur, fmt, onPick, accent, accentBg, onClose }
           </button>
         ); })}
       </div>
-    </>
-  );
+    </>, document.body);
 }
-function TargetInputs({ d }: { d: PlanDraft }) {
+function TargetInputs({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
   const [bankMenu, setBankMenu] = useState(false);
   const [perMenu, setPerMenu] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const period = d.trailPeriod || '', pct = d.bankPct == null ? '70' : d.bankPct, target = d.bankTarget == null ? '100k' : d.bankTarget;
+  // bank% and trail period are shared with the thesis Target-rule sentence AND drive the
+  // Reward·plan split — so every setter recomposes targetNote (bankPct also flows into the strip).
   const setPct = (v: string) => { const n = String(v).replace(/[^0-9]/g, '').slice(0, 3); planActions.setDraft({ bankPct: n, targetNote: composeNote(n, period, target) }); };
   const setPer = (v: string) => planActions.setDraft({ trailPeriod: v, targetNote: composeNote(pct, v, target) });
-  const priceInput = (k: 't1' | 't2', border: string, bg: string) => (
-    <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-      <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, fontSize: 14, color: '#cbc9c0' }}>$</span>
-      <input value={d[k]} onChange={(e) => planActions.setDraft({ [k]: e.target.value.replace(/,/g, '') } as Partial<PlanDraft>)} inputMode="decimal" placeholder="0.00" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 26px', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', color: '#1a1813', outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
-    </div>
-  );
-  const chevBtn = (onClick: () => void, col: string) => <button onClick={onClick} aria-label="presets" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', padding: '2px 0 2px 2px', margin: 0, cursor: 'pointer', color: col }}><svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></button>;
+  const parseReward = (s: string) => { let t = String(s ?? '').trim().toLowerCase().replace(/[$,\s]/g, ''); if (!t) return NaN; let mult = 1; if (t.slice(-1) === 'k') { mult = 1e3; t = t.slice(0, -1); } else if (t.slice(-1) === 'm') { mult = 1e6; t = t.slice(0, -1); } const n = parseFloat(t); return isFinite(n) ? n * mult : NaN; };
+  const priceToReward = (price: number) => { const E = c.E, qty = c.qty; if (!isFinite(price) || price <= 0 || !isFinite(E) || E <= 0 || !isFinite(qty) || qty <= 0) return null; const rew = d.dir === 'long' ? (price - E) * qty : (E - price) * qty; return isFinite(rew) && rew > 0 ? Math.round(rew) : null; };
+  // TP1 price ⇄ bank target: typing a TP1 price recomputes the $ target (and the thesis
+  // Target-rule sentence); an empty TP1 shows the target-derived price as a Tab-to-accept hint.
+  const onT1Change = (raw: string) => { const patch: Partial<PlanDraft> = { t1: raw }; const rew = priceToReward(parseFloat(raw.replace(/,/g, ''))); if (rew != null) { const tgt = rew.toLocaleString('en-US'); patch.bankTarget = tgt; patch.targetNote = composeNote(pct, period, tgt); } planActions.setDraft(patch); };
+  const t1Sug = (() => { const E = c.E, qty = c.qty, r = parseReward(target); if (!isFinite(r) || r <= 0 || !isFinite(E) || E <= 0 || !isFinite(qty) || qty <= 0) return null; const price = d.dir === 'long' ? E + r / qty : E - r / qty; if (!isFinite(price) || price <= 0) return null; return price >= 1000 ? Math.round(price) : +price.toFixed(2); })();
+  const onT1Key = (e: React.KeyboardEvent<HTMLInputElement>) => { const accept = (e.key === 'Tab' && !e.shiftKey) || e.key === 'Enter'; if (accept && !d.t1 && t1Sug != null) { e.preventDefault(); onT1Change(String(t1Sug)); } };
+  const priceInput = (k: 't1' | 't2') => {
+    const isT1 = k === 't1', ph = isT1 && t1Sug != null ? tpFmtNum(String(t1Sug)) : '0.00';
+    return (
+      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+        <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, fontSize: 14, color: '#cbc9c0' }}>$</span>
+        <input value={d[k]} onChange={(e) => (isT1 ? onT1Change(e.target.value.replace(/,/g, '')) : planActions.setDraft({ [k]: e.target.value.replace(/,/g, '') } as Partial<PlanDraft>))} onKeyDown={isT1 ? onT1Key : undefined} inputMode="decimal" placeholder={ph} style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 26px', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', color: '#1a1813', outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
+        {isT1 && t1Sug != null && !d.t1 ? (
+          <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', display: 'inline-flex', alignItems: 'center', gap: 4, pointerEvents: 'none' }}>
+            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9db5a6' }}>Tab</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 17, height: 15, borderRadius: 5, background: '#edf5f0', border: '1px solid #d5e7dd', color: '#3f9968', fontSize: 10.5, fontWeight: 800 }}>⇥</span>
+          </span>
+        ) : null}
+      </div>
+    );
+  };
+  // chevron opens the preset menu, capturing its screen rect so the (portaled) menu can anchor to it
+  const chevBtn = (open: () => void, col: string) => <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenuPos({ top: r.bottom + 7, right: Math.max(8, window.innerWidth - r.right) }); open(); }} aria-label="presets" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', padding: '2px 0 2px 2px', margin: 0, cursor: 'pointer', color: col }}><svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></button>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
       <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#1f9d55' }}>Targets</span>
@@ -356,7 +377,7 @@ function TargetInputs({ d }: { d: PlanDraft }) {
           <span style={{ display: 'flex', alignItems: 'center', minHeight: 17, fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', color: '#5aa97a', paddingLeft: 2 }}>TP1 · Bank</span>
           <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid #e3f0e9', borderRadius: 12, background: '#fbfdfb', overflow: 'hidden' }}>
-              {priceInput('t1', '#e3f0e9', '#fbfdfb')}
+              {priceInput('t1')}
               <div style={{ display: 'flex', alignItems: 'center', gap: 3, borderLeft: '1px solid #e3f0e9', background: '#fdf2e8', padding: '0 6px 0 9px' }}>
                 <svg width={11} height={11} viewBox="0 0 24 24" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={9} fill="none" stroke="#e07b2f" strokeWidth={2.2} /><path d="M12 12 L12 3 A9 9 0 0 1 18.9 17.8 Z" fill="#e07b2f" /></svg>
                 <input value={pct} onChange={(e) => setPct(e.target.value)} inputMode="numeric" placeholder="70" style={{ width: 20, textAlign: 'right', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 13, color: '#e07b2f', outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
@@ -364,7 +385,7 @@ function TargetInputs({ d }: { d: PlanDraft }) {
                 {chevBtn(() => { setBankMenu((v) => !v); setPerMenu(false); }, '#e07b2f')}
               </div>
             </div>
-            {bankMenu ? <PresetMenu title="Bank %" opts={BANK_PRESETS} cur={pct} fmt={(v) => v + '%'} onPick={(v) => { setPct(v); setBankMenu(false); }} accent="#e07b2f" accentBg="#fdf2e8" onClose={() => setBankMenu(false)} /> : null}
+            {bankMenu && menuPos ? <PresetMenu title="Bank %" opts={BANK_PRESETS} cur={pct} fmt={(v) => v + '%'} onPick={(v) => { setPct(v); setBankMenu(false); }} accent="#e07b2f" accentBg="#fdf2e8" onClose={() => setBankMenu(false)} pos={menuPos} /> : null}
           </div>
         </div>
         {/* TP2 · Donchian trail */}
@@ -372,14 +393,14 @@ function TargetInputs({ d }: { d: PlanDraft }) {
           <span style={{ display: 'flex', alignItems: 'center', minHeight: 17, fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', color: '#5aa97a', paddingLeft: 2 }}>TP2 · Donchian trail</span>
           <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid #eeece8', borderRadius: 12, background: '#fff', overflow: 'hidden' }}>
-              {priceInput('t2', '#eeece8', '#fff')}
+              {priceInput('t2')}
               <div style={{ display: 'flex', alignItems: 'center', gap: 3, borderLeft: '1px solid #eeece8', background: '#f4f1fb', padding: '0 6px 0 9px' }}>
                 <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l3 2" /></svg>
                 <input value={period} onChange={(e) => setPer(e.target.value)} placeholder="1d" style={{ width: 24, textAlign: 'center', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: '#7c5cff', outline: 'none' }} />
                 {chevBtn(() => { setPerMenu((v) => !v); setBankMenu(false); }, '#7c5cff')}
               </div>
             </div>
-            {perMenu ? <PresetMenu title="Trail timeframe" opts={PER_PRESETS} cur={period} fmt={(v) => v} onPick={(v) => { setPer(v); setPerMenu(false); }} accent="#7c5cff" accentBg="#f4f1fb" onClose={() => setPerMenu(false)} /> : null}
+            {perMenu && menuPos ? <PresetMenu title="Trail timeframe" opts={PER_PRESETS} cur={period} fmt={(v) => v} onPick={(v) => { setPer(v); setPerMenu(false); }} accent="#7c5cff" accentBg="#f4f1fb" onClose={() => setPerMenu(false)} pos={menuPos} /> : null}
           </div>
         </div>
       </div>
@@ -629,7 +650,7 @@ export function Editor() {
           <GroupHead label="Theory" color="#7c5cff" gradient="linear-gradient(180deg,#ffffff 0%,#faf8ff 45%,#ece5fb 100%)" border="#e6ddfb" allOpen={theoryAllOpen} onToggleAll={() => setGroup(['thesis', 'chart'], !theoryAllOpen)} />
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, padding: '9px 18px', borderBottom: '1px solid #f3f1f7' }}>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, gap: 5 }}>
-              <input value={d.name} onChange={(e) => planActions.setDraft({ name: e.target.value })} placeholder={tpAutoName(d)} style={{ width: '100%', minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: '#1a1813', padding: 0 }} />
+              <input value={d.name} onChange={(e) => planActions.setDraft({ name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Tab' && !e.shiftKey && !d.name.trim() && tpAutoName(d)) { e.preventDefault(); planActions.setDraft({ name: tpAutoName(d) }); } }} placeholder={tpAutoName(d)} style={{ width: '100%', minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: '#1a1813', padding: 0 }} />
               <span style={{ height: 2, width: '100%', background: 'linear-gradient(90deg,#c9bcff,rgba(201,188,255,0))', borderRadius: 2 }} />
             </div>
             <ExpectedDate d={d} />
@@ -663,7 +684,7 @@ export function Editor() {
                 <Field label="Entry price"><PriceInput value={d.entry} onChange={(v) => planActions.setDraft({ entry: v })} placeholder="0.00" /></Field>
               )}
               <Field label="Stop loss" labelColor="#df5338" hint="blank = ride to liq"><PriceInput value={d.stop} onChange={(v) => planActions.setDraft({ stop: v })} placeholder="0.00" accent="#df5338" tint="#f2ddd6" bg="#fffcfb" /></Field>
-              <TargetInputs d={d} />
+              <TargetInputs d={d} c={c} />
               <HeatmapLaunchCard variant="row" symbol={d.sym as HeatSymbol} title="Check your stop against the real clusters" sub="Is it beyond the sweep, not inside it?" />
             </div>
             )}
