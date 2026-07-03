@@ -12,7 +12,7 @@ import { usePositions } from '@/hooks/usePositions';
 import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { HeatmapLaunchCard } from '@/components/heatmap/HeatmapLaunchCard';
 import type { HeatSymbol } from '@/hooks/useHeatmap';
-import { MiniCalendar, CalIcon } from './MiniCalendar';
+import { MiniCalendar } from './MiniCalendar';
 import { CoinIcon } from './coins';
 
 const PURP = '#7c5cff';
@@ -228,18 +228,14 @@ function ExpectedDate({ d }: { d: PlanDraft }) {
   const [open, setOpen] = useState(false);
   const sel = isoToDate(d.tradeDate);
   const MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const label = sel ? `${MONS[sel.getMonth()]} ${sel.getDate()}, ${sel.getFullYear()}` : 'dd / mm / yyyy';
   const pick = (iso: string) => { planActions.setDraft({ tradeDate: iso }); setOpen(false); };
   return (
-    <div style={{ position: 'relative', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 9, borderLeft: '1px solid #f0efec', paddingLeft: 16 }}>
-      <span style={{ width: 30, height: 30, borderRadius: 9, background: '#f3eefe', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}><CalIcon /></span>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1.1 }}>
-        <span style={{ fontWeight: 700, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a89cd6' }}>Expected</span>
-        <button onClick={() => setOpen((v) => !v)} style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, color: sel ? '#1a1813' : '#b0aea3', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          {label}
-          <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.45 }}><path d="m6 9 6 6 6-6" /></svg>
-        </button>
-      </div>
+    <div style={{ position: 'relative', flex: '0 0 auto' }}>
+      <button onClick={() => setOpen((v) => !v)} className="tpdatechip" style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', padding: '2px 2px 2px 12px', borderRadius: 12, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1, transition: 'background .14s' }}>
+        <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#b3aea2', marginBottom: 5 }}>Expected</span>
+        <span style={{ fontFamily: 'var(--font-news), Newsreader, serif', fontWeight: 500, fontSize: sel ? 27 : 16, color: sel ? '#7c5cff' : '#b6b1a7', lineHeight: 0.9, letterSpacing: 0 }}>{sel ? `${MONS[sel.getMonth()]} ${sel.getDate()}` : 'Set date'}</span>
+        {sel ? <span style={{ fontFamily: 'var(--font-mono), ui-monospace, monospace', fontWeight: 600, fontSize: 11, color: '#a29c90', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{sel.getFullYear()}</span> : null}
+      </button>
       {open ? (
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 70 }} />
@@ -600,7 +596,7 @@ export function Editor() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
-      <style>{`.tpsec-hd{transition:background .15s}.tpsec-hd:hover{background:#faf9f7}.tp-range{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;outline:none;cursor:pointer}.tp-range::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;box-shadow:0 1px 3px rgba(20,20,12,.18);cursor:pointer}.tp-range::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;cursor:pointer}`}</style>
+      <style>{`.tpsec-hd{transition:background .15s}.tpsec-hd:hover{background:#faf9f7}.tpdatechip:hover{background:#f7f5ff}.tp-range{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;outline:none;cursor:pointer}.tp-range::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;box-shadow:0 1px 3px rgba(20,20,12,.18);cursor:pointer}.tp-range::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;cursor:pointer}`}</style>
 
       {/* header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap', padding: '6px 2px 0' }}>
