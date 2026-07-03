@@ -600,13 +600,15 @@ function StatsStrip({ m, trend, dark, showLoad, onToggleLoad }: { m: NonNullable
   // dot colors mirror the chart's marker lines (CoG / MAG↑ / MAG↓ / WALL)
   const MAGDN = dark ? '#ff6b9d' : '#d6336c', WALL = '#2b6ce8';
   const label = (t: string, dot?: string, tip?: React.ReactNode) => {
-    const el = (
+    // HoverTip wraps ONLY the title text (not the dot / padding), so the tip fires
+    // only when hovering the text itself.
+    const txt = <span style={tip ? { borderBottom: '1px dotted var(--faint)', paddingBottom: 1 } : undefined}>{t}</span>;
+    return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SANS, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: MUT, whiteSpace: 'nowrap' }}>
         {dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flex: '0 0 auto' }} />}
-        <span style={tip ? { borderBottom: '1px dotted var(--faint)', paddingBottom: 1 } : undefined}>{t}</span>
+        {tip ? <HoverTip tip={tip} width={262}>{txt}</HoverTip> : txt}
       </span>
     );
-    return tip ? <HoverTip tip={tip} width={262}>{el}</HoverTip> : el;
   };
   const big = (t: string) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--ink)' }}>{t}</span>;
   const bigA = (arrow: string, ac: string, num: string) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--ink)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ color: ac, fontSize: 14 }}>{arrow}</span>{num}</span>;
