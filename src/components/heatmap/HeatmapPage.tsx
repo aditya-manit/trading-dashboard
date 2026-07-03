@@ -666,7 +666,9 @@ function LevLoadStrip({ load, dark, getView, cs, syncFrac, onSync }: { load: Loa
   const tsAt = (frac: number) => +cs[Math.max(0, Math.min(cs.length - 1, Math.round(frac * (cs.length - 1))))][0];
   const xlabs = [x0, (x0 + x1) / 2, x1].map(tsAt).map(fmtShort);
   const shadow = '0 0 3px var(--halo),0 0 3px var(--halo),0 0 3px var(--halo)';
-  const ylab = (top: string, txt: string) => <span style={{ position: 'absolute', left: 4, top, transform: 'translateY(-50%)', fontFamily: MONO, fontWeight: 600, fontSize: 8.5, color: 'var(--muted)', pointerEvents: 'none', textShadow: shadow }}>{txt}</span>;
+  // y-labels live in the LEFT gutter (right-aligned to the plot's left edge) so they get
+  // their own space instead of overlapping the chart or leaving the gutter empty.
+  const ylab = (top: string, txt: string) => <span style={{ position: 'absolute', right: '100%', marginRight: 8, top, transform: 'translateY(-50%)', fontFamily: MONO, fontWeight: 600, fontSize: 8.5, color: 'var(--muted)', pointerEvents: 'none', whiteSpace: 'nowrap', textAlign: 'right' }}>{txt}</span>;
   // hover driven by the SHARED syncFrac (set by this strip OR the heatmap), so the
   // guide/dot/tooltip appear here even when you're hovering the heatmap. Positioned
   // in % (no px measure needed), flips left near the right edge; tooltip is NOT
