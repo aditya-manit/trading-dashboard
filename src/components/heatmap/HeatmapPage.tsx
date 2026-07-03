@@ -6,6 +6,7 @@ import {
   type HeatSymbol, type HeatModel, type HeatInterval,
 } from '@/hooks/useHeatmap';
 import { computeHeatmapMetrics } from '@/lib/heatmap-metrics';
+import { HoverTip } from '../plan/HoverTip';
 
 const MONO = "var(--font-mono), 'JetBrains Mono', monospace";
 const SANS = "'Plus Jakarta Sans', sans-serif";
@@ -598,27 +599,38 @@ function StatsStrip({ m, trend, dark, showLoad, onToggleLoad }: { m: NonNullable
   const GRN = '#1f9d55', RED = '#df5338', PUR = '#7c5cff', MUT = 'var(--muted)';
   // dot colors mirror the chart's marker lines (CoG / MAG↑ / MAG↓ / WALL)
   const MAGDN = dark ? '#ff6b9d' : '#d6336c', WALL = '#2b6ce8';
-  const label = (t: string, dot?: string) => (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SANS, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: MUT, whiteSpace: 'nowrap' }}>
-      {dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flex: '0 0 auto' }} />}{t}
-    </span>
-  );
+  const label = (t: string, dot?: string, tip?: React.ReactNode) => {
+    const el = (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SANS, fontWeight: 800, fontSize: 8.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: MUT, whiteSpace: 'nowrap' }}>
+        {dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flex: '0 0 auto' }} />}
+        <span style={tip ? { borderBottom: '1px dotted var(--faint)', paddingBottom: 1 } : undefined}>{t}</span>
+      </span>
+    );
+    return tip ? <HoverTip tip={tip} width={262}>{el}</HoverTip> : el;
+  };
   const big = (t: string) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--ink)' }}>{t}</span>;
   const bigA = (arrow: string, ac: string, num: string) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', color: 'var(--ink)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ color: ac, fontSize: 14 }}>{arrow}</span>{num}</span>;
   const sm = (t: string, c: string) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, color: c, whiteSpace: 'nowrap' }}>{t}</span>;
-  const cell = (lab: string, kids: React.ReactNode, dot?: string, last?: boolean) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '13px 20px', flex: '1 1 0', minWidth: 0, borderRight: last ? 'none' : '1px solid var(--divider)' }}>{label(lab, dot)}<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 2 }}>{kids}</div></div>
+  const cell = (lab: string, kids: React.ReactNode, dot?: string, tip?: React.ReactNode, last?: boolean) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '13px 20px', flex: '1 1 0', minWidth: 0, borderRight: last ? 'none' : '1px solid var(--divider)' }}>{label(lab, dot, tip)}<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 2 }}>{kids}</div></div>
   );
+  // Plain-language "what is this / how it's computed" hovers (shared HoverTip style).
+  const strong = (s: string) => <span style={{ fontWeight: 700, color: '#fff' }}>{s}</span>;
+  const TIP_COG = <span>The <b>balance point</b> of all the liquidation fuel — a size-weighted average price, so <b>bigger clusters pull it harder</b> (background noise is subtracted first). The {strong('▲/▼ %')} shows how far it sits above/below the live price. Above price = fuel leans up (an upward tug).</span>;
+  const TIP_MAGUP = <span>The <b>closest heavy cluster of stops above</b> the current price — a level price tends to get drawn toward (a &ldquo;magnet&rdquo;). Picked by <b>size AND closeness</b>, so a big nearby wall beats a huge far one. Shows the cluster&rsquo;s peak size and how far above price it sits.</span>;
+  const TIP_MAGDN = <span>The <b>closest heavy cluster of stops below</b> the current price — where price may get pulled down to. Same <b>size-and-closeness</b> pick as the magnet above. Shows the cluster&rsquo;s peak size and how far below price it sits.</span>;
+  const TIP_WALL = <span>The <b>single biggest cluster of liquidations</b> in view (by total size), no matter how far away — the heaviest &ldquo;wall&rdquo; of stops. Shows its price, total size, its <b>share of all the fuel</b>, and the price band it spans.</span>;
+  const TIP_LOAD = <span><b>Total liquidation fuel</b> stacked in the book right now — the sum of estimated liquidation value across <b>every price level</b> (a gauge of how much leverage is loaded up). <b>σ</b> is recent price volatility. Click to see how the load built over time.</span>;
   const up = m.lcgGap >= 0;
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', width: '100%', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}>
-      {cell('Center of gravity', <>{big(fmtPrice(m.lcg))}{sm((up ? '▲ +' : '▼ −') + Math.abs(m.lcgGap).toFixed(2) + '%', up ? GRN : RED)}<GapDelta cur={m.lcgGap} prev={trend.gapPrev} /><Spark data={trend.gapSeries} color="#7c5cff" /></>, PUR)}
-      {cell('Nearest magnet ↑', m.nearestAbove ? <>{bigA('↑', GRN, fmtPrice(m.nearestAbove.peakPrice))}{sm(fmtVal(m.nearestAbove.peak), PUR)}{sm('+' + m.nearestAbove.dist.toFixed(2) + '%', GRN)}</> : big('—'), GRN)}
-      {cell('Nearest magnet ↓', m.nearestBelow ? <>{bigA('↓', RED, fmtPrice(m.nearestBelow.peakPrice))}{sm(fmtVal(m.nearestBelow.peak), PUR)}{sm('−' + m.nearestBelow.dist.toFixed(2) + '%', RED)}</> : big('—'), MAGDN)}
-      {cell('Strongest wall', m.strongest ? <>{big(fmtPrice(m.strongest.peakPrice))}{sm(fmtVal(m.strongest.mass), PUR)}{sm(Math.round(m.strongest.share * 100) + '%', MUT)}{sm(`[${fmtPrice(m.strongest.lo)}–${fmtPrice(m.strongest.hi)}]`, 'var(--faint)')}</> : big('—'), WALL)}
+      {cell('Center of gravity', <>{big(fmtPrice(m.lcg))}{sm((up ? '▲ +' : '▼ −') + Math.abs(m.lcgGap).toFixed(2) + '%', up ? GRN : RED)}<GapDelta cur={m.lcgGap} prev={trend.gapPrev} /><Spark data={trend.gapSeries} color="#7c5cff" /></>, PUR, TIP_COG)}
+      {cell('Nearest magnet ↑', m.nearestAbove ? <>{bigA('↑', GRN, fmtPrice(m.nearestAbove.peakPrice))}{sm(fmtVal(m.nearestAbove.peak), PUR)}{sm('+' + m.nearestAbove.dist.toFixed(2) + '%', GRN)}</> : big('—'), GRN, TIP_MAGUP)}
+      {cell('Nearest magnet ↓', m.nearestBelow ? <>{bigA('↓', RED, fmtPrice(m.nearestBelow.peakPrice))}{sm(fmtVal(m.nearestBelow.peak), PUR)}{sm('−' + m.nearestBelow.dist.toFixed(2) + '%', RED)}</> : big('—'), MAGDN, TIP_MAGDN)}
+      {cell('Strongest wall', m.strongest ? <>{big(fmtPrice(m.strongest.peakPrice))}{sm(fmtVal(m.strongest.mass), PUR)}{sm(Math.round(m.strongest.share * 100) + '%', MUT)}{sm(`[${fmtPrice(m.strongest.lo)}–${fmtPrice(m.strongest.hi)}]`, 'var(--faint)')}</> : big('—'), WALL, TIP_WALL)}
       <div onClick={onToggleLoad} title={showLoad ? 'Hide load-over-time chart' : 'Show load-over-time chart'} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '13px 20px', flex: '1 1 0', minWidth: 0, cursor: 'pointer', background: showLoad ? 'var(--navactive)' : 'transparent', transition: 'background .15s' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {label('Leverage load · σ', '#ef9512')}
+          {label('Leverage load · σ', '#ef9512', TIP_LOAD)}
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', marginLeft: 'auto', transform: showLoad ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}><path d="m6 9 6 6 6-6" /></svg>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 2 }}>
