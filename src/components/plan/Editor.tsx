@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import {
   type PlanDraft, type SizeMode, type Sym, type Dir, type Conv,
   tpCompute, tpFmtNum, tpNum, tpMoney, tpAutoName, TP_MARKETS, TP_EQUITY, type Plan, type Status,
@@ -226,25 +227,35 @@ function TargetRule({ d }: { d: PlanDraft }) {
 // ── Expected-date dropdown (in the name row) ─────────────────────────────────
 function ExpectedDate({ d }: { d: PlanDraft }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => setMounted(true), []);
   const sel = isoToDate(d.tradeDate);
   const MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const pick = (iso: string) => { planActions.setDraft({ tradeDate: iso }); setOpen(false); };
+  // Portal the calendar to <body> — the Theory group has overflow:hidden (for its
+  // rounded corners) which would otherwise clip the popover. Position it below-right
+  // of the chip from its live rect.
+  const toggle = () => {
+    if (!open && btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPos({ top: r.bottom + 9, right: Math.max(8, window.innerWidth - r.right) }); }
+    setOpen((v) => !v);
+  };
   return (
     <div style={{ position: 'relative', flex: '0 0 auto' }}>
-      <button onClick={() => setOpen((v) => !v)} className="tpdatechip" style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', padding: '2px 2px 2px 12px', borderRadius: 12, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1, transition: 'background .14s' }}>
+      <button ref={btnRef} onClick={toggle} className="tpdatechip" style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', padding: '2px 2px 2px 12px', borderRadius: 12, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1, transition: 'background .14s' }}>
         <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#b3aea2', marginBottom: 5 }}>Expected</span>
         <span style={{ fontFamily: 'var(--font-news), Newsreader, serif', fontWeight: 500, fontSize: sel ? 27 : 16, color: sel ? '#7c5cff' : '#b6b1a7', lineHeight: 0.9, letterSpacing: 0 }}>{sel ? `${MONS[sel.getMonth()]} ${sel.getDate()}` : 'Set date'}</span>
         {sel ? <span style={{ fontFamily: 'var(--font-mono), ui-monospace, monospace', fontWeight: 600, fontSize: 11, color: '#a29c90', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{sel.getFullYear()}</span> : null}
       </button>
-      {open ? (
+      {open && mounted && pos ? createPortal(
         <>
-          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 70 }} />
-          <div style={{ position: 'absolute', top: 'calc(100% + 9px)', right: 0, zIndex: 71, width: 288, boxSizing: 'border-box', background: '#fff', border: '1px solid #ecebe6', borderRadius: 14, boxShadow: '0 14px 40px -12px rgba(20,20,12,0.28)', padding: 16, animation: 'pkUp .16s ease both' }}>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 200 }} />
+          <div style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 201, width: 288, boxSizing: 'border-box', background: '#fff', border: '1px solid #ecebe6', borderRadius: 14, boxShadow: '0 14px 40px -12px rgba(20,20,12,0.28)', padding: 16, animation: 'pkUp .16s ease both' }}>
             <style>{`@keyframes pkUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
             <MiniCalendar value={d.tradeDate} onPick={pick} onClear={() => pick('')} cellH={32} />
           </div>
-        </>
-      ) : null}
+        </>, document.body) : null}
     </div>
   );
 }
@@ -596,7 +607,7 @@ export function Editor() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
-      <style>{`.tpsec-hd{transition:background .15s}.tpsec-hd:hover{background:#faf9f7}.tpdatechip:hover{background:#f7f5ff}.tp-range{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;outline:none;cursor:pointer}.tp-range::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;box-shadow:0 1px 3px rgba(20,20,12,.18);cursor:pointer}.tp-range::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;cursor:pointer}`}</style>
+      <style>{`.tpsec-hd{transition:background .15s}.tpsec-hd:hover{background:#faf9f7}.tpdatechip:hover{background:#f4f1fd}.tp-range{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;outline:none;cursor:pointer}.tp-range::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;box-shadow:0 1px 3px rgba(20,20,12,.18);cursor:pointer}.tp-range::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:#fff;border:1px solid #d7d4cc;cursor:pointer}`}</style>
 
       {/* header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap', padding: '6px 2px 0' }}>
