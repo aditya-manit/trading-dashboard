@@ -803,11 +803,11 @@ function ProfPeakHead({ prof, ya }: { prof: Profile; ya: number[] }) {
   const row = (dir: string, arrow: string, color: string, j: number, tip: React.ReactNode) => {
     const has = j >= 0;
     return (
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, whiteSpace: 'nowrap' }}>
-        <span style={{ color, fontSize: 10, lineHeight: 1 }}>{arrow}</span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, whiteSpace: 'nowrap' }}>
+        <span style={{ color, fontSize: 11, lineHeight: 1 }}>{arrow}</span>
         <HoverTip tip={tip} width={258} style={{ pointerEvents: 'auto' }}><span style={{ fontWeight: 800, fontSize: 7.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted)', textDecoration: 'underline dotted', textDecorationColor: 'var(--faint)', textUnderlineOffset: 2 }}>Peak</span></HoverTip>
-        <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 12.5, letterSpacing: '-0.01em', color: 'var(--ink)' }}>{has ? '$' + Math.round(ya[j]).toLocaleString('en-US') : '—'}</span>
-        {has ? <span style={{ marginLeft: 'auto', fontFamily: MONO, fontWeight: 700, fontSize: 12, color }}>{fmtUsd(prof.tot[j])}</span> : null}
+        <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em', color: 'var(--ink)' }}>{has ? '$' + Math.round(ya[j]).toLocaleString('en-US') : '—'}</span>
+        {has ? <span style={{ marginLeft: 'auto', fontFamily: MONO, fontWeight: 700, fontSize: 14, color }}>{fmtUsd(prof.tot[j])}</span> : null}
       </div>
     );
   };
