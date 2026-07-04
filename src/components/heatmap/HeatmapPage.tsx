@@ -531,7 +531,7 @@ export function HeatmapPage({ initialSymbol = 'BTC', onClose }: { initialSymbol?
         {prof && prep && (
           <div ref={profPanelRef} style={{ flex: '0 0 220px', position: 'relative', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
             {/* peak above / below — in the reclaimed top space (peaks moved off the chart) */}
-            <div style={{ position: 'absolute', left: 16, right: 14, top: 6, pointerEvents: 'none' }}><ProfPeakHead prof={prof} ya={prep.ya} /></div>
+            <div style={{ position: 'absolute', left: 16, right: 14, top: 2, pointerEvents: 'none' }}><ProfPeakHead prof={prof} ya={prep.ya} /></div>
             {/* liquidity bars — vertically aligned to the heatmap plot area */}
             <div onMouseMove={onProfHover} onMouseLeave={() => setProfHover(null)} style={{ position: 'absolute', left: 14, top: profAlign.top, right: 14, bottom: profAlign.bot, overflow: 'visible' }}>
               <canvas ref={profRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
@@ -815,7 +815,7 @@ function ProfPeakHead({ prof, ya }: { prof: Profile; ya: number[] }) {
   const tipAbove = <span>The price level with the <b>most liquidations stacked above</b> the current price in the standing book (the latest column) — the single tallest bar on the <b>short side</b> (green). Shows that price and its total size.</span>;
   const tipBelow = <span>The price level with the <b>most liquidations stacked below</b> the current price — the single tallest bar on the <b>long side</b> (red). Shows that price and its total size.</span>;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontVariantNumeric: 'tabular-nums' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontVariantNumeric: 'tabular-nums' }}>
       {row('above', '▲', '#1f9d55', prof.peakAboveJ, tipAbove)}
       <div style={{ height: 1, background: 'var(--divider)' }} />
       {row('below', '▼', '#df5338', prof.peakBelowJ, tipBelow)}
