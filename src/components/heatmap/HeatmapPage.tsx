@@ -804,7 +804,7 @@ function ProfPeakHead({ prof, ya }: { prof: Profile; ya: number[] }) {
     const has = j >= 0;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <HoverTip tip={tip} width={258} style={{ pointerEvents: 'auto', alignSelf: 'flex-start' }}><span style={{ fontWeight: 800, fontSize: 7.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)', borderBottom: '1px dotted var(--faint)', paddingBottom: 1 }}>{'Peak ' + dir}</span></HoverTip>
+        <HoverTip tip={tip} width={258} style={{ pointerEvents: 'auto', alignSelf: 'flex-start' }}><span style={{ fontWeight: 800, fontSize: 7.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--muted)', textDecoration: 'underline dotted', textDecorationColor: 'var(--faint)', textUnderlineOffset: 2 }}>{'Peak ' + dir}</span></HoverTip>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em', color: 'var(--ink)', display: 'inline-flex', alignItems: 'baseline', gap: 5 }}><span style={{ color, fontSize: 10 }}>{arrow}</span>{has ? '$' + Math.round(ya[j]).toLocaleString('en-US') : '—'}</span>
           {has ? <span style={{ marginLeft: 'auto', fontFamily: MONO, fontWeight: 700, fontSize: 13.5, color }}>{fmtUsd(prof.tot[j])}</span> : null}
