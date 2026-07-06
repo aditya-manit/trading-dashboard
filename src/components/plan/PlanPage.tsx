@@ -476,23 +476,15 @@ function FedChip() {
   const r = reg.regime;
   // color-coded by regime (also maps to the BTC tone: hiking = tight/bearish red,
   // cutting = easy/bullish green, holding = neutral slate)
-  const cfg = r === 'hiking' ? { label: 'Hiking', col: '#df5338', tint: '#fdecea' }
-    : r === 'cutting' ? { label: 'Cutting', col: '#1f9d55', tint: '#eaf6ef' }
-    : { label: 'Holding', col: '#5f7484', tint: '#eef2f6' };
-  const sv = { width: 11, height: 11, viewBox: '0 0 24 24', style: { flex: '0 0 auto' } as CSSProperties };
-  const icon = r === 'hiking'
-    ? <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></svg>
-    : r === 'cutting'
-    ? <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3" /><path d="M8.12 8.12 12 12" /><path d="M20 4 8.12 15.88" /><circle cx="6" cy="18" r="3" /><path d="M14.8 14.8 20 20" /></svg>
-    : <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
+  const cfg = r === 'hiking' ? { label: 'Hiking', col: '#df5338', dot: '#df5338' }
+    : r === 'cutting' ? { label: 'Cutting', col: '#1f9d55', dot: '#2faa63' }
+    : { label: 'Holding', col: '#5f7484', dot: '#8aa0b0' };
   return (
     <HoverTip tip={`Fed policy cycle — auto-detected from the fed funds rate${reg.rate != null ? ` (now ${reg.rate.toFixed(2)}%${reg.asOf ? ', ' + reg.asOf.slice(0, 7) : ''})` : ''}. It sets every card's Fed step: hiking → "hikes", holding/cutting → "stays tight".`} width={266}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'help', whiteSpace: 'nowrap' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px 2px 6px', borderRadius: 7, background: cfg.tint }}>
-          {icon}
-          <b style={{ fontWeight: 800, fontSize: 10.5, color: cfg.col }}>{cfg.label}</b>
-        </span>
-        {reg.rate != null && <span style={{ fontWeight: 600, fontSize: 9.5, color: '#a8a69b', fontVariantNumeric: 'tabular-nums' }}>{reg.rate.toFixed(2)}%</span>}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'help', whiteSpace: 'nowrap' }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flex: '0 0 auto' }} />
+        <span style={{ fontWeight: 800, fontSize: 11, color: cfg.col }}>{cfg.label}</span>
+        {reg.rate != null && <span style={{ fontWeight: 600, fontSize: 9, color: '#a8a69b', fontVariantNumeric: 'tabular-nums' }}>{reg.rate.toFixed(2)}%</span>}
       </span>
     </HoverTip>
   );
