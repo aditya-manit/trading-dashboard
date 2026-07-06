@@ -59,7 +59,7 @@ export function PlanDrawer() {
   const { data: positions } = usePositions();
   const { data: candles } = useBtcCandles(Math.floor(Date.now() / 1000) - 20 * 86400);
   const equity = parseFloat(account?.total || '') || TP_EQUITY;
-  const btcPos = (positions || []).find((x) => x.contract === 'BTC_USDT' && x.size !== 0);
+  const btcPos = (Array.isArray(positions) ? positions : []).find((x) => x.contract === 'BTC_USDT' && x.size !== 0);
   const btcMark = parseFloat(btcPos?.mark_price || '') || (candles && candles.length ? parseFloat(candles[candles.length - 1].c) : NaN) || undefined;
 
   const p = openPlanId ? plans.find((x) => x.id === openPlanId) : null;
