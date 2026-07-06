@@ -422,12 +422,12 @@ function NewsCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def
         </div>
         {hasReaction ? (
           <>
-            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>{ins!.condition ? `If ${firstWord(ins!.condition)}` : 'Reaction'}</span></div>
-            <div style={{ ...valueCellBase, ...topBorder }}><ReactionLine e={e} /></div>
+            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>Verdict</span></div>
+            <div style={{ ...valueCellBase, ...topBorder }}><Verdict e={e} /></div>
           </>
         ) : loading ? (
           <>
-            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>Reaction</span></div>
+            <div style={{ ...labelCellBase, ...topBorder }}><span style={cellLabel}>Verdict</span></div>
             <div style={{ ...valueCellBase, ...topBorder }}><Skel w={150} /></div>
           </>
         ) : null}
