@@ -468,6 +468,27 @@ function NewsZero({ icon, title, sub, tint }: { icon: ReactNode; title: string; 
   );
 }
 
+// Tiny fed-funds-rate sparkline for the Fed chip's (dark) tooltip.
+function FedSparkline({ series, col }: { series: { d: string; v: number }[]; col: string }) {
+  const w = 230, h = 48, padX = 5, padTop = 9, padBot = 12;
+  const vs = series.map((s) => s.v);
+  const mn = Math.min(...vs), mx = Math.max(...vs), rng = mx - mn || 1;
+  const x = (i: number) => padX + (i / (series.length - 1)) * (w - 2 * padX);
+  const y = (v: number) => padTop + (1 - (v - mn) / rng) * (h - padTop - padBot);
+  const pts = series.map((s, i) => `${x(i).toFixed(1)},${y(s.v).toFixed(1)}`).join(' ');
+  const lastX = x(series.length - 1), lastY = y(vs[vs.length - 1]);
+  const mon = (d: string) => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][(+d.split('-')[1]) - 1] + " '" + d.slice(2, 4);
+  return (
+    <svg width={w} height={h} style={{ display: 'block' }}>
+      <polyline points={pts} fill="none" stroke={col} strokeWidth={1.7} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={lastX} cy={lastY} r={2.6} fill={col} />
+      <text x={2} y={9} fontSize={7.5} fill="#b3aea2">{mx.toFixed(2)}%</text>
+      <text x={2} y={h - 3} fontSize={7.5} fill="#b3aea2">{mn.toFixed(2)}%</text>
+      <text x={w - 2} y={h - 3} fontSize={7.5} fill="#8a8577" textAnchor="end">{mon(series[series.length - 1].d)}</text>
+    </svg>
+  );
+}
+
 // Fed-cycle chip (auto-derived from the fed funds rate). Sits in the news header;
 // its regime drives every card's Fed step (hikes vs stays tight).
 function FedChip() {
@@ -486,7 +507,18 @@ function FedChip() {
     ? <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3" /><path d="M8.12 8.12 12 12" /><path d="M20 4 8.12 15.88" /><circle cx="6" cy="18" r="3" /><path d="M14.8 14.8 20 20" /></svg>
     : <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>; // 🔒 stays tight
   return (
-    <HoverTip tip={`Fed policy cycle — auto-detected from the fed funds rate${reg.rate != null ? ` (now ${reg.rate.toFixed(2)}%${reg.asOf ? ', ' + reg.asOf.slice(0, 7) : ''})` : ''}. When the Fed cuts, money gets cheap and BTC tends to pump (green); hiking or staying tight is a headwind (red).`} width={266}>
+    <HoverTip width={252} tip={
+      <span style={{ display: 'block' }}>
+        <span style={{ display: 'block' }}>Fed policy cycle — from the fed funds rate{reg.rate != null ? ` (now ${reg.rate.toFixed(2)}%${reg.asOf ? ', ' + reg.asOf.slice(0, 7) : ''})` : ''}.</span>
+        {reg.series && reg.series.length > 2 && (
+          <span style={{ display: 'block', marginTop: 6 }}>
+            <FedSparkline series={reg.series} col={cfg.col} />
+            <span style={{ display: 'block', fontSize: 8, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#8a8577', marginTop: 1 }}>Fed funds rate · last 24 mo</span>
+          </span>
+        )}
+        <span style={{ display: 'block', marginTop: 7 }}>When the Fed cuts, money gets cheap and BTC tends to pump (green); hiking or staying tight is a headwind (red).</span>
+      </span>
+    }>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'help', whiteSpace: 'nowrap' }}>
         {icon}
         <span style={{ fontWeight: 600, fontSize: 11, color: cfg.col }}>{cfg.label}</span>

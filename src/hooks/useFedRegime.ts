@@ -7,6 +7,7 @@ export interface FedRegimeData {
   rate: number | null; // effective fed funds rate %
   asOf?: string; // ISO month of the latest reading
   delta?: number; // change over the last ~6 months (pp)
+  series?: { d: string; v: number }[]; // last ~24 monthly readings for the sparkline
 }
 
 const fetcher = (u: string): Promise<FedRegimeData> => fetch(u).then((r) => r.json());

@@ -24,7 +24,9 @@ export async function GET() {
     let regime: Regime = 'holding';
     if (delta >= 0.25) regime = 'hiking';
     else if (delta <= -0.25) regime = 'cutting';
-    return NextResponse.json({ regime, rate: latest.v, asOf: latest.date, delta });
+    // last ~2 years of monthly readings for the tooltip sparkline
+    const series = rows.slice(-24).map((o) => ({ d: o.date, v: o.v }));
+    return NextResponse.json({ regime, rate: latest.v, asOf: latest.date, delta, series });
   } catch (e) {
     // graceful: default to 'holding' so the verdict still renders sensibly
     return NextResponse.json({ regime: 'holding', rate: null, error: String((e as Error).message) });
