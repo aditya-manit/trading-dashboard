@@ -474,9 +474,11 @@ function FedChip() {
   const reg = useFedRegime();
   if (!reg) return null;
   const r = reg.regime;
-  const cfg = r === 'hiking' ? { label: 'Hiking', col: '#c0672f', bg: '#fdf3ee' }
-    : r === 'cutting' ? { label: 'Cutting', col: '#1f9d55', bg: '#eef8f1' }
-    : { label: 'Holding', col: '#8a8577', bg: '#f4f3f0' };
+  // color-coded by regime (also maps to the BTC tone: hiking = tight/bearish red,
+  // cutting = easy/bullish green, holding = neutral slate)
+  const cfg = r === 'hiking' ? { label: 'Hiking', col: '#df5338', tint: '#fdecea' }
+    : r === 'cutting' ? { label: 'Cutting', col: '#1f9d55', tint: '#eaf6ef' }
+    : { label: 'Holding', col: '#5f7484', tint: '#eef2f6' };
   const sv = { width: 11, height: 11, viewBox: '0 0 24 24', style: { flex: '0 0 auto' } as CSSProperties };
   const icon = r === 'hiking'
     ? <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></svg>
@@ -485,10 +487,12 @@ function FedChip() {
     : <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
   return (
     <HoverTip tip={`Fed policy cycle — auto-detected from the fed funds rate${reg.rate != null ? ` (now ${reg.rate.toFixed(2)}%${reg.asOf ? ', ' + reg.asOf.slice(0, 7) : ''})` : ''}. It sets every card's Fed step: hiking → "hikes", holding/cutting → "stays tight".`} width={266}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'help', whiteSpace: 'nowrap' }}>
-        {icon}
-        <span style={{ fontWeight: 800, fontSize: 11, color: cfg.col }}>{cfg.label}</span>
-        {reg.rate != null && <span style={{ fontWeight: 600, fontSize: 9, color: '#a8a69b', fontVariantNumeric: 'tabular-nums' }}>{reg.rate.toFixed(2)}%</span>}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'help', whiteSpace: 'nowrap' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px 2px 6px', borderRadius: 7, background: cfg.tint }}>
+          {icon}
+          <b style={{ fontWeight: 800, fontSize: 10.5, color: cfg.col }}>{cfg.label}</b>
+        </span>
+        {reg.rate != null && <span style={{ fontWeight: 600, fontSize: 9.5, color: '#a8a69b', fontVariantNumeric: 'tabular-nums' }}>{reg.rate.toFixed(2)}%</span>}
       </span>
     </HoverTip>
   );
@@ -554,6 +558,11 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
       )}
       <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5, padding: '11px 16px', flex: '0 0 auto' }}>
+        <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>Fed</span>
+        <FedChip />
+      </div>
+      <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5, padding: '11px 16px', flex: '0 0 auto' }}>
         <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>This week</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
           {legend.map(([col, n, l]) => (
@@ -564,11 +573,6 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
             </span>
           ))}
         </div>
-      </div>
-      <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5, padding: '11px 16px', flex: '0 0 auto' }}>
-        <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>Fed</span>
-        <FedChip />
       </div>
       <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
       <button onClick={onViewAll} onMouseEnter={() => setVaHover(true)} onMouseLeave={() => setVaHover(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontFamily: 'inherit', background: vaHover ? '#faf8ff' : 'transparent', border: 'none', padding: '0 16px', flex: '0 0 auto', alignSelf: 'stretch', transition: 'all .15s' }}>
