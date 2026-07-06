@@ -213,15 +213,15 @@ function Verdict({ e }: { e: CalendarEvent }) {
   const fc = (e.forecast || '').trim();
   const inverted = /unemploy|jobless|claim/i.test(e.title); // higher print = weaker economy
   const thresh = fc ? `${inverted ? 'Below' : 'Beats'} ${fc}` : `Comes in ${cond}`;
-  const dirTxt = dir === 'up' ? 'UP' : dir === 'down' ? 'DOWN' : 'FLAT';
   const dirCol = dir === 'up' ? '#1f9d55' : dir === 'down' ? '#df5338' : '#9b988d';
-  const why = dir === 'down' ? (inverted ? 'strong labor → Fed stays tight' : 'hotter economy → Fed stays tight')
-    : dir === 'up' ? (inverted ? 'weak labor → Fed cuts sooner' : 'cooler economy → Fed cuts sooner')
-    : 'likely already priced in';
+  // cause → effect chain: threshold → economy read → Fed action → BTC
+  const econ = dir === 'down' ? (inverted ? 'strong labor' : 'hotter economy') : (inverted ? 'weak labor' : 'cooler economy');
+  const fed = dir === 'down' ? 'Fed stays tight' : dir === 'up' ? 'Fed cuts sooner' : 'priced in';
+  const btcTxt = dir === 'up' ? 'BTC ↑' : dir === 'down' ? 'BTC ↓' : 'BTC flat';
+  const arrow = <span style={{ color: '#cfccc3', margin: '0 5px', fontWeight: 700 }}>→</span>;
   return (
-    <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-      <span style={{ fontWeight: 700, fontSize: 11.5, color: '#56544b', lineHeight: 1.35 }}>{thresh} <span style={{ color: '#cfccc3' }}>→</span> BTC likely <b style={{ color: dirCol, fontWeight: 800 }}>{dirTxt}</b></span>
-      <span style={{ fontWeight: 600, fontSize: 10, color: '#a8a69b' }}>{why}</span>
+    <span style={{ fontWeight: 600, fontSize: 11, color: '#8b8578', lineHeight: 1.55 }}>
+      <b style={{ color: '#56544b', fontWeight: 700 }}>{thresh}</b>{arrow}{econ}{arrow}{fed}{arrow}<b style={{ color: dirCol, fontWeight: 800 }}>{btcTxt}</b>
     </span>
   );
 }
