@@ -202,6 +202,12 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
   return <span style={{ fontWeight: 600, fontSize: 11.5, color: '#56544b' }}><AssetArrows assets={e.insight.assets} /></span>;
 }
 
+// Fed policy regime — FLIP THIS WHEN THE CYCLE TURNS. Drives the verdict's Fed
+// action word + icon (the card can't infer the cycle on its own).
+//   'hold'   = at peak, debating cuts (current): hot data → stays tight 🔒, soft → cuts sooner ✂
+//   'hiking' = actively raising rates:            hot data → hikes ↑,       soft → pauses ⏸
+const FED_REGIME: 'hold' | 'hiking' = 'hold';
+
 // Plain-English verdict (v2 card): "Beats 54.2 → BTC likely DOWN" + the why.
 // Handles inverted events (unemployment/claims) where a HIGHER print is the cooler read.
 function Verdict({ e }: { e: CalendarEvent }) {
@@ -217,7 +223,8 @@ function Verdict({ e }: { e: CalendarEvent }) {
   // cause → effect chain: threshold → economy read → Fed action → BTC
   const hot = dir === 'down'; // hot/hawkish scenario drives BTC down
   const econ = hot ? (inverted ? 'strong labor' : 'hotter economy') : (inverted ? 'weak labor' : 'cooler economy');
-  const fed = dir === 'down' ? 'Fed stays tight' : dir === 'up' ? 'Fed cuts sooner' : 'priced in';
+  const hiking = FED_REGIME === 'hiking';
+  const fed = hot ? (hiking ? 'Fed hikes' : 'Fed stays tight') : dir === 'up' ? (hiking ? 'Fed pauses' : 'Fed cuts sooner') : 'priced in';
   const btcTxt = dir === 'up' ? 'BTC ↑' : dir === 'down' ? 'BTC ↓' : 'BTC flat';
   const arrow = <span style={{ color: '#cfccc3', margin: '0 5px', fontWeight: 700 }}>→</span>;
   const isvg = { width: 14, height: 14, viewBox: '0 0 24 24', style: { display: 'block', flex: '0 0 auto' } as CSSProperties };
@@ -225,10 +232,13 @@ function Verdict({ e }: { e: CalendarEvent }) {
   const econIcon = hot
     ? <svg {...isvg} fill="none" stroke="#e0862a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
     : <svg {...isvg} fill="none" stroke="#4a90d9" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="2" y2="22" /><path d="m17 5-5 3-5-3" /><path d="m7 19 5-3 5 3" /><path d="M2 12h20" /><path d="m5 7 3 5-3 5" /><path d="m19 7-3 5 3 5" /></svg>;
-  // the Fed ACTION, not the entity: lock = rates held tight · scissors = rate cut
-  const fedIcon = dir === 'up'
-    ? <svg {...isvg} fill="none" stroke="#3f8a5f" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3" /><path d="M8.12 8.12 12 12" /><path d="M20 4 8.12 15.88" /><circle cx="6" cy="18" r="3" /><path d="M14.8 14.8 20 20" /></svg>
-    : <svg {...isvg} fill="none" stroke="#c0672f" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
+  // the Fed ACTION (not the entity), regime-aware:
+  //   hiking → ↑ hikes (hawkish) / ⏸ pauses (dovish);  hold → 🔒 stays tight / ✂ cuts
+  const lockIcon = <svg {...isvg} fill="none" stroke="#c0672f" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
+  const scissorsIcon = <svg {...isvg} fill="none" stroke="#3f8a5f" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3" /><path d="M8.12 8.12 12 12" /><path d="M20 4 8.12 15.88" /><circle cx="6" cy="18" r="3" /><path d="M14.8 14.8 20 20" /></svg>;
+  const hikeIcon = <svg {...isvg} fill="none" stroke="#c0672f" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></svg>;
+  const pauseIcon = <svg {...isvg} fill="#3f8a5f" stroke="none"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>;
+  const fedIcon = hot ? (hiking ? hikeIcon : lockIcon) : dir === 'up' ? (hiking ? pauseIcon : scissorsIcon) : lockIcon;
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', fontWeight: 600, fontSize: 11.5, color: '#8b8578', whiteSpace: 'nowrap' }}>
       <b style={{ color: '#56544b', fontWeight: 700 }}>{thresh}</b>{arrow}
