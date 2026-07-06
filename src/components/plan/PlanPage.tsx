@@ -6,6 +6,7 @@ import { HoverTip } from './HoverTip';
 import { HeatmapLaunchCard } from '@/components/heatmap/HeatmapLaunchCard';
 import { PLAN_STEP_DIAGRAMS } from './planDiagrams';
 import { useCalendar, useCalendarInsights, useCalendarDefinitions, useCalendarReleased, useCalendarArchive, eventKey, type CalendarEvent, type AssetDir, type ReleasedInfo } from '@/hooks/useCalendar';
+import { useFedRegime } from '@/hooks/useFedRegime';
 import { isBtcRelevant, relevanceTag } from '@/lib/calendar-filter';
 import { planActions } from '@/lib/plan-store';
 import { DrawerResizeHandle, useDrawerWidth } from './DrawerResize';
@@ -202,15 +203,11 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
   return <span style={{ fontWeight: 600, fontSize: 11.5, color: '#56544b' }}><AssetArrows assets={e.insight.assets} /></span>;
 }
 
-// Fed policy regime — FLIP THIS WHEN THE CYCLE TURNS. Drives the verdict's Fed
-// action word + icon (the card can't infer the cycle on its own).
-//   'hold'   = at peak, debating cuts (current): hot data → stays tight 🔒, soft → cuts sooner ✂
-//   'hiking' = actively raising rates:            hot data → hikes ↑,       soft → pauses ⏸
-const FED_REGIME: 'hold' | 'hiking' = 'hold';
-
 // Plain-English verdict (v2 card): "Beats 54.2 → BTC likely DOWN" + the why.
 // Handles inverted events (unemployment/claims) where a HIGHER print is the cooler read.
+// Fed action word/icon is regime-aware (auto-derived from the fed funds rate).
 function Verdict({ e }: { e: CalendarEvent }) {
+  const reg = useFedRegime();
   const ins = e.insight;
   if (!ins || !ins.assets.length) return null;
   const btc = ins.assets.find((a) => a.sym.toUpperCase().includes('BTC'));
@@ -223,7 +220,7 @@ function Verdict({ e }: { e: CalendarEvent }) {
   // cause → effect chain: threshold → economy read → Fed action → BTC
   const hot = dir === 'down'; // hot/hawkish scenario drives BTC down
   const econ = hot ? (inverted ? 'strong labor' : 'hotter economy') : (inverted ? 'weak labor' : 'cooler economy');
-  const hiking = FED_REGIME === 'hiking';
+  const hiking = reg?.regime === 'hiking';
   const fed = hot ? (hiking ? 'Fed hikes' : 'Fed stays tight') : dir === 'up' ? (hiking ? 'Fed pauses' : 'Fed cuts sooner') : 'priced in';
   const btcTxt = dir === 'up' ? 'BTC ↑' : dir === 'down' ? 'BTC ↓' : 'BTC flat';
   const arrow = <span style={{ color: '#cfccc3', margin: '0 5px', fontWeight: 700 }}>→</span>;
@@ -471,6 +468,32 @@ function NewsZero({ icon, title, sub, tint }: { icon: ReactNode; title: string; 
   );
 }
 
+// Fed-cycle chip (auto-derived from the fed funds rate). Sits in the news header;
+// its regime drives every card's Fed step (hikes vs stays tight).
+function FedChip() {
+  const reg = useFedRegime();
+  if (!reg) return null;
+  const r = reg.regime;
+  const cfg = r === 'hiking' ? { label: 'Hiking', col: '#c0672f', bg: '#fdf3ee' }
+    : r === 'cutting' ? { label: 'Cutting', col: '#1f9d55', bg: '#eef8f1' }
+    : { label: 'Holding', col: '#8a8577', bg: '#f4f3f0' };
+  const sv = { width: 11, height: 11, viewBox: '0 0 24 24', style: { flex: '0 0 auto' } as CSSProperties };
+  const icon = r === 'hiking'
+    ? <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></svg>
+    : r === 'cutting'
+    ? <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3" /><path d="M8.12 8.12 12 12" /><path d="M20 4 8.12 15.88" /><circle cx="6" cy="18" r="3" /><path d="M14.8 14.8 20 20" /></svg>
+    : <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
+  return (
+    <HoverTip tip={`Fed policy cycle — auto-detected from the fed funds rate${reg.rate != null ? ` (now ${reg.rate.toFixed(2)}%${reg.asOf ? ', ' + reg.asOf.slice(0, 7) : ''})` : ''}. It sets every card's Fed step: hiking → "hikes", holding/cutting → "stays tight".`} width={266}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px 3px 6px', borderRadius: 999, background: cfg.bg, cursor: 'help', whiteSpace: 'nowrap' }}>
+        {icon}
+        <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: cfg.col }}>Fed · {cfg.label}</span>
+        {reg.rate != null && <span style={{ fontFamily: 'var(--font-mono), monospace', fontWeight: 700, fontSize: 9, color: cfg.col }}>{reg.rate.toFixed(2)}%</span>}
+      </span>
+    </HoverTip>
+  );
+}
+
 // V5 "departure-board" news header: pulse + next release + big live countdown +
 // time-until progress bar + this-week impact legend + View all (handoff 17).
 function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
@@ -496,6 +519,7 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
           <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#1a1813', whiteSpace: 'nowrap' }}>Market news</span>
           <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#bba074', whiteSpace: 'nowrap' }}>Live feed</span>
         </div>
+        <FedChip />
       </div>
       <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
       {next ? (
