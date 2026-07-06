@@ -13,7 +13,7 @@ export interface PlanDraft {
   sym: Sym;
   dir: Dir;
   conv: Conv;
-  entryMode: 'price' | 'zone';
+  entryMode: 'price' | 'zone' | 'ladder';
   entry: string;
   ez1: string;
   ez2: string;
@@ -37,6 +37,7 @@ export interface PlanDraft {
   bankTarget?: string;
   startDate?: string; // planned entry date (range start), ISO yyyy-mm-dd
   tradeDate?: string; // planned exit / expected date (range end)
+  entries?: { price: string; pct: string }[]; // limit-ladder fills (price + fill %)
 }
 
 // A saved plan: board metadata + (for user plans) a full `draft` snapshot. Seeds
@@ -81,8 +82,9 @@ export const TP_MARKETS: Record<Sym, { mark: number; step: number; tick: number;
 
 export function TP_BLANK(): PlanDraft {
   return {
-    sym: 'BTC', dir: 'long', conv: 'med', entryMode: 'price',
+    sym: 'BTC', dir: 'long', conv: 'med', entryMode: 'ladder',
     entry: '', ez1: '', ez2: '', stop: '', t1: '', t2: '', t3: '',
+    entries: [{ price: '', pct: '' }, { price: '', pct: '' }, { price: '', pct: '' }],
     lev: 5, sizeMode: 'marginpct', sizeVal: '', sizeVals: {},
     chart: '', name: '', rationale: '', trigger: '', invalidation: '', targetNote: '',
     trailPeriod: '', bankPct: '70', bankTarget: '100k', startDate: '', tradeDate: todayISO(),
@@ -184,6 +186,23 @@ export interface Compute {
   valid: boolean;
 }
 
+// clamp a fill-% string to 0..100
+export const pctNum = (v?: string): number => { const n = parseFloat(String(v ?? '').replace(/[^0-9.]/g, '')); return isFinite(n) ? Math.max(0, Math.min(100, n)) : NaN; };
+
+export interface EntryRung { price: string; pct: string; idx: number; isLast: boolean; }
+// Normalize d.entries into fill rungs (seed from single-entry/zone if empty; min 2 rungs).
+export function tpEntryRungs(d: PlanDraft): EntryRung[] {
+  const raw = (Array.isArray(d.entries) ? d.entries : []).map((e) => ({ price: (e?.price ?? '') as string, pct: (e?.pct ?? '') as string }));
+  if (raw.length === 0) {
+    let seed = '';
+    if (d.entryMode === 'zone') { const a = tpNum(d.ez1), b = tpNum(d.ez2); if (isFinite(a) && isFinite(b)) seed = String(Math.round((a + b) / 2)); else if (isFinite(a)) seed = String(a); else if (isFinite(b)) seed = String(b); }
+    else if (d.entry != null && String(d.entry) !== '') seed = String(d.entry);
+    if (seed) raw.push({ price: seed, pct: '' });
+  }
+  while (raw.length < 2) raw.push({ price: '', pct: '' });
+  return raw.map((r, i) => ({ ...r, idx: i, isLast: i === raw.length - 1 }));
+}
+
 // Core trade math — risk, sizing, R:R, liquidation, validity. Faithful port of
 // the design's tpCompute (qty is in units of the asset; notional = qty × price).
 export function tpCompute(d: PlanDraft, equity = TP_EQUITY, markOverride?: number): Compute {
@@ -197,6 +216,16 @@ export function tpCompute(d: PlanDraft, equity = TP_EQUITY, markOverride?: numbe
   if (d.entryMode === 'zone') {
     const a = tpNum(d.ez1), b = tpNum(d.ez2);
     E = isFinite(a) && isFinite(b) ? (a + b) / 2 : isFinite(a) ? a : b;
+  } else if (d.entryMode === 'ladder') {
+    // weighted-average entry across the fill rungs (last rung takes the remainder %)
+    const rungs = tpEntryRungs(d);
+    const parsed = rungs.map((r) => pctNum(r.pct));
+    const nonLast = parsed.slice(0, -1).reduce((s, p) => s + (isFinite(p) ? p : 0), 0);
+    const rem = Math.max(0, 100 - nonLast);
+    let wsum = 0, psum = 0;
+    rungs.forEach((r, i) => { const price = tpNum(r.price); if (!isFinite(price)) return; let w = r.isLast ? (isFinite(parsed[i]) ? parsed[i] : rem) : (isFinite(parsed[i]) ? parsed[i] : 0); if (!(w > 0)) w = 0; wsum += w; psum += price * w; });
+    if (wsum > 0) E = psum / wsum;
+    else { const fp = rungs.map((r) => tpNum(r.price)).filter((v) => isFinite(v)); E = fp.length ? fp.reduce((a, b) => a + b, 0) / fp.length : NaN; }
   } else E = tpNum(d.entry);
 
   const hasEntry = isFinite(E);

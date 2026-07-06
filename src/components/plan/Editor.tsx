@@ -5,8 +5,9 @@ import { createPortal } from 'react-dom';
 import {
   type PlanDraft, type SizeMode, type Sym, type Dir, type Conv,
   tpCompute, tpFmtNum, tpNum, tpMoney, tpAutoName, TP_MARKETS, TP_EQUITY, type Plan, type Status,
-  composeNote,
+  composeNote, tpEntryRungs, pctNum,
 } from '@/lib/plan-model';
+import { HoverTip } from './HoverTip';
 import { planActions, usePlanStore } from '@/lib/plan-store';
 import { useAccount } from '@/hooks/useAccount';
 import { usePositions } from '@/hooks/usePositions';
@@ -400,6 +401,154 @@ function PresetMenu({ title, opts, cur, fmt, onPick, accent, accentBg, onClose, 
       </div>
     </>, document.body);
 }
+// ── Multi-fill entry ladder + section labels (handoff: full Levels port) ─────
+function Pie({ pct, color, size = 11 }: { pct: number; color: string; size?: number }) {
+  const r = 9, cx = 12, cy = 12, p = Math.max(0, Math.min(100, isFinite(pct) ? pct : 0));
+  let wedge: React.ReactNode = null;
+  if (p >= 99.99) wedge = <circle cx={cx} cy={cy} r={r} fill={color} />;
+  else if (p > 0.01) { const ang = (p / 100) * 2 * Math.PI, ex = cx + r * Math.sin(ang), ey = cy - r * Math.cos(ang), large = p > 50 ? 1 : 0; wedge = <path d={`M${cx} ${cy} L${cx} ${cy - r} A${r} ${r} 0 ${large} 1 ${ex.toFixed(2)} ${ey.toFixed(2)} Z`} fill={color} />; }
+  return <svg width={size} height={size} viewBox="0 0 24 24" style={{ flex: '0 0 auto' }}><circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={2.2} opacity={0.3} />{wedge}</svg>;
+}
+
+const setEntryField = (d: PlanDraft, idx: number, field: 'price' | 'pct', val: string) => {
+  const ex = tpEntryRungs(d).map((r) => ({ price: r.price, pct: r.pct }));
+  ex[idx] = { ...ex[idx], [field]: val };
+  planActions.setDraft({ entries: ex, entryMode: 'ladder' });
+};
+const addEntry = (d: PlanDraft) => { const ex = tpEntryRungs(d).map((r) => ({ price: r.price, pct: r.pct })); if (ex.length >= 6) return; ex.push({ price: '', pct: '' }); planActions.setDraft({ entries: ex, entryMode: 'ladder' }); };
+const removeEntry = (d: PlanDraft, idx: number) => { const ex = tpEntryRungs(d).map((r) => ({ price: r.price, pct: r.pct })); if (ex.length <= 2) return; ex.splice(idx, 1); planActions.setDraft({ entries: ex, entryMode: 'ladder' }); };
+
+function EntryLadder({ d }: { d: PlanDraft }) {
+  const PURP = '#7c5cff', INK = '#1a1813';
+  const rungs = tpEntryRungs(d);
+  const parsed = rungs.map((r) => pctNum(r.pct));
+  const nonLast = parsed.slice(0, -1).reduce((s, p) => s + (isFinite(p) ? p : 0), 0);
+  const rem = Math.max(0, 100 - nonLast);
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: '10px 12px' }}>
+      {rungs.map((r, idx) => {
+        const pctPh = r.isLast ? String(Math.round(rem)) : '50';
+        return (
+          <div key={'en' + idx} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.05em', color: PURP, paddingLeft: 3 }}>{'Fill ' + (idx + 1)}</span>
+              {idx >= 2 ? <button onClick={() => removeEntry(d, idx)} title="Remove fill" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', padding: 0, margin: 0, cursor: 'pointer', color: '#c4c1b8', flex: '0 0 auto' }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M8 12h8" /></svg></button> : null}
+            </div>
+            <div className="tpsplit" style={{ display: 'flex', alignItems: 'stretch', border: '1px solid #e7e3dc', borderRadius: 12, background: '#fdfdff', overflow: 'hidden' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, fontSize: 13, color: '#cbc9c0' }}>$</span>
+                <input value={tpFmtNum(r.price)} onChange={(e) => setEntryField(d, idx, 'price', e.target.value.replace(/,/g, ''))} inputMode="decimal" placeholder="0.00" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 3px 8px 22px', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 600, fontSize: 13.5, letterSpacing: '-0.02em', color: INK, outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2, borderLeft: '1px solid #e6def8', background: '#f4f1fd', padding: '0 8px', flex: '0 0 auto' }}>
+                <Pie pct={isFinite(parsed[idx]) ? parsed[idx] : (r.isLast ? rem : 0)} color={PURP} />
+                <input value={r.pct || ''} onChange={(e) => setEntryField(d, idx, 'pct', e.target.value.replace(/[^0-9]/g, '').slice(0, 3))} onKeyDown={(e) => { if (e.key === 'Tab' && !e.shiftKey && !e.currentTarget.value && e.currentTarget.placeholder) { e.preventDefault(); setEntryField(d, idx, 'pct', e.currentTarget.placeholder); } }} inputMode="numeric" placeholder={pctPh} style={{ width: 25, textAlign: 'right', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: PURP, outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
+                <span style={{ fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: PURP }}>%</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {rungs.length < 6 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <span style={{ fontSize: 10.5, paddingLeft: 3, visibility: 'hidden' }}>+</span>
+          <button onClick={() => addEntry(d)} aria-label="Add fill" title="Add another fill" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 39, border: '1px dashed #d8cff2', background: '#f7f5fe', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 11, letterSpacing: '0.01em', color: PURP }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>Add fill
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function EntryTotals({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
+  const PURP = '#7c5cff';
+  const rungs = tpEntryRungs(d);
+  const parsed = rungs.map((r) => pctNum(r.pct));
+  const nonLast = parsed.slice(0, -1).reduce((s, p) => s + (isFinite(p) ? p : 0), 0);
+  const rem = Math.max(0, 100 - nonLast);
+  const total = Math.round(rungs.reduce((s, r, i) => s + (r.isLast ? (isFinite(parsed[i]) ? parsed[i] : rem) : (isFinite(parsed[i]) ? parsed[i] : 0)), 0));
+  const bad = total !== 100;
+  const avg = isFinite(c.E) ? tpMoney(c.E, c.E < 1000 ? 2 : 0) : '—';
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontWeight: 600, fontSize: 10.5, color: '#8f8a7f' }}>Avg <b style={{ color: PURP, fontWeight: 800, fontFamily: MONOF }}>{avg}</b></span>
+      <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#d6d1c6' }} />
+      <span style={{ fontWeight: 600, fontSize: 10.5, color: bad ? '#c0492f' : '#8f8a7f' }}>Fills <b style={{ color: bad ? '#df5338' : PURP, fontWeight: 800, fontFamily: MONOF }}>{total + '%'}</b></span>
+    </span>
+  );
+}
+
+function BanksTotal({ d }: { d: PlanDraft }) {
+  const pctTotal = Math.round(pctNum(d.bankPct) || 0);
+  const bad = pctTotal !== 100;
+  return <span style={{ fontWeight: 600, fontSize: 10.5, color: bad ? '#c0492f' : '#8f8a7f' }}>Banks <b style={{ color: bad ? '#df5338' : '#1f9d55', fontWeight: 800, fontFamily: MONOF }}>{pctTotal + '%'}</b>{bad ? ' · aim 100%' : ''}</span>;
+}
+
+const secTipTitle = (t: string) => <span style={{ display: 'block', fontWeight: 800, fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#8a8577', marginBottom: 3 }}>{t}</span>;
+const ENTRY_TIP = <span>{secTipTitle('Limit-ladder in · where to place your rungs')}{['Broken resistance now flipped to support — the top of the band', 'The 0.5 / 0.618 fib retracement', 'A prior swing low', 'The 20 / 50 MA if price is riding it', 'A round number (60k, 62.5k)'].map((l, i) => <span key={i} style={{ display: 'block', marginTop: 3 }}>{l}</span>)}<span style={{ display: 'block', marginTop: 3 }}>A liquidation magnet or wall — your heatmap’s <b>Nearest magnet ↓</b> and <b>Strongest wall</b> are natural lower rungs</span></span>;
+const RISK_TIP = <span>{secTipTitle('Stop & liquidation')}<span style={{ display: 'block', marginTop: 3 }}>Stop loss is your planned exit if the idea is wrong.</span><span style={{ display: 'block', marginTop: 3 }}>Liquidation is the exchange’s forced close — set by leverage. Keep your stop well clear of it.</span></span>;
+const TARGETS_TIP = <span>{secTipTitle('Bank & trail out')}<span style={{ display: 'block', marginTop: 3 }}>Bank a fixed slice of the position at each target price.</span><span style={{ display: 'block', marginTop: 3 }}>Trail the rest up on your chosen timeframe / Donchian channel to ride the move.</span></span>;
+
+function SectionHeader({ text, color, tip, right }: { text: string; color: string; tip: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+      <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color, whiteSpace: 'nowrap' }}>
+        <HoverTip tip={tip} width={308}>
+          <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, cursor: 'help', color, letterSpacing: '0.06em', fontWeight: 800 }}>
+            <span>{text}</span>
+            <span style={{ height: 2, width: '100%', background: color, borderRadius: 2 }} />
+          </span>
+        </HoverTip>
+      </span>
+      <span style={{ flex: 1, height: 1, background: '#efece6', minWidth: 12 }} />
+      {right}
+    </div>
+  );
+}
+
+function LiqCell({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
+  const liqVal = c.hasEntry && isFinite(c.liq) ? tpFmtNum(String(Math.round(c.liq))) : '';
+  const pctHint = c.hasEntry && isFinite(c.liq) && c.E ? (c.liq / c.E - 1) * 100 : NaN;
+  const pctTxt = isFinite(pctHint) ? (pctHint >= 0 ? '+' : '') + pctHint.toFixed(0) + '%' : '';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+      <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a8a294' }}>Liquidation <span style={{ color: '#c8c3b8' }}>· auto from {tpNum(d.lev) || 5}×</span></span>
+      <div style={{ position: 'relative' }}>
+        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, fontSize: 13, color: '#cdcabf' }}>$</span>
+        <input value={liqVal} readOnly tabIndex={-1} inputMode="decimal" placeholder="0.00" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 48px 8px 22px', border: '1px solid #eeeae3', borderRadius: 12, fontFamily: MONOF, fontWeight: 600, fontSize: 13.5, letterSpacing: '-0.02em', color: '#938d82', background: '#f7f6f3', outline: 'none', fontVariantNumeric: 'tabular-nums', cursor: 'default' }} />
+        <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontFamily: MONOF, fontWeight: 700, fontSize: 11, color: '#b7b1a5', pointerEvents: 'none' }}>{pctTxt}</span>
+      </div>
+    </div>
+  );
+}
+
+function DirLevHeading({ d }: { d: PlanDraft }) {
+  const isShort = d.dir === 'short', dc = isShort ? '#df5338' : '#1f9d55';
+  const lev = (tpNum(d.lev) || 5) + '×';
+  let holdSeg: React.ReactNode = null;
+  if (d.tradeDate) {
+    const pp = String(d.tradeDate).split('-'); const sel = new Date(+pp[0], +pp[1] - 1, +pp[2]);
+    let st: Date;
+    if (d.startDate) { const sp = String(d.startDate).split('-'); st = new Date(+sp[0], +sp[1] - 1, +sp[2]); }
+    else { const n = new Date(); st = new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+    const days = Math.round((sel.getTime() - st.getTime()) / 86400000);
+    if (!isNaN(days) && days >= 0) {
+      const txt = days === 0 ? 'today' : days >= 14 ? '~' + Math.round(days / 7) + 'w' : '~' + days + 'd';
+      holdSeg = <><span style={{ color: '#c9c5bb', margin: '0 1px' }}>·</span><svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={9} /><path d="M12 7.5V12l3 1.8" /></svg><span style={{ color: '#7c5cff' }}>{txt}</span></>;
+    }
+  }
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 24, letterSpacing: '-0.025em', lineHeight: 1.08 }}>
+      <svg width={21} height={21} viewBox="0 0 24 24" fill="none" stroke={dc} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}>{isShort ? <><path d="M22 17 13.5 8.5l-5 5L2 7" /><path d="M16 17h6v-6" /></> : <><path d="M22 7 13.5 15.5l-5-5L2 17" /><path d="M16 7h6v6" /></>}</svg>
+      <span style={{ color: dc }}>{isShort ? 'Short' : 'Long'}</span>
+      <span style={{ color: '#c9c5bb', margin: '0 1px' }}>·</span>
+      <svg width={18} height={18} viewBox="0 0 24 24" fill="#1a1813" stroke="none" style={{ flex: '0 0 auto' }}><path d="M13 2 3 14h7l-1 8 10-12h-7z" /></svg>
+      <span style={{ color: '#1a1813' }}>{lev}</span>
+      {holdSeg}
+    </span>
+  );
+}
+
 function TargetInputs({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
   const [bankMenu, setBankMenu] = useState(false);
   const [perMenu, setPerMenu] = useState(false);
@@ -435,7 +584,6 @@ function TargetInputs({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> 
   const chevBtn = (open: () => void, col: string) => <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenuPos({ top: r.bottom + 7, right: Math.max(8, window.innerWidth - r.right) }); open(); }} aria-label="presets" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', padding: '2px 0 2px 2px', margin: 0, cursor: 'pointer', color: col }}><svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></button>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#1f9d55' }}>Targets</span>
       <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
         {/* TP1 · Bank */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
@@ -712,6 +860,7 @@ export function Editor() {
           <span style={{ fontWeight: 800, fontSize: 29, letterSpacing: '-0.025em', color: '#1a1813', lineHeight: 1.08 }}>{editing ? 'Edit plan.' : 'Plan this trade.'}</span>
           <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>{editing ? `Updating ${TP_MARKETS[d.sym].label} ${d.dir} — change levels, size, leverage or thesis.` : 'Lock the specifics — levels, size, leverage, thesis. You’ll still execute manually on TradingView.'}</span>
         </div>
+        <span style={{ alignSelf: 'flex-start', marginTop: -4 }}><DirLevHeading d={d} /></span>
       </div>
 
       {/* top equity strip — live math condensed into Risk/Reward/R:R/Position/Margin/Stop-vs-liq */}
@@ -747,17 +896,38 @@ export function Editor() {
 
           <div style={{ borderBottom: '1px solid #f3f1f7' }}>
             <SecHead title="Levels" open={secOpen.levels} onToggle={() => toggleSec('levels')} fixedH
-              right={<Seg opts={[{ v: 'price', label: 'Single price' }, { v: 'zone', label: 'Zone' }]} cur={d.entryMode} onPick={(v) => planActions.setDraft({ entryMode: v as 'price' | 'zone' })} accent="#23211b" />}
+              right={<Seg opts={[{ v: 'ladder', label: 'Ladder' }, { v: 'zone', label: 'Zone' }]} cur={d.entryMode === 'zone' ? 'zone' : 'ladder'} onPick={(v) => planActions.setDraft({ entryMode: v as 'ladder' | 'zone' })} accent="#23211b" />}
               collapsedRight={<LevelsSummary d={d} c={c} />} />
             {secOpen.levels && (
             <div style={{ padding: '4px 18px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* ENTRY */}
               {d.entryMode === 'zone' ? (
-                <Field label="Entry zone" labelColor="#7c5cff"><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ flex: 1 }}><PriceInput value={d.ez1} onChange={(v) => planActions.setDraft({ ez1: v })} placeholder="from" /></div><span style={{ fontWeight: 800, fontSize: 14, color: '#cbc9c0' }}>–</span><div style={{ flex: 1 }}><PriceInput value={d.ez2} onChange={(v) => planActions.setDraft({ ez2: v })} placeholder="to" /></div></div></Field>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  <SectionHeader text="Entry" color="#7c5cff" tip={ENTRY_TIP} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ flex: 1 }}><PriceInput value={d.ez1} onChange={(v) => planActions.setDraft({ ez1: v })} placeholder="from" /></div><span style={{ fontWeight: 800, fontSize: 14, color: '#cbc9c0' }}>–</span><div style={{ flex: 1 }}><PriceInput value={d.ez2} onChange={(v) => planActions.setDraft({ ez2: v })} placeholder="to" /></div></div>
+                </div>
               ) : (
-                <Field label="Entry price"><PriceInput value={d.entry} onChange={(v) => planActions.setDraft({ entry: v })} placeholder="0.00" /></Field>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  <SectionHeader text="Entry" color="#7c5cff" tip={ENTRY_TIP} right={<EntryTotals d={d} c={c} />} />
+                  <EntryLadder d={d} />
+                </div>
               )}
-              <Field label="Stop loss" labelColor="#df5338" hint="blank = ride to liq"><PriceInput value={d.stop} onChange={(v) => planActions.setDraft({ stop: v })} placeholder="0.00" accent="#df5338" tint="#f2ddd6" bg="#fffcfb" /></Field>
-              <TargetInputs d={d} c={c} />
+              {/* RISK — stop + liquidation */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                <SectionHeader text="Risk" color="#df5338" tip={RISK_TIP} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#df5338' }}>Stop loss <span style={{ color: '#d3beb7' }}>· blank = ride to liq</span></span>
+                    <PriceInput value={d.stop} onChange={(v) => planActions.setDraft({ stop: v })} placeholder="0.00" accent="#df5338" tint="#f2ddd6" bg="#fffcfb" />
+                  </div>
+                  <LiqCell d={d} c={c} />
+                </div>
+              </div>
+              {/* TARGETS */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                <SectionHeader text="Targets" color="#1f9d55" tip={TARGETS_TIP} right={<BanksTotal d={d} />} />
+                <TargetInputs d={d} c={c} />
+              </div>
               <HeatmapLaunchCard variant="row" symbol={d.sym as HeatSymbol} title="Check your stop against the real clusters" sub="Is it beyond the sweep, not inside it?" />
             </div>
             )}
