@@ -35,7 +35,7 @@ export function Topbar({ page, onPageChange }: { page: Page; onPageChange: (p: P
   const onPlan = page === 'plan';
   const { view: planView, plans } = usePlanStore();
   const { data: tradeData } = usePositionHistory();
-  const tradeCount = (tradeData || []).filter((p) => Math.abs(parseFloat(p.max_size) || 0) > 0).length;
+  const tradeCount = (Array.isArray(tradeData) ? tradeData : []).filter((p) => Math.abs(parseFloat(p.max_size) || 0) > 0).length;
 
   useEffect(() => { setSynced('just now'); }, []);
 
