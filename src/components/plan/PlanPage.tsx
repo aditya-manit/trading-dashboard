@@ -202,6 +202,50 @@ function ReactionLine({ e }: { e: CalendarEvent }) {
   return <span style={{ fontWeight: 600, fontSize: 11.5, color: '#56544b' }}><AssetArrows assets={e.insight.assets} /></span>;
 }
 
+// Plain-English verdict (v2 card): "Beats 54.2 → BTC likely DOWN" + the why.
+// Handles inverted events (unemployment/claims) where a HIGHER print is the cooler read.
+function Verdict({ e }: { e: CalendarEvent }) {
+  const ins = e.insight;
+  if (!ins || !ins.assets.length) return null;
+  const btc = ins.assets.find((a) => a.sym.toUpperCase().includes('BTC'));
+  const dir = btc?.dir; // up | down | flat — direction in the "hot" scenario
+  const cond = firstWord(ins.condition || 'hot');
+  const fc = (e.forecast || '').trim();
+  const inverted = /unemploy|jobless|claim/i.test(e.title); // higher print = weaker economy
+  const thresh = fc ? `${inverted ? 'Below' : 'Beats'} ${fc}` : `Comes in ${cond}`;
+  const dirTxt = dir === 'up' ? 'UP' : dir === 'down' ? 'DOWN' : 'FLAT';
+  const dirCol = dir === 'up' ? '#1f9d55' : dir === 'down' ? '#df5338' : '#9b988d';
+  const why = dir === 'down' ? (inverted ? 'strong labor → Fed stays tight' : 'hotter economy → Fed stays tight')
+    : dir === 'up' ? (inverted ? 'weak labor → Fed cuts sooner' : 'cooler economy → Fed cuts sooner')
+    : 'likely already priced in';
+  return (
+    <div style={{ padding: '9px 13px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontWeight: 700, fontSize: 12, color: '#56544b', flexWrap: 'wrap' }}>
+        <span style={{ color: dirCol, fontSize: 10 }}>▶</span>
+        <span>{thresh}</span>
+        <span style={{ color: '#cfccc3' }}>→</span>
+        <span>BTC likely <b style={{ color: dirCol, fontWeight: 800 }}>{dirTxt}</b></span>
+      </span>
+      <span style={{ fontWeight: 600, fontSize: 10.5, color: '#a8a69b', paddingLeft: 16 }}>{why}</span>
+    </div>
+  );
+}
+
+// v2 print row: date · 4h reaction (bold, the immediate move) → day close.
+function PrintRowV2({ p }: { p: { date: string; pct: number; reactPct?: number } }) {
+  const label = new Date(`${p.date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const hasReact = typeof p.reactPct === 'number';
+  const react = hasReact ? (p.reactPct as number) : p.pct, reactUp = react >= 0, dayUp = p.pct >= 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontVariantNumeric: 'tabular-nums' }}>
+      <span style={{ fontWeight: 600, fontSize: 10, color: '#a8a69b', width: 44, flex: '0 0 auto' }}>{label}</span>
+      <span style={{ fontWeight: 800, fontSize: 11.5, color: reactUp ? '#1f9d55' : '#df5338', width: 52, textAlign: 'right' }}>{reactUp ? '+' : '−'}{Math.abs(react).toFixed(1)}%</span>
+      <span style={{ color: '#cfccc3', fontSize: 11, fontWeight: 700 }}>→</span>
+      {hasReact ? <span style={{ fontWeight: 700, fontSize: 11, color: dayUp ? '#1f9d55' : '#df5338' }}>{dayUp ? '+' : '−'}{Math.abs(p.pct).toFixed(1)}%</span> : <span style={{ color: '#c9c5bb', fontSize: 11, fontWeight: 700 }}>—</span>}
+    </div>
+  );
+}
+
 // Released (already-fired) card: recessed tint, 4-col spec table — Forecast +
 // Actual (with Hot/Soft surprise chip), and If-<condition> + realized Reaction.
 function ReleasedCard({ e, info, loading }: { e: CalendarEvent; info?: ReleasedInfo; loading?: boolean }) {
@@ -270,7 +314,7 @@ function ReleasedCard({ e, info, loading }: { e: CalendarEvent; info?: ReleasedI
 
 // Rich strip card: header (currency/title + time + live countdown) over a
 // Forecast / If-<condition> / BTC-2-prints table.
-function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; def?: string }) {
+function StripCard({ e, loading, def, v2 }: { e: CalendarEvent; loading: boolean; def?: string; v2?: boolean }) {
   const { mutate } = useSWRConfig();
   const [refreshing, setRefreshing] = useState(false);
   const color = IMPACT_COLOR[e.impact] || '#8c8a81';
@@ -311,6 +355,31 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
           <CountdownLabel date={e.date} />
         </div>
       </div>
+      {v2 ? (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* forecast */}
+          <div style={{ padding: '9px 13px', display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ ...cellLabel, width: 56, flex: '0 0 auto' }}>Forecast</span>
+            <span style={{ fontWeight: 800, fontSize: 13, color: v.muted ? '#a8a69b' : '#1a1813' }}>{v.main}</span>
+            {v.note && <span style={{ fontWeight: 600, fontSize: 10.5, color: '#a8a69b' }}>{v.note}</span>}
+          </div>
+          {/* plain-English verdict */}
+          {hasReaction ? <div style={topBorder}><Verdict e={e} /></div>
+            : loading ? <div style={{ ...topBorder, padding: '9px 13px' }}><Skel w={180} /></div> : null}
+          {/* prints — day → 4h */}
+          {prints.length > 0 && !refreshing ? (
+            <div style={{ ...topBorder, padding: '9px 13px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={cellLabel}>BTC after last {prints.length}</span>
+                <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#c4bfae' }}>4h → day</span>
+              </div>
+              {prints.map((p, i) => <PrintRowV2 key={i} p={p} />)}
+            </div>
+          ) : (loading || refreshing) ? (
+            <div style={{ ...topBorder, padding: '9px 13px', display: 'flex', flexDirection: 'column', gap: 7 }}><Skel w="100%" /><Skel w="100%" /></div>
+          ) : null}
+        </div>
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr' }}>
         <div style={labelCellBase}><span style={cellLabel}>Forecast</span></div>
         <div style={{ ...valueCellBase, alignItems: 'baseline', gap: 5 }}>
@@ -344,6 +413,7 @@ function StripCard({ e, loading, def }: { e: CalendarEvent; loading: boolean; de
           </>
         ) : null}
       </div>
+      )}
     </div>
   );
 }
@@ -777,7 +847,7 @@ export function PlanPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
             {calLoading
               ? [0, 1, 2, 3].map((i) => <div key={i} style={{ height: 150, background: '#fff', border: '1px solid #f0efec', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.03)' }} />)
-              : stripEvents.map((e, i) => <StripCard key={i} e={e} loading={insightsLoading} def={defMap?.[e.title]} />)}
+              : stripEvents.map((e, i) => <StripCard key={i} e={e} loading={insightsLoading} def={defMap?.[e.title]} v2={i === 0} />)}
           </div>
         )}
       </div>
