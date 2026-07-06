@@ -220,16 +220,21 @@ function Verdict({ e }: { e: CalendarEvent }) {
   const fed = dir === 'down' ? 'Fed stays tight' : dir === 'up' ? 'Fed cuts sooner' : 'priced in';
   const btcTxt = dir === 'up' ? 'BTC ↑' : dir === 'down' ? 'BTC ↓' : 'BTC flat';
   const arrow = <span style={{ color: '#cfccc3', margin: '0 5px', fontWeight: 700 }}>→</span>;
-  const isvg = { width: 12, height: 12, viewBox: '0 0 24 24', style: { verticalAlign: '-2px', marginRight: 3, flex: '0 0 auto' } as CSSProperties };
+  const isvg = { width: 14, height: 14, viewBox: '0 0 24 24', style: { display: 'block', flex: '0 0 auto' } as CSSProperties };
   // flame (hot economy) / snowflake (cool economy)
   const econIcon = hot
     ? <svg {...isvg} fill="none" stroke="#e0862a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
     : <svg {...isvg} fill="none" stroke="#4a90d9" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="2" y2="22" /><path d="m17 5-5 3-5-3" /><path d="m7 19 5-3 5 3" /><path d="M2 12h20" /><path d="m5 7 3 5-3 5" /><path d="m19 7-3 5 3 5" /></svg>;
-  // landmark (the Fed / central bank)
-  const fedIcon = <svg {...isvg} fill="none" stroke="#7a746a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" x2="21" y1="22" y2="22" /><line x1="6" x2="6" y1="18" y2="11" /><line x1="10" x2="10" y1="18" y2="11" /><line x1="14" x2="14" y1="18" y2="11" /><line x1="18" x2="18" y1="18" y2="11" /><polygon points="12 2 20 7 4 7" /></svg>;
+  // the Fed ACTION, not the entity: lock = rates held tight · scissors = rate cut
+  const fedIcon = dir === 'up'
+    ? <svg {...isvg} fill="none" stroke="#3f8a5f" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3" /><path d="M8.12 8.12 12 12" /><path d="M20 4 8.12 15.88" /><circle cx="6" cy="18" r="3" /><path d="M14.8 14.8 20 20" /></svg>
+    : <svg {...isvg} fill="none" stroke="#c0672f" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
   return (
-    <span style={{ fontWeight: 600, fontSize: 11, color: '#8b8578', lineHeight: 1.7 }}>
-      <b style={{ color: '#56544b', fontWeight: 700 }}>{thresh}</b>{arrow}{econIcon}{econ}{arrow}{fedIcon}{fed}{arrow}<b style={{ color: dirCol, fontWeight: 800 }}>{btcTxt}</b>
+    <span style={{ display: 'inline-flex', alignItems: 'center', fontWeight: 600, fontSize: 11.5, color: '#8b8578', whiteSpace: 'nowrap' }}>
+      <b style={{ color: '#56544b', fontWeight: 700 }}>{thresh}</b>{arrow}
+      <HoverTip tip={econ}>{econIcon}</HoverTip>{arrow}
+      <HoverTip tip={fed}>{fedIcon}</HoverTip>{arrow}
+      <b style={{ color: dirCol, fontWeight: 800 }}>{btcTxt}</b>
     </span>
   );
 }
