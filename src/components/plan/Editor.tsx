@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import {
   type PlanDraft, type SizeMode, type Sym, type Dir, type Conv,
   tpCompute, tpFmtNum, tpNum, tpMoney, tpAutoName, TP_MARKETS, TP_EQUITY, type Plan, type Status,
-  composeNote, isoToDate,
+  composeNote,
 } from '@/lib/plan-model';
 import { planActions, usePlanStore } from '@/lib/plan-store';
 import { useAccount } from '@/hooks/useAccount';
@@ -13,7 +13,6 @@ import { usePositions } from '@/hooks/usePositions';
 import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { HeatmapLaunchCard } from '@/components/heatmap/HeatmapLaunchCard';
 import type { HeatSymbol } from '@/hooks/useHeatmap';
-import { MiniCalendar } from './MiniCalendar';
 import { CoinIcon } from './coins';
 
 const PURP = '#7c5cff';
@@ -224,36 +223,102 @@ function TargetRule({ d }: { d: PlanDraft }) {
   );
 }
 
-// ── Expected-date dropdown (in the name row) ─────────────────────────────────
+// ── Planned-window date RANGE picker (Notion-style start→end) ─────────────────
+// Trigger chip in the Theory name row; portaled calendar with hover preview.
 function ExpectedDate({ d }: { d: PlanDraft }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const [view, setView] = useState<{ y: number; m: number } | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => setMounted(true), []);
-  const sel = isoToDate(d.tradeDate);
+
+  const toISO = (dt: Date) => dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+  const parse = (s?: string): Date | null => { if (!s) return null; const p = String(s).split('-'); return new Date(+p[0], (+p[1]) - 1, +p[2]); };
+  const dayN = (x: Date | null): number | null => (x ? new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime() : null);
+  const sameDay = (a: Date | null, b: Date | null) => !!(a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate());
+  const today = new Date();
+  const start = parse(d.startDate);
+  const sel = parse(d.tradeDate);
+  const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const pick = (iso: string) => { planActions.setDraft({ tradeDate: iso }); setOpen(false); };
-  // Portal the calendar to <body> — the Theory group has overflow:hidden (for its
-  // rounded corners) which would otherwise clip the popover. Position it below-right
-  // of the chip from its live rect.
+  const vw = view || (sel ? { y: sel.getFullYear(), m: sel.getMonth() } : { y: today.getFullYear(), m: today.getMonth() });
+
+  const pick = (dt: Date) => {
+    const iso = toISO(dt);
+    if (!start || (start && sel)) { planActions.setDraft({ startDate: iso, tradeDate: '' }); setHover(null); }
+    else if ((dayN(dt) as number) < (dayN(start) as number)) { planActions.setDraft({ startDate: iso }); }
+    else { planActions.setDraft({ tradeDate: iso }); setOpen(false); setHover(null); }
+  };
+
+  const hasVal = !!(start || sel);
+  const holdDays = (start && sel) ? Math.round(((dayN(sel) as number) - (dayN(start) as number)) / 86400000) : null;
+  const holdTxt = holdDays != null ? (holdDays === 0 ? 'same day' : holdDays === 1 ? '1 day hold' : holdDays + ' days hold') : null;
+  const fmtD = (x: Date) => MONS[x.getMonth()] + ' ' + x.getDate();
+  const bigLabel = (start && sel) ? (fmtD(start) + '  →  ' + (start.getMonth() === sel.getMonth() ? String(sel.getDate()) : fmtD(sel))) : (start ? (fmtD(start) + '  →  ?') : (sel ? fmtD(sel) : 'Set dates'));
+
+  // Portal the calendar to <body> — the Theory group has overflow:hidden which would
+  // otherwise clip it. Position below-right of the chip from its live rect.
   const toggle = () => {
-    if (!open && btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPos({ top: r.bottom + 9, right: Math.max(8, window.innerWidth - r.right) }); }
+    if (!open && btnRef.current) { const r = btnRef.current.getBoundingClientRect(); setPos({ top: r.bottom + 9, right: Math.max(8, window.innerWidth - r.right) }); setView(vw); }
     setOpen((v) => !v);
   };
+
+  // grid
+  const first = new Date(vw.y, vw.m, 1);
+  const gridStart = new Date(vw.y, vw.m, 1 - first.getDay());
+  const cells: Date[] = [];
+  for (let i = 0; i < 42; i++) { const dt = new Date(gridStart); dt.setDate(gridStart.getDate() + i); cells.push(dt); }
+  const hov = (start && !sel && hover) ? parse(hover) : null;
+  const pEnd = sel || ((hov && (dayN(hov) as number) > (dayN(start) as number)) ? hov : null);
+
   return (
     <div style={{ position: 'relative', flex: '0 0 auto' }}>
-      <button ref={btnRef} onClick={toggle} className="tpdatechip" style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', padding: '2px 2px 2px 12px', borderRadius: 12, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1, transition: 'background .14s' }}>
-        <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#b3aea2', marginBottom: 5 }}>Expected</span>
-        <span style={{ fontFamily: 'var(--font-news), Newsreader, serif', fontWeight: 500, fontSize: sel ? 27 : 16, color: sel ? '#7c5cff' : '#b6b1a7', lineHeight: 0.9, letterSpacing: 0 }}>{sel ? `${MONS[sel.getMonth()]} ${sel.getDate()}` : 'Set date'}</span>
-        {sel ? <span style={{ fontFamily: 'var(--font-mono), ui-monospace, monospace', fontWeight: 600, fontSize: 11, color: '#a29c90', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{sel.getFullYear()}</span> : null}
+      <button ref={btnRef} onClick={toggle} className={'tpdatechip' + (hasVal ? ' on' : '')} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', padding: '2px 2px 2px 12px', borderRadius: 12, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1, transition: 'background .14s' }}>
+        <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#b3aea2', marginBottom: 5 }}>{hasVal ? 'Planned window' : 'Expected'}</span>
+        <span style={{ fontFamily: 'var(--font-news), Newsreader, serif', fontWeight: 500, fontSize: hasVal ? 21 : 16, color: hasVal ? '#7c5cff' : '#b6b1a7', lineHeight: 0.95, letterSpacing: 0, whiteSpace: 'nowrap' }}>{bigLabel}</span>
+        {holdTxt ? <span style={{ fontFamily: 'var(--font-mono), ui-monospace, monospace', fontWeight: 600, fontSize: 11, color: '#7c5cff', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{holdTxt}</span> : null}
       </button>
       {open && mounted && pos ? createPortal(
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 200 }} />
           <div style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 201, width: 288, boxSizing: 'border-box', background: '#fff', border: '1px solid #ecebe6', borderRadius: 14, boxShadow: '0 14px 40px -12px rgba(20,20,12,0.28)', padding: 16, animation: 'pkUp .16s ease both' }}>
             <style>{`@keyframes pkUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
-            <MiniCalendar value={d.tradeDate} onPick={pick} onClear={() => pick('')} cellH={32} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontWeight: 800, fontSize: 14.5, color: '#1a1813', letterSpacing: '-0.01em' }}>{MON[vw.m] + ' ' + vw.y}</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {(['p', 'n'] as const).map((dir) => (
+                  <button key={dir} onClick={() => setView({ y: vw.y, m: vw.m + (dir === 'n' ? 1 : -1) })} style={{ width: 27, height: 27, borderRadius: 8, border: '1px solid #efedea', background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', color: '#56524b' }}>
+                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d={dir === 'n' ? 'm9 18 6-6-6-6' : 'm15 18-6-6 6-6'} /></svg>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: 4 }}>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((w, i) => <span key={i} style={{ textAlign: 'center', fontWeight: 700, fontSize: 10.5, color: '#b3b0a6', padding: '4px 0' }}>{w}</span>)}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '2px 0' }}>
+              {cells.map((dt, i) => {
+                const inM = dt.getMonth() === vw.m, isS = sameDay(dt, start), isE = sameDay(dt, pEnd), isEnd = isS || isE, isHovEnd = !sel && isE, isT = sameDay(dt, today);
+                const rng = !!(start && pEnd) && (dayN(dt) as number) > (dayN(start) as number) && (dayN(dt) as number) < (dayN(pEnd) as number);
+                const rad = isS ? (pEnd ? '8px 0 0 8px' : '8px') : (isE ? (start ? '0 8px 8px 0' : '8px') : (rng ? '0' : '8px'));
+                return (
+                  <button key={i} onClick={() => pick(dt)} onMouseEnter={() => { if (start && !sel) setHover(toISO(dt)); }}
+                    style={{ height: 32, borderRadius: rad, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: (isEnd || isT) ? 800 : 600, fontSize: 12.5,
+                      background: isEnd ? (isHovEnd ? '#9a83f5' : '#7c5cff') : (rng ? '#efe9ff' : 'transparent'), color: isEnd ? '#fff' : (inM ? '#1a1813' : '#cfcdc4'),
+                      boxShadow: (isT && !isEnd) ? 'inset 0 0 0 1.5px #ddd0f7' : 'none', display: 'grid', placeItems: 'center' }}>
+                    {dt.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid #f2f1ed' }}>
+              <button onClick={() => { planActions.setDraft({ startDate: '', tradeDate: '' }); setOpen(false); setHover(null); }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 12.5, color: '#897f70', padding: 0 }}>Clear</button>
+              {(start && pEnd)
+                ? <span style={{ fontWeight: 800, fontSize: 12, color: '#7c5cff' }}>{(() => { const dd = Math.round(((dayN(pEnd) as number) - (dayN(start) as number)) / 86400000); return dd === 0 ? 'same day' : dd === 1 ? '1 day hold' : dd + ' days hold'; })()}</span>
+                : <span style={{ fontWeight: 600, fontSize: 11, color: '#b3aea2' }}>{start ? 'Pick the exit date' : 'Pick the entry date'}</span>}
+            </div>
           </div>
         </>, document.body) : null}
     </div>
@@ -630,7 +695,7 @@ export function Editor() {
     const name = d.name.trim();
     const plan: Plan = editing
       ? { ...editing, ...d, name, draft: { ...d }, status: editing.status }
-      : { id: 'tp_' + Date.now().toString(36), sym: d.sym, dir: d.dir, conv: d.conv, status: 'idea' as Status, createdAt: Date.now(), name, lev: d.lev, rationale: d.rationale, trigger: d.trigger, invalidation: d.invalidation, targetNote: d.targetNote, tradeDate: d.tradeDate, entry: d.entry, stop: d.stop, rr: c.rrList[0]?.rr, draft: { ...d } };
+      : { id: 'tp_' + Date.now().toString(36), sym: d.sym, dir: d.dir, conv: d.conv, status: 'idea' as Status, createdAt: Date.now(), name, lev: d.lev, rationale: d.rationale, trigger: d.trigger, invalidation: d.invalidation, targetNote: d.targetNote, startDate: d.startDate, tradeDate: d.tradeDate, entry: d.entry, stop: d.stop, rr: c.rrList[0]?.rr, draft: { ...d } };
     planActions.savePlan(plan);
   };
 

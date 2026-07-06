@@ -35,7 +35,8 @@ export interface PlanDraft {
   trailPeriod?: string;
   bankPct?: string;
   bankTarget?: string;
-  tradeDate?: string;
+  startDate?: string; // planned entry date (range start), ISO yyyy-mm-dd
+  tradeDate?: string; // planned exit / expected date (range end)
 }
 
 // A saved plan: board metadata + (for user plans) a full `draft` snapshot. Seeds
@@ -63,6 +64,7 @@ export interface Plan {
   riskPctLabel?: string;
   chart?: string;
   draft?: PlanDraft;
+  startDate?: string; // planned entry date (range start) — editor-only, not read downstream
   tradeDate?: string; // expected trade date (ISO yyyy-mm-dd)
   archived?: boolean; // hidden from its column unless "show archived" is on
 }
@@ -83,7 +85,7 @@ export function TP_BLANK(): PlanDraft {
     entry: '', ez1: '', ez2: '', stop: '', t1: '', t2: '', t3: '',
     lev: 5, sizeMode: 'marginpct', sizeVal: '', sizeVals: {},
     chart: '', name: '', rationale: '', trigger: '', invalidation: '', targetNote: '',
-    trailPeriod: '', bankPct: '70', bankTarget: '100k', tradeDate: todayISO(),
+    trailPeriod: '', bankPct: '70', bankTarget: '100k', startDate: '', tradeDate: todayISO(),
   };
 }
 
