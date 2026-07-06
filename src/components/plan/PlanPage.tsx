@@ -840,10 +840,11 @@ export function PlanPage() {
             Loading economic calendar…
           </div>
         ) : (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 7 }}><FedChip /></div>
+          <div style={{ position: 'relative' }}>
+            {/* Fed chip floats just above the header's top-right — absolute, so it adds no row height */}
+            <span style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, zIndex: 2 }}><FedChip /></span>
             <NewsHeader next={nextEvent ?? null} progressPct={newsProgress} counts={tierCounts} total={weekHigh.length} onViewAll={() => setNewsOpen(true)} />
-          </>
+          </div>
         )}
         {/* strip cards — hidden entirely when there are no upcoming events
             (the empty banner above already says so) */}
