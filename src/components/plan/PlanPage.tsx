@@ -510,16 +510,18 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
   const legend: [string, number, string][] = [['#0ea5e9', counts.usMacro, 'US Macro'], ['#7c5cff', counts.centralBank, 'Central bank']];
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', background: '#fff', border: '1px solid #efedea', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(20,20,12,0.03)', flexWrap: 'wrap' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 17px', flex: '0 0 auto' }}>
-        <span style={{ position: 'relative', width: 8, height: 8, flex: '0 0 auto', display: 'inline-block' }}>
-          <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#1f9d55' }} />
-          <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#1f9d55', transformOrigin: 'center', animation: 'pkPulse 2s infinite' }} />
-        </span>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#1a1813', whiteSpace: 'nowrap' }}>Market news</span>
-          <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#bba074', whiteSpace: 'nowrap' }}>Live feed</span>
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: '11px 17px', flex: '0 0 auto' }}>
         <FedChip />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ position: 'relative', width: 8, height: 8, flex: '0 0 auto', display: 'inline-block' }}>
+            <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#1f9d55' }} />
+            <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#1f9d55', transformOrigin: 'center', animation: 'pkPulse 2s infinite' }} />
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#1a1813', whiteSpace: 'nowrap' }}>Market news</span>
+            <span style={{ fontWeight: 700, fontSize: 8.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#bba074', whiteSpace: 'nowrap' }}>Live feed</span>
+          </div>
+        </div>
       </div>
       <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
       {next ? (
