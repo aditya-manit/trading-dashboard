@@ -485,10 +485,10 @@ function FedChip() {
     : <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
   return (
     <HoverTip tip={`Fed policy cycle — auto-detected from the fed funds rate${reg.rate != null ? ` (now ${reg.rate.toFixed(2)}%${reg.asOf ? ', ' + reg.asOf.slice(0, 7) : ''})` : ''}. It sets every card's Fed step: hiking → "hikes", holding/cutting → "stays tight".`} width={266}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px 3px 6px', borderRadius: 999, background: cfg.bg, cursor: 'help', whiteSpace: 'nowrap' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'help', whiteSpace: 'nowrap' }}>
         {icon}
-        <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: cfg.col }}>Fed · {cfg.label}</span>
-        {reg.rate != null && <span style={{ fontFamily: 'var(--font-mono), monospace', fontWeight: 700, fontSize: 9, color: cfg.col }}>{reg.rate.toFixed(2)}%</span>}
+        <span style={{ fontWeight: 800, fontSize: 11, color: cfg.col }}>{cfg.label}</span>
+        {reg.rate != null && <span style={{ fontWeight: 600, fontSize: 9, color: '#a8a69b', fontVariantNumeric: 'tabular-nums' }}>{reg.rate.toFixed(2)}%</span>}
       </span>
     </HoverTip>
   );
@@ -564,6 +564,11 @@ function NewsHeader({ next, progressPct, counts, total, onViewAll }: {
             </span>
           ))}
         </div>
+      </div>
+      <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5, padding: '11px 16px', flex: '0 0 auto' }}>
+        <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#a8a69b' }}>Fed</span>
+        <FedChip />
       </div>
       <div style={{ width: 1, background: '#efedea', flex: '0 0 auto' }} />
       <button onClick={onViewAll} onMouseEnter={() => setVaHover(true)} onMouseLeave={() => setVaHover(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontFamily: 'inherit', background: vaHover ? '#faf8ff' : 'transparent', border: 'none', padding: '0 16px', flex: '0 0 auto', alignSelf: 'stretch', transition: 'all .15s' }}>
@@ -840,11 +845,7 @@ export function PlanPage() {
             Loading economic calendar…
           </div>
         ) : (
-          <div style={{ position: 'relative' }}>
-            {/* Fed chip floats just above the header's top-right — absolute, so it adds no row height */}
-            <span style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, zIndex: 2 }}><FedChip /></span>
-            <NewsHeader next={nextEvent ?? null} progressPct={newsProgress} counts={tierCounts} total={weekHigh.length} onViewAll={() => setNewsOpen(true)} />
-          </div>
+          <NewsHeader next={nextEvent ?? null} progressPct={newsProgress} counts={tierCounts} total={weekHigh.length} onViewAll={() => setNewsOpen(true)} />
         )}
         {/* strip cards — hidden entirely when there are no upcoming events
             (the empty banner above already says so) */}
