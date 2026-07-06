@@ -478,7 +478,7 @@ function FedChip() {
   // cutting = easy/bullish green, holding = neutral slate)
   const cfg = r === 'hiking' ? { label: 'Hiking', col: '#df5338' }
     : r === 'cutting' ? { label: 'Cutting', col: '#1f9d55' }
-    : { label: 'Holding', col: '#5f7484' };
+    : { label: 'Holding', col: '#2f6ce8' };
   const sv = { width: 13, height: 13, viewBox: '0 0 24 24', style: { flex: '0 0 auto' } as CSSProperties };
   const icon = r === 'hiking' // ↑ hikes
     ? <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></svg>
@@ -486,7 +486,7 @@ function FedChip() {
     ? <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3" /><path d="M8.12 8.12 12 12" /><path d="M20 4 8.12 15.88" /><circle cx="6" cy="18" r="3" /><path d="M14.8 14.8 20 20" /></svg>
     : <svg {...sv} fill="none" stroke={cfg.col} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>; // 🔒 stays tight
   return (
-    <HoverTip tip={`Fed policy cycle — auto-detected from the fed funds rate${reg.rate != null ? ` (now ${reg.rate.toFixed(2)}%${reg.asOf ? ', ' + reg.asOf.slice(0, 7) : ''})` : ''}. It sets every card's Fed step: hiking → "hikes", holding/cutting → "stays tight".`} width={266}>
+    <HoverTip tip={`Fed policy cycle — auto-detected from the fed funds rate${reg.rate != null ? ` (now ${reg.rate.toFixed(2)}%${reg.asOf ? ', ' + reg.asOf.slice(0, 7) : ''})` : ''}. When the Fed cuts, money gets cheap and BTC tends to pump (green); hiking or staying tight is a headwind (red).`} width={266}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'help', whiteSpace: 'nowrap' }}>
         {icon}
         <span style={{ fontWeight: 600, fontSize: 11, color: cfg.col }}>{cfg.label}</span>
