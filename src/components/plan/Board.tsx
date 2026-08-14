@@ -25,24 +25,61 @@ const LANES: Lane[] = [
 ];
 const money = (v: number) => (isFinite(v) ? tpMoney(v, v < 1000 ? 2 : 0) : '—');
 
-// Board card — the 'ac' variant the design actually renders: margin donut +
-// coin/name/dir/lev + entry, over big Risk·equity / Reward·equity numbers + bar.
+const MONO5 = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
+const NEWS5 = "var(--font-news), 'Newsreader', Georgia, serif";
+// Per-status tint table for the 5a card's identity panel (base A→B gradient, hover H1/H2, label + separator).
+const T5: Record<Status, { a: string; b: string; h1: string; h2: string; lbl: string; sep: string }> = {
+  idea: { a: '#fffaf3', b: '#fbeeda', h1: '#fdf4e6', h2: '#f6ddb4', lbl: '#bd9c6a', sep: '#e6d3b4' },
+  armed: { a: '#f8f5ff', b: '#efe9fd', h1: '#f4edff', h2: '#e2d5fb', lbl: '#9a8fc0', sep: '#c9c1e2' },
+  triggered: { a: '#f4fbf7', b: '#e2f3ea', h1: '#ecf7f0', h2: '#c9e8d6', lbl: '#84ac94', sep: '#bcdcc8' },
+};
+// planned-window date labels for a card (single date via relDateLabel; range when startDate is set).
+function cardDateLabels(p: Plan): { main: string; sub: string | null } | null {
+  const rel = relDateLabel(p.tradeDate);
+  if (!rel) return null;
+  if (p.startDate && p.tradeDate) {
+    const sp = String(p.startDate).split('-'); const sd = new Date(+sp[0], +sp[1] - 1, +sp[2]);
+    const tp = String(p.tradeDate).split('-'); const td = new Date(+tp[0], +tp[1] - 1, +tp[2]);
+    if (!isNaN(sd.getTime()) && !isNaN(td.getTime())) {
+      const MM = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const fmt = (x: Date) => MM[x.getMonth()] + ' ' + x.getDate();
+      const sameMo = sd.getMonth() === td.getMonth() && sd.getFullYear() === td.getFullYear();
+      const main = fmt(sd) + ' → ' + (sameMo ? String(td.getDate()) : fmt(td));
+      const a0 = new Date(sd); a0.setHours(0, 0, 0, 0); const b0 = new Date(td); b0.setHours(0, 0, 0, 0);
+      const dd = Math.round((b0.getTime() - a0.getTime()) / 86400000);
+      return { main, sub: dd === 0 ? 'same day' : dd === 1 ? '1 day hold' : dd + ' days hold' };
+    }
+  }
+  return { main: rel.label, sub: rel.sub };
+}
+
+// Board card — the "5a" split card: a status-tinted identity panel (left, 56%) beside a
+// to-scale vertical risk/reward ladder (right). All numbers derive live from the saved plan.
 function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => void; tradeState?: 'executed' | 'closed' | null }) {
   const [hover, setHover] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [kbHover, setKbHover] = useState(false);
   const dragAt = useRef(0);
-  const rel = relDateLabel(p.tradeDate);
   const archived = !!p.archived;
-  const ts = tradeState ? ({ executed: { ink: '#1f9d55', tint: '#f3faf6', dot: '#1f9d55', label: 'Executed', sub: 'trade taken' }, closed: { ink: '#6f6a60', tint: '#faf9f7', dot: '#9a958a', label: 'Closed', sub: 'no trade taken' } } as const)[tradeState] : null;
   const long = p.dir === 'long', col = long ? '#1f9d55' : '#df5338';
+  const RED = '#df5338';
+  const levHigh = parseFloat(String(p.lev)) > 5;
   const d = planToDraft(p), c = tpCompute(d);
-  const tp1 = c.rrList[0], rr = c.primaryR;
+  const tp1 = c.rrList[0];
   const rewardUSD = tp1 ? tp1.rewardUSD : NaN, rewardPct = isFinite(rewardUSD) ? (rewardUSD / c.Q) * 100 : NaN;
-  const riskW = isFinite(rr) && rr > 0 ? Math.max(8, Math.min(60, 100 / (1 + rr))) : 25;
   const mp = Math.max(0, Math.min(100, c.marginPct || 0));
-  const cvn = ({ high: { n: 3, label: 'High', col: '#7c5cff' }, med: { n: 2, label: 'Med', col: '#9d86f5' }, low: { n: 1, label: 'Low', col: '#c3b6f2' } } as const)[p.conv || 'med'] || { n: 2, label: 'Med', col: '#9d86f5' };
+  const cvn = ({ high: { n: 3, col: '#7c5cff' }, med: { n: 2, col: '#9d86f5' }, low: { n: 1, col: '#c3b6f2' } } as const)[p.conv || 'med'] || { n: 2, col: '#9d86f5' };
+  const t5 = T5[p.status] || T5.armed;
+  const eqRisk = c.riskPct, eqRew = rewardPct;
+  const ladderOk = isFinite(eqRisk) && isFinite(eqRew) && eqRisk + eqRew > 0;
+  const eTop = ladderOk ? (eqRisk / (eqRisk + eqRew)) * 100 : 50;
+  const dateLbl = cardDateLabels(p);
+  const ts = tradeState ? ({ executed: { ink: '#1f9d55', tint: '#f3faf6', bd: '#cde9d8', dot: '#1f9d55', label: 'Executed', sub: 'trade taken' }, closed: { ink: '#6f6a60', tint: '#faf9f7', bd: '#e7e5df', dot: '#9a958a', label: 'Closed', sub: 'no trade taken' } } as const)[tradeState] : null;
+
+  const vLbl = (t: string, colr: string) => <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.09em', textTransform: 'uppercase', color: colr, whiteSpace: 'nowrap' }}>{t}</span>;
+  const zoneStyle = (share: number): React.CSSProperties => ({ flex: Math.max(ladderOk ? share : 50, 24), display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1, minWidth: 0 });
 
   return (
     <div draggable
@@ -50,33 +87,19 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
       onDragEnd={() => setDragging(false)}
       onClick={() => { if (Date.now() - dragAt.current > 250) onOpen(p); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative', background: '#fff', border: archived ? '1.5px dotted #c4c0b6' : '1px solid #efedea', borderRadius: 14, overflow: menuOpen ? 'visible' : 'hidden', zIndex: menuOpen ? 20 : undefined, cursor: dragging ? 'grabbing' : 'pointer', display: 'flex', flexDirection: 'column', opacity: dragging ? 0.45 : 1, boxShadow: dragging ? '0 12px 28px rgba(20,20,12,0.16)' : hover ? '0 6px 18px rgba(20,18,12,0.08)' : '0 1px 3px rgba(20,20,12,0.04)', transition: 'box-shadow .15s, opacity .12s' }}>
-      {/* direction bookmark (top-left triangle) — replaced by the ARCHIVED tag when archived */}
+      style={{ position: 'relative', background: '#fff', border: archived ? '1.5px dotted #c4c0b6' : '1px solid #efedea', borderRadius: 16, overflow: menuOpen ? 'visible' : 'hidden', zIndex: menuOpen ? 20 : undefined, cursor: dragging ? 'grabbing' : 'pointer', display: 'flex', flexDirection: 'column', opacity: dragging ? 0.45 : 1, boxShadow: dragging ? '0 12px 28px rgba(20,20,12,0.16)' : '0 1px 3px rgba(20,20,12,0.04)', transition: 'box-shadow .12s, opacity .12s, border-color .12s' }}>
+      {/* ARCHIVED tag (top-left) */}
       {archived ? (
         <span style={{ position: 'absolute', top: 8, left: 0, zIndex: 6, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px 3px 13px', borderRadius: '0 99px 99px 0', background: '#efede9', boxShadow: '0 1px 2px rgba(20,20,12,0.06)' }}>
           <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#8a857b" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><rect x={3} y={4} width={18} height={4} rx={1} /><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" /></svg>
           <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#8a857b' }}>Archived</span>
         </span>
-      ) : (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: 36, height: 36, background: col, clipPath: 'polygon(0 0,100% 0,0 100%)', zIndex: 3 }} />
-      )}
-      {/* corner: kebab (hover) over the always-on date trigger */}
+      ) : null}
+      {/* corner: kebab only (date moved into the identity panel) */}
       <div style={{ position: 'absolute', top: 8, right: 11, zIndex: 6, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
-        <button title="Plan actions" onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
-          style={{ width: 22, height: 22, flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid ' + (menuOpen ? '#ddd0f7' : '#efedea'), background: menuOpen ? '#f3eefe' : '#fff', borderRadius: 7, cursor: 'pointer', color: menuOpen ? '#7c5cff' : '#a8a39a', padding: 0, opacity: menuOpen || hover ? 1 : 0, transition: 'opacity .12s, background .12s, border-color .12s, color .12s' }}>
+        <button title="Plan actions" onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }} onMouseEnter={() => setKbHover(true)} onMouseLeave={() => setKbHover(false)}
+          style={{ width: 22, height: 22, flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid ' + (menuOpen || kbHover ? '#ddd0f7' : '#efedea'), background: menuOpen || kbHover ? '#f3eefe' : '#fff', borderRadius: 7, cursor: 'pointer', color: menuOpen || kbHover ? '#7c5cff' : '#a8a39a', padding: 0, opacity: menuOpen || hover ? 1 : 0, transition: 'opacity .12s, background .12s, border-color .12s, color .12s' }}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><circle cx={12} cy={5} r={1.7} /><circle cx={12} cy={12} r={1.7} /><circle cx={12} cy={19} r={1.7} /></svg>
-        </button>
-        <button title={rel ? 'Change expected date' : 'Set expected date'} onClick={(e) => { e.stopPropagation(); setDateOpen(true); }}
-          style={{ border: 'none', background: 'transparent', padding: '2px 4px', margin: '-2px -4px', borderRadius: 7, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#f7f5ff'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
-          {rel ? (
-            <>
-              <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '-0.015em', color: '#6b46e0' }}>{rel.label}</span>
-              {rel.sub ? <span style={{ fontWeight: 600, fontSize: 9, letterSpacing: '0.02em', color: '#b3aea2' }}>{rel.sub}</span> : null}
-            </>
-          ) : (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#b9a9ee' }}><CalIcon size={11} stroke="currentColor" />Date</span>
-          )}
         </button>
       </div>
       {menuOpen ? (
@@ -100,61 +123,84 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
         </>
       ) : null}
       {dateOpen ? <PlanDateModal plan={p} onClose={() => setDateOpen(false)} /> : null}
-      {/* head: donut + name/dir/lev + entry */}
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 13, padding: '12px 15px 9px' }}>
-        <div style={{ position: 'relative', width: 66, height: 66, flex: '0 0 auto', alignSelf: 'center', borderRadius: '50%', background: `conic-gradient(#7c5cff 0 ${mp}%,#f0efeb ${mp}% 100%)` }}>
-          <div style={{ position: 'absolute', inset: 7, background: '#fff', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.03em', color: '#1a1813', lineHeight: 1 }}>{isFinite(c.marginPct) ? Math.round(c.marginPct) : '—'}<span style={{ fontSize: 10, color: '#7c5cff' }}>%</span></span>
-            <span style={{ fontWeight: 700, fontSize: 6, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#bbb3a8' }}>margin</span>
+
+      <div style={{ display: 'flex', alignItems: 'stretch' }}>
+        {/* LEFT — status-tinted identity panel */}
+        <div style={{ position: 'relative', flex: '0 0 56%', minWidth: 0, overflow: 'hidden', padding: '18px 16px 17px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 196, background: `linear-gradient(160deg, ${t5.a}, ${t5.b})` }}>
+          {/* hover overlay: near-white top → deeper tint bottom */}
+          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(160deg, #ffffff 0%, ${t5.h1} 45%, ${t5.h2} 100%)`, opacity: hover ? 1 : 0, transition: 'opacity .3s ease', pointerEvents: 'none', zIndex: 0 }} />
+          {/* 1. meta row */}
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+            <CoinIcon sym={p.sym} />
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', flex: '1 1 auto', minWidth: 0 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontWeight: 800, fontSize: 9.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: col, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">{long ? <><path d="M7 17 17 7" /><path d="M8 7h9v9" /></> : <><path d="M7 7 17 17" /><path d="M17 8v9H8" /></>}</svg>{long ? 'Long' : 'Short'}
+              </span>
+              <span style={{ color: t5.sep, fontSize: 9, flexShrink: 0 }}>·</span>
+              <span style={{ fontWeight: 800, fontSize: 11.5, color: levHigh ? RED : '#1a1813', flexShrink: 0 }}>{p.lev}×</span>
+              <span style={{ color: t5.sep, fontSize: 9, flexShrink: 0 }}>·</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                {[0, 1, 2].map((i) => <span key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: i < cvn.n ? cvn.col : 'transparent', border: i < cvn.n ? 'none' : '1px solid ' + t5.sep, boxSizing: 'border-box' }} />)}
+              </span>
+            </span>
           </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 11, paddingRight: 58 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><CoinIcon sym={p.sym} /><span style={{ fontWeight: 800, fontSize: 13.5, letterSpacing: '-0.015em', color: '#1a1813', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpPlanName(p)}</span></span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 800, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: col }}>
-                <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">{long ? <><path d="M7 17 17 7" /><path d="M8 7h9v9" /></> : <><path d="M7 7 17 17" /><path d="M17 8v9H8" /></>}</svg>{long ? 'Long' : 'Short'}
+          {/* 2. title */}
+          <span style={{ position: 'relative', zIndex: 1, fontFamily: NEWS5, fontWeight: 600, fontSize: 17, letterSpacing: 0, color: '#1a1813', lineHeight: 1.25, paddingRight: 4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflowWrap: 'anywhere', wordBreak: 'break-word' } as React.CSSProperties}>{tpPlanName(p)}</span>
+          {/* 3. date + status row */}
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button title={dateLbl ? 'Change planned window' : 'Set planned window'} onClick={(e) => { e.stopPropagation(); setDateOpen(true); }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f3eefe'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              style={{ border: 'none', background: 'transparent', padding: '2px 4px', margin: '-2px -4px', borderRadius: 7, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, lineHeight: 1.05, width: 'max-content', maxWidth: '100%', transition: 'background .12s' }}>
+              {dateLbl ? (
+                <>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: '#7c5cff', whiteSpace: 'nowrap' }}>{dateLbl.main}</span>
+                  {dateLbl.sub ? <span style={{ fontWeight: 600, fontSize: 9, letterSpacing: '0.02em', color: p.startDate ? '#8a7fd0' : '#b3aea2' }}>{dateLbl.sub}</span> : null}
+                </>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#b9a9ee', opacity: hover ? 1 : 0, transition: 'opacity .12s' }}><CalIcon size={11} stroke="currentColor" />Date</span>
+              )}
+            </button>
+            {ts && p.status === 'triggered' ? (
+              <span title={ts.sub} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 99, background: ts.tint, border: '1px solid ' + ts.bd }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: ts.dot, flex: '0 0 auto' }} />
+                <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: ts.ink }}>{ts.label}</span>
               </span>
-              <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#d6d4cc' }} />
-              <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}><span style={{ fontWeight: 800, fontSize: 13, letterSpacing: '-0.02em', color: '#1a1813' }}>{p.lev}×</span><span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#b3b0a6' }}>lev</span></span>
-              <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#d6d4cc' }} />
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2.5 }}>
-                  {[0, 1, 2].map((i) => <span key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i < cvn.n ? cvn.col : 'transparent', border: i < cvn.n ? 'none' : '1px solid #d2cfc6', boxSizing: 'border-box' }} />)}
-                </span>
-                <span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#b3b0a6' }}>{cvn.label}</span>
-              </span>
+            ) : null}
+          </div>
+          {/* 4. entry + margin (pushed to the bottom) */}
+          <div style={{ position: 'relative', zIndex: 1, marginTop: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px 8px', flexWrap: 'wrap', paddingTop: 5 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{vLbl('Entry', t5.lbl)}
+              <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 19, color: '#1a1813', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>{c.hasEntry ? money(c.E) : '—'}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{vLbl('Margin · eq', t5.lbl)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 16, height: 16, borderRadius: '50%', background: `conic-gradient(#7c5cff 0% ${mp}%, #e3ddf6 ${mp}% 100%)`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f4f0fd', display: 'block' }} /></span>
+                <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 19, color: '#7c5cff', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>{isFinite(c.marginPct) ? Math.round(c.marginPct) + '%' : '—'}</span>
+              </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: '1px solid #f1f0ed', paddingTop: 3 }}>
-            <span style={{ fontWeight: 700, fontSize: 7.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#a8a69b' }}>Entry</span>
-            <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '-0.01em', color: '#1a1813' }}>{c.hasEntry ? money(c.E) : '—'}</span>
+        </div>
+
+        {/* RIGHT — to-scale vertical risk/reward ladder */}
+        <div style={{ flex: 1, display: 'flex', padding: '18px 14px 17px 13px', gap: 11, minWidth: 0 }}>
+          <div style={{ position: 'relative', flex: '0 0 5px' }}>
+            <div style={{ position: 'absolute', left: 0, top: 0, width: 5, height: eTop + '%', borderRadius: '3px 3px 0 0', background: 'linear-gradient(180deg,#df5338,#f0917f)' }} />
+            <div style={{ position: 'absolute', left: 0, top: eTop + '%', width: 5, height: (100 - eTop) + '%', borderRadius: '0 0 3px 3px', background: 'linear-gradient(180deg,#5fbd88,#1f9d55)' }} />
+            <span style={{ position: 'absolute', left: -2, top: `calc(${eTop}% - 4px)`, width: 9, height: 9, borderRadius: '50%', background: '#1a1813', border: '2px solid #ffffff', boxShadow: '0 0 0 1px #1a1813' }} />
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={zoneStyle(eqRisk)}>{vLbl('Risk · eq', '#df5338')}
+              <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 18.5, letterSpacing: '-0.01em', color: '#df5338', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(eqRisk) ? '-' + Math.round(eqRisk) + '%' : '—'}</span>
+              <span style={{ fontFamily: MONO5, fontSize: 11, color: '#e0a89e', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : ''}</span>
+            </div>
+            <div style={{ height: 8 }} />
+            <div style={zoneStyle(eqRew)}>{vLbl('Reward · eq', '#1f9d55')}
+              <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 18.5, letterSpacing: '-0.01em', color: '#1f9d55', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(eqRew) ? '+' + Math.round(eqRew) + '%' : '—'}</span>
+              <span style={{ fontFamily: MONO5, fontSize: 11, color: '#8fcaa7', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(rewardUSD) ? '+' + money(rewardUSD) : ''}</span>
+            </div>
           </div>
         </div>
       </div>
-      {/* triggered: executed (trade linked) / closed (no trade) */}
-      {ts ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 15px', borderTop: '1px solid #f3f2ef', background: ts.tint }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: ts.dot, flex: '0 0 auto' }} />
-          <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: ts.ink }}>{ts.label}</span>
-          <span style={{ fontWeight: 600, fontSize: 9.5, color: '#b3aea2' }}>{'· ' + ts.sub}</span>
-        </div>
-      ) : null}
-      {/* score */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', alignItems: 'center', padding: '11px 15px 12px', borderTop: '1px solid #f3f2ef' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bbb3a8' }}>Risk · equity</span>
-          <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.035em', color: '#df5338', lineHeight: 1.05 }}>{isFinite(c.riskPct) ? '↓ ' + c.riskPct.toFixed(1) + '%' : '—'}</span>
-          <span style={{ fontWeight: 700, fontSize: 10, color: '#c9a99f' }}>{isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : '—'}</span>
-        </div>
-        <span style={{ width: 1, height: 38, background: '#eeede9' }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-end' }}>
-          <span style={{ fontWeight: 700, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#bbb3a8' }}>Reward · equity</span>
-          <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.035em', color: '#1f9d55', lineHeight: 1.05 }}>{isFinite(rewardPct) ? '↑ ' + rewardPct.toFixed(1) + '%' : '—'}</span>
-          <span style={{ fontWeight: 700, fontSize: 10, color: '#9cc4ab' }}>{isFinite(rewardUSD) ? '+' + money(rewardUSD) : '—'}</span>
-        </div>
-      </div>
-      <div style={{ display: 'flex', height: 4 }}><div style={{ width: riskW + '%', background: '#df5338' }} /><div style={{ flex: 1, background: '#1f9d55' }} /></div>
     </div>
   );
 }
