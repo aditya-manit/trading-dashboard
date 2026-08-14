@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import {
   type PlanDraft, type SizeMode, type Sym, type Dir, type Conv,
   tpCompute, tpFmtNum, tpNum, tpMoney, tpAutoName, TP_MARKETS, TP_EQUITY, type Plan, type Status,
-  composeNote, tpEntryRungs, pctNum,
+  tpEntryRungs, pctNum, tpLevels, type Level,
 } from '@/lib/plan-model';
 import { HoverTip } from './HoverTip';
 import { planActions, usePlanStore } from '@/lib/plan-store';
@@ -24,8 +24,6 @@ const SIZE_MODES: { v: SizeMode; label: string; unit: string; hint: string }[] =
   { v: 'riskusd', label: 'Risk, USD', unit: 'USD risk', hint: 'USD lost if stopped' },
   { v: 'riskpct', label: 'Risk, %', unit: '% risk', hint: '% of equity risked' },
 ];
-
-const card: CSSProperties = { background: '#fff', border: '1px solid #efedf3', borderRadius: 18, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden' };
 
 // ── collapsible-section scaffolding (Theory: thesis/chart · Setup: identity/levels/sizing/leverage) ──
 type SecKey = 'thesis' | 'chart' | 'identity' | 'levels' | 'sizing' | 'leverage';
@@ -141,87 +139,74 @@ function PriceInput({ value, onChange, placeholder, accent = '#7c5cff', tint = '
   );
 }
 
-type ThesisFieldDef = { k: keyof PlanDraft; n: string; dot: string; nc: string; lab: string; cap: string; ph: string; tint: string };
+const MONO = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
+type ThesisFieldDef = { k: keyof PlanDraft; dot: string; lab: string; ph: string; tint: string };
 const THESIS_FIELDS: ThesisFieldDef[] = [
-  { k: 'rationale', n: '01', dot: '#7c5cff', nc: '#a99cf2', lab: 'Rationale', cap: 'why the trade exists', ph: 'Reclaim of the range low, momentum turning up.', tint: '#f5f2ff' },
-  { k: 'trigger', n: '02', dot: '#1f9d55', nc: '#92caa7', lab: 'Trigger', cap: 'the exact entry condition', ph: '15m close back above 64,000 and holds.', tint: '#eef8f1' },
-  { k: 'invalidation', n: '03', dot: '#df5338', nc: '#eaa493', lab: 'Invalidation', cap: 'what proves it wrong', ph: 'Loses 61,900 on the 1h — idea is dead.', tint: '#fdf3f0' },
-  { k: 'targetNote', n: '04', dot: '#c9821f', nc: '#e2bd86', lab: 'Target / exit', cap: 'how you take profit', ph: 'Scale out into 70k, trail the rest.', tint: '#fbf5ea' },
+  { k: 'rationale', dot: '#7c5cff', lab: 'Rationale', ph: 'Reclaim of the range low, momentum turning up.', tint: '#f5f2ff' },
+  { k: 'trigger', dot: '#1f9d55', lab: 'Trigger', ph: '15m close back above 64,000 and holds.', tint: '#eef8f1' },
+  { k: 'invalidation', dot: '#df5338', lab: 'Invalidation', ph: 'Loses 61,900 on the 1h — idea is dead.', tint: '#fdf3f0' },
+  { k: 'targetNote', dot: '#c9821f', lab: 'Target / exit', ph: '', tint: '#fbf5ea' },
 ];
-function ThesisField({ f, i, d }: { f: ThesisFieldDef; i: number; d: PlanDraft }) {
+// Plain text of the auto-composed Target/exit sentence (Tab commits this into the field).
+function targetPlainText(c: ReturnType<typeof tpCompute>): string {
+  const lv = (c.levels || []).filter((l) => l.hasPrice);
+  if (!lv.length) return 'Scale out into 70k, trail the rest.';
+  const money = (v: number) => tpMoney(v, v < 1000 ? 2 : 0);
+  let s = '';
+  lv.forEach((l, j) => {
+    const pct = Math.round(l.pct || 0), tf = l.trail, tl = l.trailLen;
+    const bank = 'bank ' + pct + '% at ' + money(l.price);
+    const trailTxt = tf ? 'trail on ' + tf + ' TF' + (tl ? ' · ' + tl + '-bar Donchian' : '') + ' and ' : '';
+    const leg = trailTxt + bank;
+    s += j === 0 ? leg.charAt(0).toUpperCase() + leg.slice(1) : ', then ' + leg;
+  });
+  return s + '.';
+}
+// Color-coded placeholder overlay for the empty Target/exit field (bank% green, trail purple, prices ink).
+function TargetPlaceholder({ c }: { c: ReturnType<typeof tpCompute> }) {
+  const GREY = '#8a8577', GREEN = '#1f9d55', PURP = '#7c5cff', INK = '#1a1813';
+  const money = (v: number) => tpMoney(v, v < 1000 ? 2 : 0);
+  const lv = (c.levels || []).filter((l) => l.hasPrice);
+  const seg: { s: string; col: string; mono?: boolean }[] = [];
+  const add = (s: string, col: string, mono?: boolean) => seg.push({ s, col, mono });
+  if (!lv.length) { add('Scale out into ', GREY); add('70k', GREEN, true); add(', trail the rest.', GREY); }
+  else {
+    lv.forEach((l, j) => {
+      const pct = Math.round(l.pct || 0), tf = l.trail, tl = l.trailLen;
+      const trailAdd = (cap: boolean) => { if (!tf) { add(cap ? 'Bank ' : 'bank ', GREY); return; } add(cap ? 'Trail on ' : 'trail on ', GREY); add(tf, PURP, true); add(' TF', GREY); if (tl) { add(' · ', GREY); add(tl + '-bar', PURP, true); add(' Donchian', GREY); } add(' and ', GREY); add('bank ', GREY); };
+      if (j === 0) trailAdd(true); else { add(', then ', GREY); trailAdd(false); }
+      add(pct + '%', GREEN, true); add(' at ', GREY); add(money(l.price), INK, true);
+    });
+    add('.', GREY);
+  }
+  return <span style={{ display: 'inline', lineHeight: 1.62 }}>{seg.map((x, i) => <span key={i} style={{ color: x.col, fontWeight: x.mono ? 700 : 600, fontFamily: x.mono ? MONO : 'inherit', fontVariantNumeric: x.mono ? 'tabular-nums' : 'normal' }}>{x.s}</span>)}</span>;
+}
+function ThesisField({ f, i, d, c }: { f: ThesisFieldDef; i: number; d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
   const [foc, setFoc] = useState(false);
-  // Tab on an empty field accepts the placeholder suggestion.
+  const isTarget = f.k === 'targetNote';
+  // Tab on an empty field accepts the placeholder suggestion (the composed sentence for Target/exit).
   const onTab = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Tab' && !e.shiftKey && !e.currentTarget.value && e.currentTarget.placeholder) {
-      e.preventDefault();
-      planActions.setDraft({ [f.k]: e.currentTarget.placeholder } as Partial<PlanDraft>);
+    if (e.key === 'Tab' && !e.shiftKey && !e.currentTarget.value) {
+      const sug = isTarget ? targetPlainText(c) : e.currentTarget.placeholder;
+      if (sug) { e.preventDefault(); planActions.setDraft({ [f.k]: sug } as Partial<PlanDraft>); }
     }
   };
+  const empty = !String(d[f.k] ?? '');
   return (
-    <div style={{ padding: '13px 18px', borderBottom: i < 3 ? '1px solid #f3f1f7' : 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 10.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#1a1813' }}>
-          <span style={{ fontWeight: 800, fontSize: 9, color: f.nc, fontVariantNumeric: 'tabular-nums' }}>{f.n}</span>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: f.dot }} />{f.lab}
-        </span>
-        <span style={{ fontWeight: 500, fontSize: 10.5, color: '#bdbbb1', letterSpacing: '0.01em' }}>{f.cap}</span>
-      </div>
-      {f.k === 'targetNote' ? <TargetRule d={d} /> : (
-        <textarea value={String(d[f.k] ?? '')} onChange={(e) => planActions.setDraft({ [f.k]: e.target.value } as Partial<PlanDraft>)} onKeyDown={onTab} onFocus={() => setFoc(true)} onBlur={() => setFoc(false)} placeholder={f.ph}
-          style={{ width: '100%', boxSizing: 'border-box', minHeight: 54, resize: 'vertical', padding: '8px 11px', border: 'none', borderRadius: 10, background: foc ? f.tint : 'transparent', fontFamily: 'inherit', fontWeight: 600, fontSize: 13.5, color: '#26221c', outline: 'none', lineHeight: 1.62, transition: 'background .15s' }} />
-      )}
-    </div>
-  );
-}
-function Thesis({ d }: { d: PlanDraft }) {
-  return <div style={{ display: 'flex', flexDirection: 'column' }}>{THESIS_FIELDS.map((f, i) => <ThesisField key={f.k} f={f} i={i} d={d} />)}</div>;
-}
-
-// ── Management rule strip (Target / exit) — tappable colored slots ──────────
-const MONO = "'JetBrains Mono', monospace";
-function MgmtChip({ val, presets, set, fmt, empty, ph, w, col, bg, bd }: {
-  val: string; presets: string[]; set: (v: string) => void; fmt?: (x: string) => string; empty: string; ph: string; w: number; col: string; bg: string; bd: string;
-}) {
-  const [editing, setEditing] = useState(false);
-  if (editing) {
-    return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, verticalAlign: 'middle' }}>
-        <input autoFocus value={val} placeholder={ph} onChange={(e) => set(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditing(false); }} onBlur={() => setEditing(false)}
-          style={{ width: w, border: '1px solid ' + bd, background: '#fff', borderRadius: 7, padding: '3px 8px', fontFamily: MONO, fontWeight: 800, fontSize: 12.5, color: col, outline: 'none' }} />
-        {presets.map((p) => (
-          <button key={p} onMouseDown={(e) => { e.preventDefault(); set(p); setEditing(false); }}
-            style={{ cursor: 'pointer', border: '1px solid ' + bd, background: bg, color: col, borderRadius: 6, padding: '3px 7px', fontFamily: MONO, fontWeight: 800, fontSize: 10.5, lineHeight: 1 }}>{fmt ? fmt(p) : p}</button>
-        ))}
+    <div style={{ padding: '11px 16px', borderBottom: i < 3 ? '1px solid #f3f1f7' : 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontWeight: 800, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#1a1813' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: f.dot }} />{f.lab}
       </span>
-    );
-  }
-  return (
-    <button onClick={() => setEditing(true)}
-      style={{ cursor: 'pointer', verticalAlign: 'middle', display: 'inline-flex', alignItems: 'center', gap: 4, border: (val ? '1px solid ' : '1px dashed ') + bd, background: bg, color: col, borderRadius: 7, padding: '2px 10px', fontFamily: MONO, fontWeight: 800, fontSize: 12.5, lineHeight: 1.45 }}>
-      {val ? (fmt ? fmt(val) : val) : empty}
-    </button>
-  );
-}
-function TargetRule({ d }: { d: PlanDraft }) {
-  const period = d.trailPeriod || '';
-  const pct = d.bankPct == null ? '70' : d.bankPct;
-  const target = d.bankTarget == null ? '100k' : d.bankTarget;
-  const setPeriod = (v: string) => planActions.setDraft({ trailPeriod: v, targetNote: composeNote(pct, v, target) });
-  const setPct = (v: string) => { const n = String(v).replace(/[^0-9]/g, ''); planActions.setDraft({ bankPct: n, targetNote: composeNote(n, period, target) }); };
-  const setTarget = (v: string) => { const t = String(v).trim(); planActions.setDraft({ bankTarget: t, targetNote: composeNote(pct, period, t) }); };
-  return (
-    <div style={{ minHeight: 82, boxSizing: 'border-box', padding: '12px 13px', borderRadius: 10, background: '#fbf8f3', border: '1px solid #f0e7d9', fontWeight: 600, fontSize: 13, lineHeight: 1.95, color: '#1a1813' }}>
-      Trail with <b style={{ color: '#7c5cff', fontFamily: MONO, fontWeight: 800 }}>Donchian(</b>
-      <MgmtChip val={period} presets={['15m', '1h', '4h']} set={setPeriod} empty="set period" ph="e.g. 1h" w={58} col="#7c5cff" bg="#f3eefe" bd="#ddd0f7" />
-      <b style={{ color: '#7c5cff', fontFamily: MONO, fontWeight: 800 }}>, 3)</b>
-      {' on impulse candles (HA). Bank '}
-      <MgmtChip val={pct} presets={['50', '70', '100']} set={setPct} fmt={(x) => x + '%'} empty="set %" ph="e.g. 70" w={54} col="#e07b2f" bg="#fdf2e8" bd="#f0d4b6" />
-      {' when reward hits '}
-      <MgmtChip val={target} presets={['100k', '150k', '200k']} set={setTarget} fmt={(x) => '$' + x} empty="set target" ph="e.g. 100k" w={66} col="#1f9d55" bg="#edf7f0" bd="#bce0cb" />
-      {', then trail the rest as before.'}
+      <div style={{ position: 'relative' }}>
+        <textarea value={String(d[f.k] ?? '')} onChange={(e) => planActions.setDraft({ [f.k]: e.target.value } as Partial<PlanDraft>)} onKeyDown={onTab} onFocus={() => setFoc(true)} onBlur={() => setFoc(false)} placeholder={isTarget ? '' : f.ph}
+          style={{ position: 'relative', zIndex: 1, width: '100%', boxSizing: 'border-box', minHeight: 54, fieldSizing: 'content', resize: 'vertical', padding: '8px 11px', border: 'none', borderRadius: 10, background: foc ? f.tint : 'transparent', fontFamily: 'inherit', fontWeight: 600, fontSize: 13.5, color: '#26221c', outline: 'none', lineHeight: 1.62, transition: 'background .15s' } as CSSProperties} />
+        {isTarget && empty ? <div style={{ position: 'absolute', left: 0, top: 0, padding: '8px 11px', fontSize: 13.5, lineHeight: 1.62, pointerEvents: 'none', zIndex: 0 }}><TargetPlaceholder c={c} /></div> : null}
+      </div>
     </div>
   );
+}
+function Thesis({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
+  return <div style={{ display: 'flex', flexDirection: 'column' }}>{THESIS_FIELDS.map((f, i) => <ThesisField key={f.k} f={f} i={i} d={d} c={c} />)}</div>;
 }
 
 // ── Planned-window date RANGE picker (Notion-style start→end) ─────────────────
@@ -380,27 +365,7 @@ function ChartUpload({ d, onFull }: { d: PlanDraft; onFull: (src: string) => voi
 }
 const tool: CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'inherit', fontWeight: 800, fontSize: 10.5, padding: '6px 9px', borderRadius: 8, border: 'none', background: 'rgba(20,18,12,0.6)', color: '#fff', backdropFilter: 'blur(5px)' };
 
-// ── inline TP widgets (TP1 · Bank% · preset menu · TP2 · Donchian-trail period · preset menu), ported from dc.html ──
 const MONOF = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
-const BANK_PRESETS = ['50', '60', '70', '75', '80', '100'];
-const PER_PRESETS = ['12h', '1d', '2d', '3d', '1w'];
-// Portaled to <body> — the Setup group has overflow:hidden (rounded corners) which
-// would otherwise clip the dropdown. Anchored below-right of the chevron via `pos`.
-function PresetMenu({ title, opts, cur, fmt, onPick, accent, accentBg, onClose, pos }: { title: string; opts: string[]; cur: string; fmt: (v: string) => string; onPick: (v: string) => void; accent: string; accentBg: string; onClose: () => void; pos: { top: number; right: number } }) {
-  return createPortal(
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200 }} />
-      <div style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 201, background: '#fff', border: '1px solid #ece9e3', borderRadius: 11, boxShadow: '0 14px 34px -10px rgba(30,20,10,.26)', padding: 5, minWidth: 138, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#b3aea2', padding: '4px 9px 5px' }}>{title}</div>
-        {opts.map((o) => { const active = String(cur) === String(o); return (
-          <button key={o} onClick={() => onPick(o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, border: 'none', background: active ? accentBg : 'transparent', borderRadius: 7, padding: '7px 9px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-            <span style={{ fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: active ? accent : '#3a352c' }}>{fmt(o)}</span>
-            {active ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg> : null}
-          </button>
-        ); })}
-      </div>
-    </>, document.body);
-}
 // ── Multi-fill entry ladder + section labels (handoff: full Levels port) ─────
 function Pie({ pct, color, size = 11 }: { pct: number; color: string; size?: number }) {
   const r = 9, cx = 12, cy = 12, p = Math.max(0, Math.min(100, isFinite(pct) ? pct : 0));
@@ -417,6 +382,37 @@ const setEntryField = (d: PlanDraft, idx: number, field: 'price' | 'pct', val: s
 };
 const addEntry = (d: PlanDraft) => { const ex = tpEntryRungs(d).map((r) => ({ price: r.price, pct: r.pct })); if (ex.length >= 6) return; ex.push({ price: '', pct: '' }); planActions.setDraft({ entries: ex, entryMode: 'ladder' }); };
 const removeEntry = (d: PlanDraft, idx: number) => { const ex = tpEntryRungs(d).map((r) => ({ price: r.price, pct: r.pct })); if (ex.length <= 2) return; ex.splice(idx, 1); planActions.setDraft({ entries: ex, entryMode: 'ladder' }); };
+
+// ── scale-out level editing (writes the legacy t1/bankPct + t2/t2pct/trailPeriod + tExtra[] fields) ──
+type LvlField = 'price' | 'pct' | 'trail' | 'trailLen';
+const setLevelField = (d: PlanDraft, idx: number, field: LvlField, val: string) => {
+  if (idx === 0) return planActions.setDraft(({ price: { t1: val }, pct: { bankPct: val }, trail: { t1trail: val }, trailLen: { t1trailLen: val } } as Record<LvlField, Partial<PlanDraft>>)[field]);
+  if (idx === 1) return planActions.setDraft(({ price: { t2: val }, pct: { t2pct: val }, trail: { trailPeriod: val }, trailLen: { trailPeriodLen: val } } as Record<LvlField, Partial<PlanDraft>>)[field]);
+  const ex = (Array.isArray(d.tExtra) ? d.tExtra : []).slice();
+  const j = idx - 2;
+  const cur = ex[j] || { price: '', pct: '', trail: '1d', trailLen: '' };
+  ex[j] = { ...cur, [field]: val };
+  planActions.setDraft({ tExtra: ex });
+};
+const bankSumNonLast = (d: PlanDraft): number => { const lv = tpLevels(d); let s = 0; lv.forEach((l, i) => { if (i < lv.length - 1) { const p = pctNum(l.pct); if (isFinite(p)) s += p; } }); return Math.min(100, s); };
+const addLevel = (d: PlanDraft) => {
+  const lv = tpLevels(d);
+  if (lv.length >= 6) return;
+  // the current last level's effective % (its own, or the remainder if blank) is split ~half with the new one
+  const nonLastSum = bankSumNonLast(d);
+  const lastParsed = pctNum(lv[lv.length - 1].pct);
+  const lastEff = isFinite(lastParsed) ? lastParsed : Math.max(0, 100 - nonLastSum);
+  const demotedPct = String(Math.max(0, Math.round(lastEff / 2)));
+  const demotedIdx = lv.length - 1;
+  const ex = (Array.isArray(d.tExtra) ? d.tExtra : []).slice();
+  const patch: Partial<PlanDraft> = {};
+  if (demotedIdx === 1) patch.t2pct = demotedPct;
+  else if (demotedIdx >= 2) { const j = demotedIdx - 2; const cur = ex[j] || { price: '', pct: '', trail: '1d', trailLen: '' }; ex[j] = { ...cur, pct: demotedPct }; }
+  ex.push({ price: '', pct: '', trail: '1d', trailLen: '' }); // new last level: blank pct → defaults to the remainder
+  patch.tExtra = ex;
+  planActions.setDraft(patch);
+};
+const removeLevel = (d: PlanDraft, idx: number) => { if (idx < 2) return; const ex = (Array.isArray(d.tExtra) ? d.tExtra : []).slice(); ex.splice(idx - 2, 1); planActions.setDraft({ tExtra: ex }); };
 
 function EntryLadder({ d }: { d: PlanDraft }) {
   const PURP = '#7c5cff', INK = '#1a1813';
@@ -478,8 +474,8 @@ function EntryTotals({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }
   );
 }
 
-function BanksTotal({ d }: { d: PlanDraft }) {
-  const pctTotal = Math.round(pctNum(d.bankPct) || 0);
+function BanksTotal({ c }: { c: ReturnType<typeof tpCompute> }) {
+  const pctTotal = Math.round(c.pctTotal || 0);
   const bad = pctTotal !== 100;
   return <span style={{ fontWeight: 600, fontSize: 10.5, color: bad ? '#c0492f' : '#8f8a7f' }}>Banks <b style={{ color: bad ? '#df5338' : '#1f9d55', fontWeight: 800, fontFamily: MONOF }}>{pctTotal + '%'}</b>{bad ? ' · aim 100%' : ''}</span>;
 }
@@ -507,9 +503,13 @@ function SectionHeader({ text, color, tip, right }: { text: string; color: strin
 }
 
 function LiqCell({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
-  const liqVal = c.hasEntry && isFinite(c.liq) ? tpFmtNum(String(Math.round(c.liq))) : '';
-  const pctHint = c.hasEntry && isFinite(c.liq) && c.E ? (c.liq / c.E - 1) * 100 : NaN;
-  const pctTxt = isFinite(pctHint) ? (pctHint >= 0 ? '+' : '') + pctHint.toFixed(0) + '%' : '';
+  // Auto liquidation from the current entry (falls back to the live mark before an entry is typed),
+  // so the cell always previews where liq sits at this leverage. Editing leverage is the only mover.
+  const L = tpNum(d.lev) || 5;
+  const E = c.E;
+  const lq = isFinite(E) && E > 0 ? (d.dir === 'long' ? E * (1 - 1 / L) : E * (1 + 1 / L)) : NaN;
+  const liqVal = isFinite(lq) ? tpFmtNum(String(Math.round(lq))) : '';
+  const pctTxt = isFinite(E) && E > 0 ? '-' + Math.round((100 / L) * 10) / 10 + '%' : '';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
       <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#a8a294' }}>Liquidation <span style={{ color: '#c8c3b8' }}>· auto from {tpNum(d.lev) || 5}×</span></span>
@@ -549,74 +549,128 @@ function DirLevHeading({ d }: { d: PlanDraft }) {
   );
 }
 
-function TargetInputs({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
-  const [bankMenu, setBankMenu] = useState(false);
-  const [perMenu, setPerMenu] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
-  const period = d.trailPeriod || '', pct = d.bankPct == null ? '70' : d.bankPct, target = d.bankTarget == null ? '100k' : d.bankTarget;
-  // bank% and trail period are shared with the thesis Target-rule sentence AND drive the
-  // Reward·plan split — so every setter recomposes targetNote (bankPct also flows into the strip).
-  const setPct = (v: string) => { const n = String(v).replace(/[^0-9]/g, '').slice(0, 3); planActions.setDraft({ bankPct: n, targetNote: composeNote(n, period, target) }); };
-  const setPer = (v: string) => planActions.setDraft({ trailPeriod: v, targetNote: composeNote(pct, v, target) });
-  const parseReward = (s: string) => { let t = String(s ?? '').trim().toLowerCase().replace(/[$,\s]/g, ''); if (!t) return NaN; let mult = 1; if (t.slice(-1) === 'k') { mult = 1e3; t = t.slice(0, -1); } else if (t.slice(-1) === 'm') { mult = 1e6; t = t.slice(0, -1); } const n = parseFloat(t); return isFinite(n) ? n * mult : NaN; };
-  const priceToReward = (price: number) => { const E = c.E, qty = c.qty; if (!isFinite(price) || price <= 0 || !isFinite(E) || E <= 0 || !isFinite(qty) || qty <= 0) return null; const rew = d.dir === 'long' ? (price - E) * qty : (E - price) * qty; return isFinite(rew) && rew > 0 ? Math.round(rew) : null; };
-  // TP1 price ⇄ bank target: typing a TP1 price recomputes the $ target (and the thesis
-  // Target-rule sentence); an empty TP1 shows the target-derived price as a Tab-to-accept hint.
-  const onT1Change = (raw: string) => { const patch: Partial<PlanDraft> = { t1: raw }; const rew = priceToReward(parseFloat(raw.replace(/,/g, ''))); if (rew != null) { const tgt = rew.toLocaleString('en-US'); patch.bankTarget = tgt; patch.targetNote = composeNote(pct, period, tgt); } planActions.setDraft(patch); };
-  const t1Sug = (() => { const E = c.E, qty = c.qty, r = parseReward(target); if (!isFinite(r) || r <= 0 || !isFinite(E) || E <= 0 || !isFinite(qty) || qty <= 0) return null; const price = d.dir === 'long' ? E + r / qty : E - r / qty; if (!isFinite(price) || price <= 0) return null; return price >= 1000 ? Math.round(price) : +price.toFixed(2); })();
-  const onT1Key = (e: React.KeyboardEvent<HTMLInputElement>) => { const accept = (e.key === 'Tab' && !e.shiftKey) || e.key === 'Enter'; if (accept && !d.t1 && t1Sug != null) { e.preventDefault(); onT1Change(String(t1Sug)); } };
-  const priceInput = (k: 't1' | 't2') => {
-    const isT1 = k === 't1', ph = isT1 && t1Sug != null ? tpFmtNum(String(t1Sug)) : '0.00';
-    return (
+// portaled dropdown shell (anchored to a chevron rect), avoids the Setup sheet's overflow clip
+function LvlPortal({ pos, onClose, panelStyle, children }: { pos: { top: number; left?: number; right?: number }; onClose: () => void; panelStyle?: CSSProperties; children: React.ReactNode }) {
+  return createPortal(
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200 }} />
+      <div style={{ position: 'fixed', top: pos.top, left: pos.left, right: pos.right, zIndex: 201, background: '#fff', border: '1px solid #ece9e3', borderRadius: 11, boxShadow: '0 14px 34px -10px rgba(30,20,10,.26)', ...panelStyle }}>{children}</div>
+    </>, document.body);
+}
+const GRN = '#1f9d55';
+const BANK_OPTS: { v: string; hint?: string }[] = [{ v: '25' }, { v: '50' }, { v: '70', hint: 'default' }, { v: '100', hint: 'all' }];
+const TRAIL_TF_OPTS: { v: string; hint?: string }[] = [{ v: '15m' }, { v: '1h' }, { v: '4h' }, { v: '1d', hint: 'daily' }];
+const TRAIL_LEN_OPTS: { v: string }[] = [{ v: '3' }, { v: '5' }, { v: '8' }, { v: '10' }];
+const chkIcon = (col: string) => <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>;
+
+// ── Targets = scale-out bank ladder (each row: trail·Donchian | $price/reward | bank%), ported from tpTargetsUI ──
+function TargetsLadder({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
+  const raw = tpLevels(d);
+  const levels: Level[] = c.levels || [];
+  const [menu, setMenu] = useState<{ idx: number; kind: 'bank' | 'trail'; pos: { top: number; left?: number; right?: number } } | null>(null);
+  const [unitMap, setUnitMap] = useState<Record<number, 'price' | 'reward'>>({});
+  const [rewEdit, setRewEdit] = useState<{ idx: number; text: string } | null>(null);
+  const closeMenu = () => setMenu(null);
+  const openMenu = (e: React.MouseEvent, idx: number, kind: 'bank' | 'trail') => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setMenu((m) => (m && m.idx === idx && m.kind === kind ? null : { idx, kind, pos: { top: r.bottom + 6, left: kind === 'trail' ? r.left : undefined, right: kind === 'bank' ? Math.max(8, window.innerWidth - r.right) : undefined } }));
+  };
+  const chev = (idx: number, kind: 'bank' | 'trail', col: string) => (
+    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); openMenu(e, idx, kind); }} aria-label={kind + ' presets'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', padding: '2px 0 2px 1px', margin: 0, cursor: 'pointer', color: col }}>
+      <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+    </button>
+  );
+  const trailIcon = <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={GRN} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={6} cy={19} r={3} /><circle cx={18} cy={5} r={3} /><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /></svg>;
+
+  const row = (idx: number) => {
+    const rl = raw[idx], cl = levels[idx] || ({} as Level);
+    const isLastRow = idx === levels.length - 1;
+    const pctPh = isLastRow ? String(Math.round(c.runnerPct || 0)) : '70';
+    const unit = unitMap[idx] === 'reward' ? 'reward' : 'price';
+    const toggleUnit = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); setUnitMap((m) => ({ ...m, [idx]: unit === 'reward' ? 'price' : 'reward' })); };
+    const solveRew = (num: number) => { const frac = (pctNum(rl.pct) || (isLastRow ? c.runnerPct || 0 : 70)) / 100; const qty = c.qty, E = c.E; if (isFinite(num) && frac > 0 && isFinite(qty) && qty > 0 && isFinite(E) && E > 0) { const price = d.dir === 'long' ? E + num / (qty * frac) : E - num / (qty * frac); setLevelField(d, idx, 'price', String(Math.round(price))); } };
+    const rewDisp = cl.rewardUSD != null && isFinite(cl.rewardUSD) ? tpFmtNum(String(Math.round(cl.rewardUSD))) : '';
+    const rewShown = rewEdit && rewEdit.idx === idx ? rewEdit.text : rewDisp;
+
+    const trailSeg = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 1, borderRight: '1px solid #dcefe4', background: '#f1f9f4', padding: '0 3px 0 6px', flex: '0 0 auto' }}>
+        {trailIcon}
+        <input value={rl.trail || ''} onChange={(e) => setLevelField(d, idx, 'trail', e.target.value.replace(/[^0-9a-zA-Z]/g, '').slice(0, 4))} onKeyDown={(e) => { if (e.key === 'Tab' && !e.shiftKey && !e.currentTarget.value && e.currentTarget.placeholder) { e.preventDefault(); setLevelField(d, idx, 'trail', e.currentTarget.placeholder); } }} placeholder="1d" style={{ width: 20, textAlign: 'center', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 11.5, color: GRN, outline: 'none' }} />
+        <span style={{ color: '#b7d7c6', fontWeight: 800, fontSize: 11 }}>·</span>
+        <input value={rl.trailLen || ''} onChange={(e) => setLevelField(d, idx, 'trailLen', e.target.value.replace(/[^0-9]/g, '').slice(0, 3))} onKeyDown={(e) => { if (e.key === 'Tab' && !e.shiftKey && !e.currentTarget.value && e.currentTarget.placeholder) { e.preventDefault(); setLevelField(d, idx, 'trailLen', e.currentTarget.placeholder); } }} inputMode="numeric" placeholder="20" title="Donchian length (bars)" style={{ width: 20, textAlign: 'center', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 11.5, color: GRN, outline: 'none' }} />
+        {chev(idx, 'trail', GRN)}
+      </div>
+    );
+    const priceInner = (
       <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-        <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, fontSize: 14, color: '#cbc9c0' }}>$</span>
-        <input value={d[k]} onChange={(e) => (isT1 ? onT1Change(e.target.value.replace(/,/g, '')) : planActions.setDraft({ [k]: e.target.value.replace(/,/g, '') } as Partial<PlanDraft>))} onKeyDown={isT1 ? onT1Key : undefined} inputMode="decimal" placeholder={ph} style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px 8px 26px', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', color: '#1a1813', outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
-        {isT1 && t1Sug != null && !d.t1 ? (
-          <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', display: 'inline-flex', alignItems: 'center', gap: 4, pointerEvents: 'none' }}>
-            <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9db5a6' }}>Tab</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 17, height: 15, borderRadius: 5, background: '#edf5f0', border: '1px solid #d5e7dd', color: '#3f9968', fontSize: 10.5, fontWeight: 800 }}>⇥</span>
-          </span>
-        ) : null}
+        <button onClick={toggleUnit} title="Toggle price / reward $" style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', padding: 3, cursor: 'pointer', fontFamily: MONOF, fontWeight: 800, fontSize: 13, lineHeight: 1, color: unit === 'reward' ? GRN : '#cbc9c0' }}>{unit === 'reward' ? '+$' : '$'}</button>
+        {unit === 'reward'
+          ? <input value={rewShown} onChange={(e) => { const t = e.target.value; setRewEdit({ idx, text: t }); solveRew(parseFloat(t.replace(/[^0-9.]/g, ''))); }} onBlur={() => setRewEdit(null)} inputMode="numeric" placeholder="0" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 3px 8px 31px', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 600, fontSize: 13.5, letterSpacing: '-0.02em', color: GRN, outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
+          : <input value={tpFmtNum(rl.price)} onChange={(e) => setLevelField(d, idx, 'price', e.target.value.replace(/,/g, ''))} inputMode="decimal" placeholder="0.00" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 3px 8px 23px', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 600, fontSize: 13.5, letterSpacing: '-0.02em', color: '#1a1813', outline: 'none', fontVariantNumeric: 'tabular-nums' }} />}
+      </div>
+    );
+    const bankChip = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 1, borderLeft: '1px solid #d5ebdf', background: '#eef7f1', padding: '0 3px 0 6px', flex: '0 0 auto' }}>
+        <Pie pct={isFinite(cl.pct) ? cl.pct : (pctNum(rl.pct) || (isLastRow ? c.runnerPct : 70))} color={GRN} />
+        <input value={rl.pct || ''} onChange={(e) => setLevelField(d, idx, 'pct', e.target.value.replace(/[^0-9]/g, '').slice(0, 3))} onKeyDown={(e) => { if (e.key === 'Tab' && !e.shiftKey && !e.currentTarget.value && e.currentTarget.placeholder) { e.preventDefault(); setLevelField(d, idx, 'pct', e.currentTarget.placeholder); } }} inputMode="numeric" placeholder={pctPh} style={{ width: 25, textAlign: 'right', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: GRN, outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
+        <span style={{ fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: GRN }}>%</span>
+        {chev(idx, 'bank', GRN)}
+      </div>
+    );
+    const removeBtn = idx >= 2 ? <button onClick={() => removeLevel(d, idx)} title="Remove level" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', padding: 0, margin: 0, cursor: 'pointer', color: '#c4c1b8', flex: '0 0 auto' }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={9} /><path d="M8 12h8" /></svg></button> : null;
+    const rewPills = unit === 'reward' ? (
+      <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>{[100000, 150000, 200000].map((v) => { const on = Math.round(cl.rewardUSD) === v; return <button key={v} onClick={() => { setRewEdit(null); solveRew(v); }} style={{ flex: 1, border: '1px solid ' + (on ? GRN : '#cbe7d6'), background: on ? GRN : '#f2faf5', color: on ? '#fff' : GRN, borderRadius: 8, padding: '3px 0', cursor: 'pointer', fontFamily: MONOF, fontWeight: 800, fontSize: 10.5 }}>{'$' + v / 1000 + 'k'}</button>; })}</div>
+    ) : null;
+    return (
+      <div key={'lv' + idx} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.05em', color: GRN, paddingLeft: 3 }}>{'TP' + (idx + 1)}</span>{removeBtn}
+        </div>
+        <div style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid #e7e3dc', borderRadius: 12, background: '#fbfdfb', overflow: 'hidden' }}>{trailSeg}{priceInner}{bankChip}</div>
+        </div>
+        {rewPills}
       </div>
     );
   };
-  // chevron opens the preset menu, capturing its screen rect so the (portaled) menu can anchor to it
-  const chevBtn = (open: () => void, col: string) => <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenuPos({ top: r.bottom + 7, right: Math.max(8, window.innerWidth - r.right) }); open(); }} aria-label="presets" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', padding: '2px 0 2px 2px', margin: 0, cursor: 'pointer', color: col }}><svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></button>;
+
+  const optRow = (active: boolean, label: string, hint: string | undefined, onClick: () => void, accent: string, accentBg: string) => (
+    <button key={label} onClick={onClick} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, border: 'none', background: active ? accentBg : 'transparent', borderRadius: 7, padding: '7px 9px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+      <span style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}><span style={{ fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: active ? accent : '#3a352c' }}>{label}</span>{hint ? <span style={{ fontSize: 9.5, fontWeight: 600, color: '#a8a69b' }}>{hint}</span> : null}</span>
+      {active ? chkIcon(accent) : null}
+    </button>
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
-        {/* TP1 · Bank */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'flex', alignItems: 'center', minHeight: 17, fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', color: '#5aa97a', paddingLeft: 2 }}>TP1 · Bank</span>
-          <div style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid #e3f0e9', borderRadius: 12, background: '#fbfdfb', overflow: 'hidden' }}>
-              {priceInput('t1')}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3, borderLeft: '1px solid #e3f0e9', background: '#fdf2e8', padding: '0 6px 0 9px' }}>
-                <svg width={11} height={11} viewBox="0 0 24 24" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={9} fill="none" stroke="#e07b2f" strokeWidth={2.2} /><path d="M12 12 L12 3 A9 9 0 0 1 18.9 17.8 Z" fill="#e07b2f" /></svg>
-                <input value={pct} onChange={(e) => setPct(e.target.value)} inputMode="numeric" placeholder="70" style={{ width: 20, textAlign: 'right', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 13, color: '#e07b2f', outline: 'none', fontVariantNumeric: 'tabular-nums' }} />
-                <span style={{ fontWeight: 800, fontSize: 13, color: '#e07b2f' }}>%</span>
-                {chevBtn(() => { setBankMenu((v) => !v); setPerMenu(false); }, '#e07b2f')}
-              </div>
-            </div>
-            {bankMenu && menuPos ? <PresetMenu title="Bank %" opts={BANK_PRESETS} cur={pct} fmt={(v) => v + '%'} onPick={(v) => { setPct(v); setBankMenu(false); }} accent="#e07b2f" accentBg="#fdf2e8" onClose={() => setBankMenu(false)} pos={menuPos} /> : null}
-          </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: '10px 12px' }}>
+      {levels.map((_, idx) => row(idx))}
+      {levels.length < 6 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <span style={{ fontSize: 10.5, paddingLeft: 3, visibility: 'hidden' }}>+</span>
+          <button onClick={() => addLevel(d)} aria-label="Add level" title="Add another level" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 39, border: '1px dashed #cbe4d5', background: '#f6fbf8', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 11, letterSpacing: '0.01em', color: GRN }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>Add level
+          </button>
         </div>
-        {/* TP2 · Donchian trail */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'flex', alignItems: 'center', minHeight: 17, fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', color: '#5aa97a', paddingLeft: 2 }}>TP2 · Donchian trail</span>
-          <div style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid #eeece8', borderRadius: 12, background: '#fff', overflow: 'hidden' }}>
-              {priceInput('t2')}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3, borderLeft: '1px solid #eeece8', background: '#f4f1fb', padding: '0 6px 0 9px' }}>
-                <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={9} /><path d="M12 7v5l3 2" /></svg>
-                <input value={period} onChange={(e) => setPer(e.target.value)} placeholder="1d" style={{ width: 24, textAlign: 'center', border: 'none', background: 'transparent', fontFamily: MONOF, fontWeight: 800, fontSize: 12.5, color: '#7c5cff', outline: 'none' }} />
-                {chevBtn(() => { setPerMenu((v) => !v); setBankMenu(false); }, '#7c5cff')}
-              </div>
-            </div>
-            {perMenu && menuPos ? <PresetMenu title="Trail timeframe" opts={PER_PRESETS} cur={period} fmt={(v) => v} onPick={(v) => { setPer(v); setPerMenu(false); }} accent="#7c5cff" accentBg="#f4f1fb" onClose={() => setPerMenu(false)} pos={menuPos} /> : null}
+      ) : null}
+      {menu && menu.kind === 'bank' ? (
+        <LvlPortal pos={menu.pos} onClose={closeMenu} panelStyle={{ padding: 5, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <div style={{ fontFamily: 'inherit', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.11em', textTransform: 'uppercase', color: '#b3aea2', padding: '4px 9px 5px' }}>Bank % of position</div>
+          {BANK_OPTS.map((o) => optRow(String(raw[menu.idx].pct || '') === o.v, o.v + '%', o.hint, () => { setLevelField(d, menu.idx, 'pct', o.v); closeMenu(); }, GRN, '#eaf6ef'))}
+        </LvlPortal>
+      ) : null}
+      {menu && menu.kind === 'trail' ? (
+        <LvlPortal pos={menu.pos} onClose={closeMenu} panelStyle={{ padding: 6, display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 104 }}>
+            <div style={{ fontFamily: 'inherit', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#b3aea2', padding: '2px 8px 5px' }}>Timeframe</div>
+            {TRAIL_TF_OPTS.map((o) => optRow((raw[menu.idx].trail || '1d') === o.v, o.v, o.hint, () => { setLevelField(d, menu.idx, 'trail', o.v); closeMenu(); }, GRN, '#eaf6ef'))}
           </div>
-        </div>
-      </div>
+          <div style={{ width: 1, background: '#f1efe9', margin: '4px 2px' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 104 }}>
+            <div style={{ fontFamily: 'inherit', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#b3aea2', padding: '2px 8px 5px' }}>Donchian length</div>
+            {TRAIL_LEN_OPTS.map((o) => optRow(String(raw[menu.idx].trailLen || '') === o.v, o.v + '-bar', undefined, () => { setLevelField(d, menu.idx, 'trailLen', o.v); closeMenu(); }, GRN, '#eaf6ef'))}
+          </div>
+        </LvlPortal>
+      ) : null}
     </div>
   );
 }
@@ -686,47 +740,53 @@ function ChartChip({ d }: { d: PlanDraft }) {
 }
 
 // ── top equity strip (ported from dc.html `tp4aStrip`): Risk · Reward·plan · R:R · Position · Margin · Stop-vs-liq ──
+// top stats strip (ported from tp4aStrip): Risk · Reward·plan · R:R · Position · Margin · Stop-vs-liq.
+// Reward + R:R are generalized multi-slice — one bar segment per scale-out level (empty until priced).
 function EquityStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
-  const GREEN = '#1f9d55', RED = '#df5338', ORANGE = '#ff7a00', INK = '#1a1813';
+  const GREEN = '#1f9d55', RED = '#df5338', ORANGE = '#ff7a00', INK = '#1a1813', PURP = '#7c5cff';
   const MO = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
   const money = (v: number, dec = 0) => (isFinite(v) ? tpMoney(v, dec) : '—');
-  const tgt = c.rrList[0], rewardUSD = tgt ? tgt.rewardUSD : NaN, pr = c.primaryR;
-  const bpRaw = parseFloat(String(d.bankPct ?? '').replace(/[^0-9.]/g, ''));
-  const bankPct = isFinite(bpRaw) && bpRaw > 0 ? Math.min(100, bpRaw) : 100;
-  const partial = bankPct < 100;
-  const bankedReward = isFinite(rewardUSD) ? (rewardUSD * bankPct) / 100 : NaN;
-  const tgt2 = c.rrList[1], reward2Full = tgt2 ? tgt2.rewardUSD : NaN, runnerPct = 100 - bankPct;
-  const tp1Reward = partial ? bankedReward : rewardUSD;
-  const tp2Reward = partial && isFinite(reward2Full) ? (reward2Full * runnerPct) / 100 : NaN;
-  const hasReward = isFinite(tp1Reward) || isFinite(tp2Reward);
-  const totalReward = (isFinite(tp1Reward) ? tp1Reward : 0) + (isFinite(tp2Reward) ? tp2Reward : 0);
-  const planRewardBase = partial ? totalReward : rewardUSD;
-  const planR = isFinite(planRewardBase) && isFinite(c.riskUSD) && c.riskUSD > 0 ? planRewardBase / c.riskUSD : pr;
-  const tp1R = isFinite(tp1Reward) && isFinite(c.riskUSD) && c.riskUSD > 0 ? tp1Reward / c.riskUSD : NaN;
+  const slices = (c.levels || []).filter((l) => isFinite(l.rewardUSD));
+  const denom = slices.reduce((s, l) => s + (l.rewardUSD > 0 ? l.rewardUSD : 0), 0);
+  const segCol = (l: Level) => (l.isRunner ? '#57c98a' : GREEN);
+  const totalReward = c.planReward, hasReward = c.planRewardHas, planR = c.planR;
   const rrStr = isFinite(planR) ? planR.toFixed(2) : '—';
   const rrColor = !isFinite(planR) ? '#b3b0a6' : planR >= 2.5 ? GREEN : planR >= 1.5 ? '#c9821f' : RED;
   const rrVerd = !isFinite(planR) ? 'Set levels' : planR >= 2.5 ? 'Strong edge' : planR >= 1.5 ? 'Fair edge' : 'Thin edge';
 
   const lbl = (t: string, col?: string) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: 10.5, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#a29b8c' }}>{col ? <span style={{ width: 7, height: 7, borderRadius: '50%', background: col, flex: '0 0 auto' }} /> : null}{t}</span>;
   const sub = (txt: string, col = '#b6a99e') => <span style={{ fontFamily: MO, fontWeight: 700, fontSize: 11, color: col, marginTop: 4 }}>{txt}</span>;
-  const cellS = (flex: number, last?: boolean): CSSProperties => ({ flex, minWidth: 0, padding: '11px 20px', borderRight: last ? 'none' : '1px solid #f1eff5', display: 'flex', flexDirection: 'column' });
+  const cellS = (flex: number, minW: number): CSSProperties => ({ flex: `${flex} 1 ${minW}px`, minWidth: minW, padding: '11px 20px', background: '#fff', display: 'flex', flexDirection: 'column' });
   const moveIcon = (col: string, upDir: boolean) => <svg width={12} height={12} viewBox="0 0 16 16" fill="none" stroke={col} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><path d={upDir ? 'M2 11L6 7.5L9 9L14 4' : 'M2 5L6 8.5L9 7L14 12'} /><path d={upDir ? 'M10 4H14V8' : 'M10 12H14V8'} /></svg>;
   const eqIcon = (col: string) => <svg width={12} height={12} viewBox="0 0 16 16" fill={col} style={{ flex: '0 0 auto' }}><rect x={1} y={3.5} width={14} height={9} rx={1.6} /><circle cx={8} cy={8} r={1.9} fill="#fff" /><circle cx={3.4} cy={8} r={0.7} fill="#fff" /><circle cx={12.6} cy={8} r={0.7} fill="#fff" /></svg>;
   const bignum = (txt: string, col: string) => <span style={{ fontFamily: MO, fontWeight: 800, fontSize: 23, letterSpacing: '-0.025em', color: col, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', lineHeight: 1 }}>{txt}</span>;
   const rightStack = (rows: React.ReactNode[]) => <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flex: '0 0 auto' }}>{rows.map((r, i) => (r ? <span key={i} style={{ display: 'contents' }}>{r}</span> : null))}</div>;
   const pctChip = (icon: React.ReactNode, txt: string, col: string) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{icon}<span style={{ fontFamily: MO, fontWeight: 700, fontSize: 12, color: col, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{txt}</span></span>;
 
-  const finalMove = tgt2 && isFinite(tgt2.distPct) ? tgt2.distPct : tgt && isFinite(tgt.distPct) ? tgt.distPct : NaN;
+  // Reward · plan — total headline + one bar segment / legend entry per priced level
+  let finalMove = NaN; (c.levels || []).forEach((l) => { if (l.hasPrice && isFinite(l.distPct)) { if (!isFinite(finalMove) || l.distPct > finalMove) finalMove = l.distPct; } });
   const rewEqPct = isFinite(totalReward) && isFinite(c.Q) && c.Q > 0 ? (totalReward / c.Q) * 100 : NaN;
-  const tp1v = isFinite(tp1Reward) ? tp1Reward : 0, tp2v = isFinite(tp2Reward) ? tp2Reward : 0, denom = tp1v + tp2v;
-  const tp1Share = denom > 0 ? tp1v / denom : 1, tp2Share = denom > 0 ? tp2v / denom : 0, tp1Pct = Math.round(tp1Share * 100);
-  const splitLegend = (l: string, amt: string, r: string, amt2: string) => (
-    <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start', minWidth: 0 }}><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#a8a294', whiteSpace: 'nowrap' }}>{l}</span><span style={{ fontFamily: MO, fontWeight: 700, fontSize: 12.5, color: '#3f7355', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{amt}</span></div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end', minWidth: 0 }}><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#a8a294', whiteSpace: 'nowrap' }}>{r}</span><span style={{ fontFamily: MO, fontWeight: 700, fontSize: 12.5, color: '#3f7355', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{amt2}</span></div>
-    </div>
-  );
-  const splitBar = (s1: number, s2: number) => <div style={{ display: 'flex', gap: 3, height: 8, marginTop: 7 }}><div style={{ flexBasis: (s1 * 100).toFixed(2) + '%', background: GREEN, borderRadius: 99 }} />{s2 > 0 ? <div style={{ flexBasis: (s2 * 100).toFixed(2) + '%', background: '#57c98a', borderRadius: 99 }} /> : null}</div>;
+  const sliceBar = slices.length ? (
+    <div style={{ display: 'flex', gap: 3, height: 8, marginTop: 7 }}>{slices.map((l, idx) => { const share = denom > 0 ? Math.max(0, l.rewardUSD) / denom : 0; return share > 0 ? <div key={idx} style={{ flexGrow: share, flexShrink: 1, flexBasis: 0, minWidth: 2, background: segCol(l), borderRadius: 99 }} /> : null; })}</div>
+  ) : null;
+  const sliceLegend = slices.length ? (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 6 }}>{slices.map((l, idx) => (
+      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: idx === 0 ? 'flex-start' : idx === slices.length - 1 ? 'flex-end' : 'center' }}>
+        <span style={{ fontFamily: MO, fontWeight: 700, fontSize: 12, color: '#3f7355', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{isFinite(l.rewardUSD) ? '+' + money(l.rewardUSD) : '—'}</span>
+        <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#a8a294', whiteSpace: 'nowrap' }}>{(l.isRunner ? 'Run' : 'TP' + l.i) + ' · ' + Math.round(l.pct) + '%'}</span>
+      </div>
+    ))}</div>
+  ) : null;
+
+  // R:R — per-level R strip + values
+  const rLevels = (c.levels || []).filter((l) => isFinite(l.r));
+  const rTotal = rLevels.reduce((s, l) => s + (l.r > 0 ? l.r : 0), 0);
+  const rrBar = rLevels.length ? (
+    <div style={{ display: 'flex', gap: 3, height: 8, marginTop: 7 }}>{rLevels.map((l, idx) => { const share = rTotal > 0 ? Math.max(0, l.r) / rTotal : 0; return share > 0 ? <div key={idx} style={{ flexGrow: share, flexShrink: 1, flexBasis: 0, minWidth: 2, background: idx % 2 ? '#57c98a' : GREEN, borderRadius: 99 }} /> : null; })}</div>
+  ) : null;
+  const rrBreak = rLevels.length ? (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 6 }}>{rLevels.map((l, idx) => <span key={idx} style={{ fontFamily: MO, fontWeight: 700, fontSize: 12, color: '#3f7355', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{l.r.toFixed(2) + 'R'}</span>)}</div>
+  ) : null;
 
   // stop-vs-liq geometry
   const price = c.mkt.mark;
@@ -738,42 +798,44 @@ function EquityStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }
   const tdot = (left: number, col: string) => <span style={{ position: 'absolute', left: left + '%', top: '50%', width: 12, height: 12, borderRadius: '50%', background: '#fff', border: '3px solid ' + col, transform: 'translate(-50%,-50%)', boxShadow: '0 1px 3px rgba(20,20,12,0.25)' }} />;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'stretch', background: '#fff', border: '1px solid #efedf3', borderRadius: 18, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden', position: 'relative', zIndex: 6 }}>
-      {/* Risk */}
-      <div style={cellS(1.15)}>{lbl('Risk', RED)}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginTop: 6 }}>{bignum(isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : '—', RED)}{rightStack([
-          isFinite(c.distStopPct) ? pctChip(moveIcon('#c56a5a', !c.isLong), c.distStopPct.toFixed(2) + '%', '#c56a5a') : null,
-          isFinite(c.riskPct) ? pctChip(eqIcon('#7c5cff'), c.riskPct.toFixed(2) + '%', '#7c5cff') : null,
-        ])}</div>
-      </div>
-      {/* Reward · plan */}
-      <div style={cellS(partial ? 1.8 : 1.7)}>{lbl(partial ? 'Reward · plan' : 'Reward · TP1', GREEN)}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginTop: 6 }}>{bignum(hasReward ? '+' + money(partial ? totalReward : rewardUSD) : '—', GREEN)}{rightStack([
-          isFinite(finalMove) ? pctChip(moveIcon('#4f9e6f', c.isLong), finalMove.toFixed(2) + '%', '#4f9e6f') : null,
-          isFinite(rewEqPct) ? pctChip(eqIcon('#7c5cff'), rewEqPct.toFixed(2) + '%', '#7c5cff') : null,
-        ])}</div>
-        {partial ? <>{splitBar(tp1Share, tp2Share)}{splitLegend('TP1 · banked · ' + tp1Pct + '%', isFinite(tp1Reward) ? '+' + money(tp1Reward) : '—', 'TP2 · runner · ' + (100 - tp1Pct) + '%', isFinite(tp2Reward) ? '+' + money(tp2Reward) : '—')}</> : null}
-      </div>
-      {/* R:R */}
-      <div style={cellS(1)}>{lbl('R : R')}
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginTop: 6 }}><span style={{ fontFamily: MO, fontWeight: 800, fontSize: 23, letterSpacing: '-0.025em', color: rrColor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{rrStr}</span><span style={{ fontFamily: MO, fontWeight: 700, fontSize: 11, color: rrColor, whiteSpace: 'nowrap', flex: '0 0 auto' }}>{rrVerd}</span></div>
-        {partial && isFinite(tp1R) ? (() => { const tp2R = isFinite(tp2Reward) && isFinite(c.riskUSD) && c.riskUSD > 0 ? tp2Reward / c.riskUSD : NaN; const r1 = isFinite(tp1R) ? tp1R : 0, r2 = isFinite(tp2R) ? tp2R : 0, rDen = r1 + r2, rS1 = rDen > 0 ? r1 / rDen : 1, rS2 = rDen > 0 ? r2 / rDen : 0; return <>{splitBar(rS1, rS2)}{splitLegend('TP1', isFinite(tp1R) ? tp1R.toFixed(2) : '—', 'TP2', isFinite(tp2R) ? tp2R.toFixed(2) : '—')}</>; })() : null}
-      </div>
-      {/* Position */}
-      <div style={cellS(0.8)}>{lbl('Position', '#7c5cff')}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}><span style={{ fontFamily: MO, fontWeight: 800, fontSize: 23, letterSpacing: '-0.025em', color: INK, fontVariantNumeric: 'tabular-nums' }}>{isFinite(c.qty) ? c.qty.toFixed(c.qty < 10 ? 3 : 2) : '—'}</span><CoinIcon sym={d.sym} /></span>
-        {sub(isFinite(c.notional) ? 'Notional · ' + money(c.notional) : '—')}
-      </div>
-      {/* Margin */}
-      <div style={cellS(1.4)}>{lbl('Margin', '#7c5cff')}
-        <span style={{ fontFamily: MO, fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: INK, marginTop: 7, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{isFinite(c.margin) ? money(c.margin) : '—'}<span style={{ color: '#7c5cff' }}>{isFinite(c.marginPct) ? ' · ' + c.marginPct.toFixed(0) + '%' : ''}</span></span>
-        <span style={{ height: 8, borderRadius: 99, background: '#f0efeb', overflow: 'hidden', display: 'block', marginTop: 8 }}><span style={{ display: 'block', height: '100%', width: Math.max(0, Math.min(100, c.marginPct || 0)) + '%', background: '#7c5cff', borderRadius: 99 }} /></span>
-      </div>
-      {/* Stop vs liq */}
-      <div style={cellS(1.6, true)}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>{lbl('Stop vs liq', ORANGE)}<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: verd.c, fontWeight: 800, fontSize: 10 }}>{verd.t}</span></div>
-        <div style={{ position: 'relative', height: 9, borderRadius: 99, background: ORANGE, marginTop: 11 }}><div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '9%', background: RED, borderRadius: '0 99px 99px 0' }} />{tdot(2, ORANGE)}{tdot(stopPos, RED)}{tdot(99, '#7c5cff')}</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 7, fontFamily: MO, fontWeight: 700, fontSize: 10.5 }}><span style={{ color: ORANGE }}>LIQ {isFinite(c.liq) ? money(c.liq) : '—'}</span><span style={{ color: RED }}>STOP {isFinite(c.S) ? money(c.S) : '—'}</span><span style={{ color: '#7c5cff' }}>{money(price)}</span></div>
+    <div style={{ background: '#fff', border: '1px solid #efedf3', borderRadius: 18, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden', position: 'relative', zIndex: 6 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: 1, background: '#f1eff5' }}>
+        {/* Risk */}
+        <div style={cellS(1.15, 232)}>{lbl('Risk', RED)}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginTop: 6 }}>{bignum(isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : '—', RED)}{rightStack([
+            isFinite(c.distStopPct) ? pctChip(moveIcon('#c56a5a', !c.isLong), c.distStopPct.toFixed(2) + '%', '#c56a5a') : null,
+            isFinite(c.riskPct) ? pctChip(eqIcon(PURP), c.riskPct.toFixed(2) + '%', PURP) : null,
+          ])}</div>
+        </div>
+        {/* Reward · plan */}
+        <div style={cellS(1.8, 250)}>{lbl('Reward · plan', GREEN)}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginTop: 6 }}>{bignum(hasReward ? '+' + money(totalReward) : '—', GREEN)}{rightStack([
+            isFinite(finalMove) ? pctChip(moveIcon('#4f9e6f', c.isLong), finalMove.toFixed(2) + '%', '#4f9e6f') : null,
+            isFinite(rewEqPct) ? pctChip(eqIcon(PURP), rewEqPct.toFixed(2) + '%', PURP) : null,
+          ])}</div>
+          {sliceBar}{sliceLegend}
+        </div>
+        {/* R:R */}
+        <div style={cellS(1, 140)}>{lbl('R : R')}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginTop: 6 }}><span style={{ fontFamily: MO, fontWeight: 800, fontSize: 23, letterSpacing: '-0.025em', color: rrColor, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{rrStr}</span><span style={{ fontFamily: MO, fontWeight: 700, fontSize: 11, color: rrColor, whiteSpace: 'nowrap', flex: '0 0 auto' }}>{rrVerd}</span></div>
+          {rrBar}{rrBreak}
+        </div>
+        {/* Position */}
+        <div style={cellS(0.8, 150)}>{lbl('Position', PURP)}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}><span style={{ fontFamily: MO, fontWeight: 800, fontSize: 23, letterSpacing: '-0.025em', color: INK, fontVariantNumeric: 'tabular-nums' }}>{isFinite(c.qty) ? c.qty.toFixed(c.qty < 10 ? 3 : 2) : '—'}</span><CoinIcon sym={d.sym} /></span>
+          {sub(isFinite(c.notional) ? 'Notional · ' + money(c.notional) : '—')}
+        </div>
+        {/* Margin */}
+        <div style={cellS(1.4, 172)}>{lbl('Margin', PURP)}
+          <span style={{ fontFamily: MO, fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: INK, marginTop: 7, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{isFinite(c.margin) ? money(c.margin) : '—'}{isFinite(c.marginPct) ? <span style={{ color: PURP, margin: '0 0 0 4px' }}>{'· ' + c.marginPct.toFixed(0) + '%'}</span> : null}</span>
+          <span style={{ height: 8, borderRadius: 99, background: '#f0efeb', overflow: 'hidden', display: 'block', marginTop: 8 }}><span style={{ display: 'block', height: '100%', width: Math.max(0, Math.min(100, c.marginPct || 0)) + '%', background: PURP, borderRadius: 99 }} /></span>
+        </div>
+        {/* Stop vs liq */}
+        <div style={cellS(1.6, 210)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>{lbl('Stop vs liq', ORANGE)}<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: verd.c, fontWeight: 800, fontSize: 10 }}>{verd.t}</span></div>
+          <div style={{ position: 'relative', height: 9, borderRadius: 99, background: ORANGE, marginTop: 11 }}><div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '9%', background: RED, borderRadius: '0 99px 99px 0' }} />{tdot(2, ORANGE)}{tdot(stopPos, RED)}{tdot(99, PURP)}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 7, fontFamily: MO, fontWeight: 700, fontSize: 10.5 }}><span style={{ color: ORANGE }}>LIQ {isFinite(c.liq) ? money(c.liq) : '—'}</span><span style={{ color: RED }}>STOP {isFinite(c.S) ? money(c.S) : '—'}</span><span style={{ color: PURP }}>{money(price)}</span></div>
+        </div>
       </div>
     </div>
   );
@@ -818,6 +880,8 @@ export function Editor() {
   const levVal = Math.min(20, Math.max(1, tpNum(d.lev) || 5));
   const levFillPct = ((levVal - 1) / 19) * 100;
   const sizePctVal = Math.min(100, Math.max(0, tpNum(d.sizeVal) || 0));
+  // hovered risk-mode cell (shows the "riding to liquidation" hint when no stop is set)
+  const [sizeTip, setSizeTip] = useState<string | null>(null);
 
   // collapsible sections + expand-all per group (persisted)
   const [secOpen, setSecOpen] = useState<Record<SecKey, boolean>>(() => {
@@ -854,10 +918,10 @@ export function Editor() {
       {/* header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap', padding: '6px 2px 0' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <span onClick={() => (editing ? planActions.cancelEdit() : planActions.setView('workbook'))} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 700, fontSize: 11.5, color: '#b0aea3', width: 'max-content' }}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>{editing ? 'Cancel edit' : 'Back to workbook'}
+          <span onClick={() => (editing ? planActions.cancelEdit() : planActions.setView('board'))} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 700, fontSize: 11.5, color: '#b0aea3', width: 'max-content' }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>{editing ? 'Cancel' : 'Back to Plans'}
           </span>
-          <span style={{ fontWeight: 800, fontSize: 29, letterSpacing: '-0.025em', color: '#1a1813', lineHeight: 1.08 }}>{editing ? 'Edit plan.' : 'Plan this trade.'}</span>
+          <span style={{ fontWeight: 800, fontSize: 24, letterSpacing: '-0.025em', color: '#1a1813', lineHeight: 1.08 }}>{editing ? 'Edit plan.' : 'Plan this trade.'}</span>
           <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>{editing ? `Updating ${TP_MARKETS[d.sym].label} ${d.dir} — change levels, size, leverage or thesis.` : 'Lock the specifics — levels, size, leverage, thesis. You’ll still execute manually on TradingView.'}</span>
         </div>
         <span style={{ alignSelf: 'flex-start', marginTop: -4 }}><DirLevHeading d={d} /></span>
@@ -878,7 +942,7 @@ export function Editor() {
             <ExpectedDate d={d} />
           </div>
           <SecHead title="Thesis" open={secOpen.thesis} onToggle={() => toggleSec('thesis')} collapsedRight={<ThesisChips d={d} />} />
-          {secOpen.thesis && <Thesis d={d} />}
+          {secOpen.thesis && <Thesis d={d} c={c} />}
           <div style={{ borderTop: '1px solid #f0efec' }}>
             <SecHead title="Chart" open={secOpen.chart} onToggle={() => toggleSec('chart')} collapsedRight={<ChartChip d={d} />} />
             {secOpen.chart && <div style={{ flex: 1 }}><ChartUpload d={d} onFull={setFull} /></div>}
@@ -896,7 +960,6 @@ export function Editor() {
 
           <div style={{ borderBottom: '1px solid #f3f1f7' }}>
             <SecHead title="Levels" open={secOpen.levels} onToggle={() => toggleSec('levels')} fixedH
-              right={<Seg opts={[{ v: 'ladder', label: 'Ladder' }, { v: 'zone', label: 'Zone' }]} cur={d.entryMode === 'zone' ? 'zone' : 'ladder'} onPick={(v) => planActions.setDraft({ entryMode: v as 'ladder' | 'zone' })} accent="#23211b" />}
               collapsedRight={<LevelsSummary d={d} c={c} />} />
             {secOpen.levels && (
             <div style={{ padding: '4px 18px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -925,8 +988,8 @@ export function Editor() {
               </div>
               {/* TARGETS */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                <SectionHeader text="Targets" color="#1f9d55" tip={TARGETS_TIP} right={<BanksTotal d={d} />} />
-                <TargetInputs d={d} c={c} />
+                <SectionHeader text="Targets" color="#1f9d55" tip={TARGETS_TIP} right={<BanksTotal c={c} />} />
+                <TargetsLadder d={d} c={c} />
               </div>
               <HeatmapLaunchCard variant="row" symbol={d.sym as HeatSymbol} title="Check your stop against the real clusters" sub="Is it beyond the sweep, not inside it?" />
             </div>
@@ -945,10 +1008,16 @@ export function Editor() {
                   : m.v === 'marginpct' ? (c.hasQty ? c.marginPct.toFixed(1) + '%' : '—')
                   : m.v === 'riskusd' ? (c.hasQty ? tpMoney(c.riskUSD, 0) : '—')
                   : (isFinite(c.riskPct) ? c.riskPct.toFixed(2) + '%' : '—');
+                // riskusd/riskpct with no stop → "riding to liquidation" hover hint (matches the reference)
+                const hasTip = (m.v === 'riskusd' || m.v === 'riskpct') && c.usingLiqStop;
                 return (
-                  <div key={m.v} onClick={() => planActions.setDraft({ sizeMode: m.v })} style={{ padding: '12px 14px', cursor: 'pointer', borderRight: i < 4 ? '1px solid #f1f0ed' : 'none', background: a ? '#faf8ff' : 'transparent', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <div key={m.v} onClick={() => planActions.setDraft({ sizeMode: m.v })}
+                    onMouseEnter={hasTip ? () => setSizeTip(m.v) : undefined}
+                    onMouseLeave={hasTip ? () => setSizeTip((s) => (s === m.v ? null : s)) : undefined}
+                    style={{ position: 'relative', padding: '12px 14px', cursor: 'pointer', borderRight: i < 4 ? '1px solid #f1f0ed' : 'none', background: a ? '#faf8ff' : 'transparent', display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <span style={{ fontWeight: a ? 800 : 700, fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: a ? '#7c5cff' : '#a8a69b', display: 'inline-flex', alignItems: 'center', gap: 5 }}>{a ? <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#7c5cff' }} /> : null}{m.label}</span>
                     <span style={{ fontWeight: 800, fontSize: 14, color: '#1a1813', fontVariantNumeric: 'tabular-nums' }}>{val}{m.v === 'qty' ? <span style={{ fontWeight: 600, fontSize: 9.5, color: '#b3b0a6' }}>{' ' + d.sym}</span> : null}</span>
+                    {hasTip && sizeTip === m.v ? <span style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 186, background: '#1a1813', color: '#fbfbf9', fontSize: 11.5, fontWeight: 500, lineHeight: 1.45, textTransform: 'none', letterSpacing: 0, padding: '9px 12px', borderRadius: 10, boxShadow: '0 10px 26px rgba(20,18,12,0.22)', zIndex: 30, textAlign: 'left', whiteSpace: 'normal', pointerEvents: 'none' }}>No stop-loss set — riding to liquidation, so your max loss is the full margin you post.</span> : null}
                   </div>
                 );
               })}
@@ -979,7 +1048,7 @@ export function Editor() {
             <div style={{ padding: '13px 18px', display: 'flex', flexDirection: 'column', gap: 13 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <button onClick={() => planActions.setDraft({ lev: Math.max(1, levVal - 1) })} style={stepBtn}>−</button>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, boxSizing: 'border-box', padding: '12px 14px', border: '1.5px solid #ededea', borderRadius: 11, background: '#fff' }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, boxSizing: 'border-box', padding: '8px 12px', border: '1px solid #eeecf3', borderRadius: 12, background: '#fff' }}>
                   <input value={String(d.lev)} onChange={(e) => planActions.setDraft({ lev: Math.max(1, Math.min(125, tpNum(e.target.value) || 1)) })} inputMode="numeric" style={{ width: '2.4ch', textAlign: 'right', padding: 0, border: 'none', outline: 'none', fontFamily: 'inherit', fontWeight: 800, fontSize: 18, color: '#1a1813', background: 'transparent' }} />
                   <span style={{ fontWeight: 800, fontSize: 16, color: '#b3b0a6' }}>×</span>
                 </div>
@@ -1010,7 +1079,7 @@ export function Editor() {
           ) : (
             <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#f4f3f0', borderRadius: 12, padding: '12px 16px' }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#b3b0a6" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><circle cx={12} cy={12} r={10} /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-              <span style={{ fontWeight: 800, fontSize: 13, color: '#b3b0a6' }}>{c.levBlocked ? 'Leverage above 10× — bring it down' : c.sizeBlocked ? 'Size above 70% — bring it down' : 'Set entry, stop, a target & size to save'}</span>
+              <span style={{ fontWeight: 800, fontSize: 13, color: '#b3b0a6' }}>{c.levBlocked ? 'Leverage above 10× — bring it down to save' : c.sizeBlocked ? 'Size above 70% — bring it down to save' : 'Fill entry, stop, a target & size'}</span>
             </span>
           )}
           <button onClick={() => planActions.clearDraft()}
@@ -1094,23 +1163,6 @@ function RiskAlert({ kind, onAdjust, onDismiss }: { kind: 'lev' | 'size'; onAdju
   );
 }
 
-const stepBtn: CSSProperties = { width: 42, height: 42, flex: '0 0 auto', borderRadius: 11, border: '1.5px solid #ededea', background: '#faf9f7', color: '#56544b', fontSize: 20, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' };
+const stepBtn: CSSProperties = { width: 34, height: 34, flex: '0 0 auto', borderRadius: 9, border: '1px solid #eeecf3', background: '#faf9f7', color: '#56544b', fontSize: 20, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' };
 
-function Field({ label, labelColor = '#897f70', hint, children }: { label: string; labelColor?: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: labelColor }}>{label}{hint ? <span style={{ color: '#d3beb7' }}>{' · ' + hint}</span> : null}</span>
-      {children}
-    </div>
-  );
-}
 
-function Seg({ opts, cur, onPick, accent = '#23211b' }: { opts: { v: string; label: string }[]; cur: string; onPick: (v: string) => void; accent?: string }) {
-  return (
-    <div style={{ display: 'inline-flex', background: '#f4f3f0', borderRadius: 10, padding: 2, gap: 2 }}>
-      {opts.map((o) => { const a = o.v === cur;
-        return <button key={o.v} onClick={() => onPick(o.v)} style={{ fontFamily: 'inherit', cursor: 'pointer', border: 'none', borderRadius: 8, padding: '7px 10px', fontWeight: a ? 800 : 700, fontSize: 12, whiteSpace: 'nowrap', color: a ? '#fff' : '#8c8a81', background: a ? accent : 'transparent', boxShadow: a ? '0 1px 2px rgba(20,20,12,0.12)' : 'none', transition: 'all .14s' }}>{o.label}</button>;
-      })}
-    </div>
-  );
-}

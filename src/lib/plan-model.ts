@@ -38,6 +38,13 @@ export interface PlanDraft {
   startDate?: string; // planned entry date (range start), ISO yyyy-mm-dd
   tradeDate?: string; // planned exit / expected date (range end)
   entries?: { price: string; pct: string }[]; // limit-ladder fills (price + fill %)
+  // scale-out bank ladder: TP1 (t1/bankPct/t1trail/t1trailLen) + TP2 (t2/t2pct/trailPeriod/trailPeriodLen)
+  // + any extra levels (tExtra). Each level banks pct% of the position at a price, carried up by a trail leg.
+  t1trail?: string;
+  t1trailLen?: string;
+  t2pct?: string;
+  trailPeriodLen?: string;
+  tExtra?: { price: string; pct: string; trail: string; trailLen: string }[];
 }
 
 // A saved plan: board metadata + (for user plans) a full `draft` snapshot. Seeds
@@ -85,9 +92,10 @@ export function TP_BLANK(): PlanDraft {
     sym: 'BTC', dir: 'long', conv: 'med', entryMode: 'ladder',
     entry: '', ez1: '', ez2: '', stop: '', t1: '', t2: '', t3: '',
     entries: [{ price: '', pct: '' }, { price: '', pct: '' }, { price: '', pct: '' }],
-    lev: 5, sizeMode: 'marginpct', sizeVal: '', sizeVals: {},
+    lev: 5, sizeMode: 'marginpct', sizeVal: '50', sizeVals: {},
     chart: '', name: '', rationale: '', trigger: '', invalidation: '', targetNote: '',
     trailPeriod: '', bankPct: '70', bankTarget: '100k', startDate: '', tradeDate: todayISO(),
+    t1trail: '1d', t1trailLen: '', t2pct: '', trailPeriodLen: '', tExtra: [{ price: '', pct: '', trail: '1d', trailLen: '' }],
   };
 }
 
@@ -126,7 +134,7 @@ export const composeNote = (pct?: string, period?: string, target?: string): str
 export const tpNum = (v: unknown): number => parseFloat(String(v ?? '').replace(/,/g, ''));
 export const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
 export const tpMoney = (v: number, dec = 0): string =>
-  '$' + v.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  isFinite(v) ? '$' + v.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : '—';
 // live comma separators for price/size inputs (display only; nfld strips them)
 export const tpFmtNum = (v: string): string => {
   if (v === '' || v == null) return '';
@@ -184,6 +192,35 @@ export interface Compute {
   sizeWarn: boolean;
   sizeBlocked: boolean;
   valid: boolean;
+  // scale-out bank ladder (each level banks pct% at a price; last level's pct defaults to the remainder)
+  levels: Level[];
+  runnerPct: number;
+  bankSum: number;
+  pctTotal: number;
+  planReward: number;
+  planRewardHas: boolean;
+  planR: number;
+}
+
+// A raw scale-out level (before compute): price + bank% + trail timeframe + Donchian length.
+export interface RawLevel { price: string; pct: string; trail: string; trailLen: string; idx: number; isLast: boolean; }
+// A computed scale-out level: adds the resolved pct + per-level reward/R.
+export interface Level {
+  i: number; price: number; pct: number; trail: string; trailLen: string;
+  isRunner: boolean; isLast: boolean; hasPrice: boolean;
+  rewardFull: number; rewardUSD: number; r: number; rr: string; distPct: number;
+}
+
+// Canonical scale-out levels for a draft: TP1 + TP2 + any tExtra rows. Every level is a bank at a
+// price; the trail (per-leg) carries the open size from one bank up to the next.
+export function tpLevels(d: PlanDraft): RawLevel[] {
+  const raw: { price: string; pct: string; trail: string; trailLen: string }[] = [];
+  raw.push({ price: d.t1 ?? '', pct: d.bankPct == null ? '70' : d.bankPct, trail: d.t1trail == null ? '1d' : d.t1trail, trailLen: d.t1trailLen ?? '' });
+  raw.push({ price: d.t2 ?? '', pct: d.t2pct ?? '', trail: d.trailPeriod == null ? '1d' : d.trailPeriod, trailLen: d.trailPeriodLen ?? '' });
+  (Array.isArray(d.tExtra) ? d.tExtra : []).forEach((e) => {
+    raw.push({ price: e?.price ?? '', pct: e?.pct ?? '', trail: e?.trail == null ? '1d' : e.trail, trailLen: e?.trailLen ?? '' });
+  });
+  return raw.map((l, i) => ({ ...l, idx: i, isLast: i === raw.length - 1 }));
 }
 
 // clamp a fill-% string to 0..100
@@ -230,7 +267,8 @@ export function tpCompute(d: PlanDraft, equity = TP_EQUITY, markOverride?: numbe
 
   const hasEntry = isFinite(E);
   const userStop = tpNum(d.stop), hasStop = isFinite(userStop);
-  const tps = [d.t1, d.t2, d.t3].map((v) => tpNum(v)).filter((v) => isFinite(v));
+  const rawLevels = tpLevels(d);
+  const tps = rawLevels.map((l) => tpNum(l.price)).filter((v) => isFinite(v));
   const isLong = d.dir === 'long';
   const refE = hasEntry ? E : mkt.mark; // fall back to mark for a live preview before entry typed
   const liq = hasEntry ? (isLong ? E * (1 - 1 / L) : E * (1 + 1 / L)) : NaN; // simple isolated approx
@@ -282,10 +320,31 @@ export function tpCompute(d: PlanDraft, equity = TP_EQUITY, markOverride?: numbe
   const sizeBlocked = sizeIsPct && isFinite(sizePct) && sizePct > 70;
   const valid = hasEntry && (hasStop || usingLiqStop) && tps.length > 0 && isFinite(sv) && hasQty && !dirErr && !levBlocked && !sizeBlocked;
 
+  // scale-out ladder: every level banks a % of the position at a price. The last level's % defaults to
+  // the remainder (100 − the others) when left blank, so slices total 100 without the user forcing it.
+  const parsedPct = rawLevels.map((l) => pctNum(l.pct));
+  const nonLastSum = parsedPct.slice(0, -1).reduce((s, p) => s + (isFinite(p) ? p : 0), 0);
+  const runnerPct = Math.max(0, 100 - nonLastSum);
+  const levels: Level[] = rawLevels.map((l, i) => {
+    const price = tpNum(l.price);
+    const isLastRow = i === rawLevels.length - 1;
+    const pct = isLastRow ? (isFinite(parsedPct[i]) ? parsedPct[i] : runnerPct) : (isFinite(parsedPct[i]) ? parsedPct[i] : 0);
+    const rewardFull = hasQty && isFinite(price) ? Math.abs(price - refE) * qty : NaN;
+    const rewardUSD = isFinite(rewardFull) ? (rewardFull * pct) / 100 : NaN;
+    const r = hasRisk && isFinite(price) ? Math.abs(price - refE) / riskPerUnit : NaN;
+    const distPct = isFinite(price) ? (Math.abs(price - refE) / refE) * 100 : NaN;
+    return { i: i + 1, price, pct, trail: l.trail, trailLen: l.trailLen, isRunner: false, isLast: l.isLast, hasPrice: isFinite(price), rewardFull, rewardUSD, r, rr: isFinite(r) ? r.toFixed(2) : '—', distPct };
+  });
+  const bankSum = levels.reduce((s, l) => s + (isFinite(l.pct) ? l.pct : 0), 0);
+  const planReward = levels.reduce((s, l) => s + (isFinite(l.rewardUSD) ? l.rewardUSD : 0), 0);
+  const planRewardHas = levels.some((l) => isFinite(l.rewardUSD));
+  const planR = planRewardHas && isFinite(riskUSD) && riskUSD > 0 ? planReward / riskUSD : NaN;
+
   return {
     mkt, Q, L, E: refE, hasEntry, S, hasStop, usingLiqStop, isLong, riskPerUnit, hasRisk, qty, hasQty,
     notional, margin, marginPct, riskUSD, riskPct, liq, distStopPct, rrList, primaryR, blendedR,
     dirErr, levWarn, levBlocked, sizeIsPct, sizePct, sizeWarn, sizeBlocked, valid,
+    levels, runnerPct, bankSum, pctTotal: bankSum, planReward, planRewardHas, planR,
   };
 }
 
