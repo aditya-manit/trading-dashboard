@@ -5,7 +5,8 @@ import { type Plan, type Status, tpCompute, planToDraft, tpPlanName, tpMoney, re
 import { planActions, usePlanStore } from '@/lib/plan-store';
 import { CoinIcon } from './coins';
 import { StatsBar } from './StatsBar';
-import { PlanDateModal, CalIcon } from './MiniCalendar';
+import { CalIcon } from './MiniCalendar';
+import { PlanInlineDate } from './PlanInlineDate';
 
 type EmptyCfg = { ink: string; ring: string; tint: string; sub: string; icon: 'plus' | 'target' | 'bolt'; title: string };
 type Lane = {
@@ -59,7 +60,6 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
   const [hover, setHover] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dateOpen, setDateOpen] = useState(false);
   const [kbHover, setKbHover] = useState(false);
   const dragAt = useRef(0);
   const archived = !!p.archived;
@@ -122,7 +122,6 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
           </div>
         </>
       ) : null}
-      {dateOpen ? <PlanDateModal plan={p} onClose={() => setDateOpen(false)} /> : null}
 
       <div style={{ display: 'flex', alignItems: 'stretch' }}>
         {/* LEFT — status-tinted identity panel */}
@@ -148,18 +147,20 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
           <span style={{ position: 'relative', zIndex: 1, fontFamily: NEWS5, fontWeight: 600, fontSize: 17, letterSpacing: 0, color: '#1a1813', lineHeight: 1.25, paddingRight: 4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflowWrap: 'anywhere', wordBreak: 'break-word' } as React.CSSProperties}>{tpPlanName(p)}</span>
           {/* 3. date + status row */}
           <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <button title={dateLbl ? 'Change planned window' : 'Set planned window'} onClick={(e) => { e.stopPropagation(); setDateOpen(true); }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#f3eefe'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              style={{ border: 'none', background: 'transparent', padding: '2px 4px', margin: '-2px -4px', borderRadius: 7, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, lineHeight: 1.05, width: 'max-content', maxWidth: '100%', transition: 'background .12s' }}>
-              {dateLbl ? (
-                <>
-                  <span style={{ fontWeight: 700, fontSize: 12, color: '#7c5cff', whiteSpace: 'nowrap' }}>{dateLbl.main}</span>
-                  {dateLbl.sub ? <span style={{ fontWeight: 600, fontSize: 9, letterSpacing: '0.02em', color: p.startDate ? '#8a7fd0' : '#b3aea2' }}>{dateLbl.sub}</span> : null}
-                </>
-              ) : (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#b9a9ee', opacity: hover ? 1 : 0, transition: 'opacity .12s' }}><CalIcon size={11} stroke="currentColor" />Date</span>
-              )}
-            </button>
+            <PlanInlineDate plan={p}>{({ onToggle }) => (
+              <button title={dateLbl ? 'Change planned window' : 'Set planned window'} onClick={onToggle}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f3eefe'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                style={{ border: 'none', background: 'transparent', padding: '2px 4px', margin: '-2px -4px', borderRadius: 7, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, lineHeight: 1.05, width: 'max-content', maxWidth: '100%', transition: 'background .12s' }}>
+                {dateLbl ? (
+                  <>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: '#7c5cff', whiteSpace: 'nowrap' }}>{dateLbl.main}</span>
+                    {dateLbl.sub ? <span style={{ fontWeight: 600, fontSize: 9, letterSpacing: '0.02em', color: p.startDate ? '#8a7fd0' : '#b3aea2' }}>{dateLbl.sub}</span> : null}
+                  </>
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#b9a9ee', opacity: hover ? 1 : 0, transition: 'opacity .12s' }}><CalIcon size={11} stroke="currentColor" />Date</span>
+                )}
+              </button>
+            )}</PlanInlineDate>
             {ts && p.status === 'triggered' ? (
               <span title={ts.sub} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 99, background: ts.tint, border: '1px solid ' + ts.bd }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: ts.dot, flex: '0 0 auto' }} />

@@ -182,14 +182,18 @@ export const planActions = {
   // into the editor snapshot only when one already exists (never fabricates a
   // partial draft — that would blank the card's math); auto-arms if it's today.
   setPlanDate(id: string, iso: string) {
+    this.setPlanDates(id, { tradeDate: iso });
+  },
+  // set the planned-window range (startDate and/or tradeDate); a tradeDate of today auto-arms an idea.
+  setPlanDates(id: string, patch: { startDate?: string; tradeDate?: string }) {
     const today = todayISO();
     let updated: Plan | undefined;
     const plans = state.plans.map((p) => {
       if (p.id !== id) return p;
-      const np: Plan = { ...p, tradeDate: iso };
-      if (p.draft && p.draft.sym) np.draft = { ...p.draft, tradeDate: iso };
+      const np: Plan = { ...p, ...patch };
+      if (p.draft && p.draft.sym) np.draft = { ...p.draft, ...patch };
       else if (np.draft) delete np.draft;
-      if (iso && iso === today && np.status === 'idea') np.status = 'armed';
+      if (np.tradeDate && np.tradeDate === today && np.status === 'idea') np.status = 'armed';
       updated = np;
       return np;
     });

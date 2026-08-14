@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { usePlanStore, planActions } from '@/lib/plan-store';
-import { tpCompute, planToDraft, tpPlanName, relDateLabel, TP_EQUITY, tpEntryRungs, pctNum, tpNum, type Plan, type Status, type PlanDraft, type Level } from '@/lib/plan-model';
+import { tpCompute, planToDraft, tpPlanName, TP_EQUITY, tpEntryRungs, pctNum, tpNum, type Plan, type Status, type PlanDraft, type Level } from '@/lib/plan-model';
 import { useAccount } from '@/hooks/useAccount';
 import { usePositions } from '@/hooks/usePositions';
 import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { CoinIcon } from './coins';
-import { PlanDateModal, CalIcon } from './MiniCalendar';
+import { CalIcon } from './MiniCalendar';
+import { PlanInlineDate, planWindowLabel } from './PlanInlineDate';
 import { EquityStrip, DirLevHeading } from './Editor';
 import { useLevelsProgress, levelsProgress } from '@/lib/levels-progress';
 
@@ -97,7 +98,7 @@ function ChartCard({ p, onFull }: { p: Plan; onFull: (src: string) => void }) {
   const onDrop = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); readChart(e.dataTransfer.files?.[0], p.id); setDrag(false); };
   const onOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); if (!drag) setDrag(true); };
   const onLeave = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); if (drag) setDrag(false); };
-  const tool: React.CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, border: 'none', background: 'rgba(20,18,12,0.62)', color: '#fff', backdropFilter: 'blur(5px)' };
+  const tool: React.CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 99 };
   return (
     <div style={cardBox}>
       <CardHead label="Your chart" icon={imgIcon} />
@@ -106,8 +107,8 @@ function ChartCard({ p, onFull }: { p: Plan; onFull: (src: string) => void }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img onClick={() => onFull(p.chart!)} src={p.chart} alt="chart" style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 11, border: '1px solid #ececea', cursor: 'zoom-in' }} />
           <div style={{ position: 'absolute', top: 23, right: 23, display: 'flex', gap: 8 }}>
-            <label title="Replace" style={tool}><input type="file" accept="image/*" style={{ display: 'none' }} onClick={(e) => e.stopPropagation()} onChange={(e) => { readChart(e.target.files?.[0], p.id); e.currentTarget.value = ''; }} /><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1={12} y1={3} x2={12} y2={15} /></svg></label>
-            <button title="Remove" onClick={(e) => { e.stopPropagation(); planActions.updateThesis(p.id, 'chart', ''); }} style={{ ...tool, background: 'rgba(223,83,56,0.9)' }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg></button>
+            <label title="Replace" className="pd-chartbtn" style={tool}><input type="file" accept="image/*" style={{ display: 'none' }} onClick={(e) => e.stopPropagation()} onChange={(e) => { readChart(e.target.files?.[0], p.id); e.currentTarget.value = ''; }} /><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1={12} y1={3} x2={12} y2={15} /></svg></label>
+            <button title="Remove" className="pd-chartbtn pd-chartbtn-del" onClick={(e) => { e.stopPropagation(); planActions.updateThesis(p.id, 'chart', ''); }} style={tool}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg></button>
           </div>
           {drag ? <div style={{ position: 'absolute', inset: 14, borderRadius: 11, border: '2px dashed #7c5cff', background: 'rgba(124,92,255,0.12)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13, color: '#6a45d8', pointerEvents: 'none' }}>Drop to replace</div> : null}
         </div>
@@ -356,7 +357,7 @@ function PopRow({ children, active, onClick }: { children: React.ReactNode; acti
   );
 }
 
-const KF = `@keyframes pdIn{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes pdFade{from{opacity:0}to{opacity:1}}@keyframes lmpop{0%{transform:scale(1)}45%{transform:scale(1.42)}100%{transform:scale(1)}}@keyframes lmglow{0%{box-shadow:0 0 0 0 rgba(31,157,85,.5)}100%{box-shadow:0 0 0 13px rgba(31,157,85,0)}}.lmdot{cursor:pointer;transition:transform .15s ease}.lmdot:hover{transform:scale(1.13)}.lmnode{cursor:pointer;border-radius:11px;transition:background .14s}.lmnode:hover{background:#faf8f4}.lmpop{animation:lmpop .5s cubic-bezier(.34,1.56,.64,1)}.lmring{animation:lmglow .7s ease-out}.lmghost2:hover{background:#f1efe9 !important;color:#6a6357 !important}.pd-thesis-row:hover{background:var(--tint)}.pd-icobtn:hover{border-color:#ddd4c8 !important;color:#5a574d !important}.pd-icobtn-del:hover{border-color:#f2ddd6 !important;color:#df5338 !important;background:#fdfbfa !important}`;
+const KF = `@keyframes pdIn{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes pdFade{from{opacity:0}to{opacity:1}}@keyframes lmpop{0%{transform:scale(1)}45%{transform:scale(1.42)}100%{transform:scale(1)}}@keyframes lmglow{0%{box-shadow:0 0 0 0 rgba(31,157,85,.5)}100%{box-shadow:0 0 0 13px rgba(31,157,85,0)}}.lmdot{cursor:pointer;transition:transform .15s ease}.lmdot:hover{transform:scale(1.13)}.lmnode{cursor:pointer;border-radius:11px;transition:background .14s}.lmnode:hover{background:#faf8f4}.lmpop{animation:lmpop .5s cubic-bezier(.34,1.56,.64,1)}.lmring{animation:lmglow .7s ease-out}.lmghost2:hover{background:#f1efe9 !important;color:#6a6357 !important}.pd-thesis-row{transition:background .12s}.pd-thesis-row:focus-within{background:var(--tint)}.pd-thesis-row textarea::placeholder{color:#c5c3b9;font-style:italic}.pd-icobtn:hover{background:#1a1813 !important;border-color:#1a1813 !important;color:#fff !important}.pd-icobtn-del:hover{background:#df5338 !important;border-color:#df5338 !important;color:#fff !important}.pd-resize::before{content:"";position:absolute;left:0;top:0;height:100%;width:3px;background:transparent;transition:background .15s}.pd-resize:hover::before{background:#7c5cff}.pd-resize::after{content:"";position:absolute;left:3px;top:50%;transform:translateY(-50%);width:4px;height:34px;border-radius:3px;background:#d8d4ea;opacity:0;transition:opacity .15s}.pd-resize:hover::after{opacity:1}.pd-chartbtn{background:rgba(255,255,255,0.82) !important;color:#26221c !important;border:1px solid rgba(255,255,255,0.9) !important;box-shadow:0 2px 10px -2px rgba(20,18,12,0.28),0 0 0 0.5px rgba(20,18,12,0.04);backdrop-filter:blur(10px) saturate(1.3);transition:background .14s,transform .1s}.pd-chartbtn:hover{background:#fff !important;transform:translateY(-1px)}.pd-chartbtn-del{color:#c23d28 !important}.pd-chartbtn-del:hover{background:#fdece8 !important;color:#b8341f !important}`;
 
 // the plan drawer has its own wide, independently-persisted width (tdplan_pdrawer_w)
 const PDW_MIN = 760;
@@ -375,7 +376,6 @@ function usePlanDrawerWidth(): [number, (v: number) => void] {
 export function PlanDrawer() {
   const { openPlanId, plans } = usePlanStore();
   const [full, setFull] = useState<string | null>(null);
-  const [dateOpen, setDateOpen] = useState(false);
   const [drawerW, setDrawerW] = usePlanDrawerWidth();
   const { data: account } = useAccount();
   const { data: positions } = usePositions();
@@ -388,7 +388,6 @@ export function PlanDrawer() {
   if (!p) return null;
   const d = planToDraft(p), c = tpCompute(d, equity, p.sym === 'BTC' ? btcMark : undefined);
   const close = () => planActions.closePlan();
-  const rel = relDateLabel(p.tradeDate);
   const dot = <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#d6d4cc' }} />;
   const ico = (title: string, onClick: () => void, kids: React.ReactNode, del?: boolean) => (
     <button onClick={onClick} title={title} className={'pd-icobtn' + (del ? ' pd-icobtn-del' : '')} style={{ cursor: 'pointer', border: '1px solid #ebe9e4', background: '#fff', width: 36, height: 36, borderRadius: 11, color: '#8c897f', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(20,20,12,0.04)', transition: 'color .12s, border-color .12s, background .12s' }}>{kids}</button>
@@ -398,11 +397,9 @@ export function PlanDrawer() {
     <>
       <style>{KF}</style>
       <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(20,18,12,0.34)', animation: 'pdFade .2s both' }} />
-      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: drawerW, maxWidth: '98vw', zIndex: 91, background: '#fff', boxShadow: '-30px 0 80px rgba(20,18,12,0.26)', display: 'flex', flexDirection: 'column', animation: 'pdIn .28s cubic-bezier(.22,1,.36,1) both' }}>
-        <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX, startW = drawerW; const move = (ev: MouseEvent) => setDrawerW(startW + (startX - ev.clientX)); const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); }; window.addEventListener('mousemove', move); window.addEventListener('mouseup', up); }}
-          title="Drag to resize" style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 9, cursor: 'ew-resize', zIndex: 93, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ width: 3, height: 40, borderRadius: 99, background: '#e7e5de' }} />
-        </div>
+      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: drawerW, maxWidth: '98vw', zIndex: 91, background: '#fff', boxShadow: '-30px 0 80px rgba(20,18,12,0.26)', display: 'flex', flexDirection: 'column', animation: 'pdIn .4s cubic-bezier(.22,.9,.28,1) both' }}>
+        <div className="pd-resize" onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX, startW = drawerW; const move = (ev: MouseEvent) => setDrawerW(startW + (startX - ev.clientX)); const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); }; window.addEventListener('mousemove', move); window.addEventListener('mouseup', up); }}
+          title="Drag to resize" style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: 9, cursor: 'ew-resize', zIndex: 93 }} />
         {/* header */}
         <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap', padding: '18px 26px', borderBottom: '1px solid #ece9e2', background: 'linear-gradient(180deg,#ffffff,#faf9f7)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
@@ -415,10 +412,12 @@ export function PlanDrawer() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <ConvPill p={p} />{dot}<StatusPill p={p} />{dot}
-              <button onClick={(e) => { e.stopPropagation(); setDateOpen(true); }} title={rel ? 'Change expected date' : 'Set expected date'}
-                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 800, fontSize: 10, letterSpacing: '0.03em', color: rel ? '#6b46e0' : '#a99ce4', background: rel ? '#f3eefe' : 'transparent', border: '1px solid ' + (rel ? '#e5dcfa' : '#e3dcf6'), borderRadius: 99, padding: '3px 9px 3px 7px', borderStyle: rel ? 'solid' : 'dashed', fontFamily: 'inherit' }}>
-                <CalIcon size={11} stroke="currentColor" />{rel ? rel.label + (rel.sub ? ' · ' + rel.sub : '') : 'Set date'}
-              </button>
+              <PlanInlineDate plan={p}>{({ onToggle }) => { const w = planWindowLabel(p); return (
+                <button onClick={onToggle} title={w ? 'Change planned window' : 'Set planned window'}
+                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 800, fontSize: 10, letterSpacing: '0.03em', color: w ? '#6b46e0' : '#a99ce4', background: w ? '#f3eefe' : 'transparent', border: '1px solid ' + (w ? '#e5dcfa' : '#e3dcf6'), borderRadius: 99, padding: '3px 9px 3px 7px', borderStyle: w ? 'solid' : 'dashed', fontFamily: 'inherit' }}>
+                  <CalIcon size={11} stroke="currentColor" />{w ? w.main + (w.sub ? ' · ' + w.sub : '') : 'Set date'}
+                </button>
+              ); }}</PlanInlineDate>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column-reverse', alignItems: 'flex-end', gap: 13, flex: '0 0 auto' }}>
@@ -442,7 +441,6 @@ export function PlanDrawer() {
       </div>
 
       {full ? <div onClick={() => setFull(null)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(14,13,11,0.88)', display: 'grid', placeItems: 'center', padding: 40, cursor: 'zoom-out' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={full} alt="" style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', borderRadius: 10 }} /></div> : null}
-      {dateOpen ? <PlanDateModal plan={p} onClose={() => setDateOpen(false)} /> : null}
     </>
   );
 }
