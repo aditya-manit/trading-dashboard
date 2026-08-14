@@ -555,7 +555,7 @@ function LiqCell({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
   );
 }
 
-function DirLevHeading({ d }: { d: PlanDraft }) {
+export function DirLevHeading({ d }: { d: PlanDraft }) {
   const isShort = d.dir === 'short', dc = isShort ? '#df5338' : '#1f9d55';
   const lev = (tpNum(d.lev) || 5) + '×';
   let holdSeg: React.ReactNode = null;
@@ -775,7 +775,7 @@ function ChartChip({ d }: { d: PlanDraft }) {
 // ── top equity strip (ported from dc.html `tp4aStrip`): Risk · Reward·plan · R:R · Position · Margin · Stop-vs-liq ──
 // top stats strip (ported from tp4aStrip): Risk · Reward·plan · R:R · Position · Margin · Stop-vs-liq.
 // Reward + R:R are generalized multi-slice — one bar segment per scale-out level (empty until priced).
-function EquityStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
+export function EquityStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
   const GREEN = '#1f9d55', RED = '#df5338', ORANGE = '#ff7a00', INK = '#1a1813', PURP = '#7c5cff';
   const MO = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
   const money = (v: number, dec = 0) => (isFinite(v) ? tpMoney(v, dec) : '—');
