@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import {
   type PlanDraft, type SizeMode, type Sym, type Dir, type Conv,
   tpCompute, tpFmtNum, tpNum, tpMoney, tpAutoName, TP_MARKETS, TP_EQUITY, type Plan, type Status,
-  tpEntryRungs, pctNum, tpLevels, type Level,
+  tpEntryRungs, pctNum, tpLevels, type Level, tpPlanName,
 } from '@/lib/plan-model';
 import { HoverTip } from './HoverTip';
 import { planActions, usePlanStore } from '@/lib/plan-store';
@@ -58,7 +58,7 @@ function GroupSheet({ glow, children }: { glow: string; children: React.ReactNod
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ position: 'absolute', top: 120, left: '50%', transform: 'translateX(-50%)', width: '82%', height: 170, borderRadius: '50%', background: glow, filter: 'blur(56px)', opacity: glow === '#7c5cff' ? 0.06 : 0.05, pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'relative', zIndex: 1, background: '#fff', border: '1px solid #efedf3', borderRadius: 20, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden' }}>{children}</div>
+      <div style={{ position: 'relative', zIndex: 1, background: '#fff', border: '1px solid #ece9f2', borderRadius: 20, overflow: 'hidden' }}>{children}</div>
     </div>
   );
 }
@@ -831,7 +831,7 @@ function EquityStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }
   const tdot = (left: number, col: string) => <span style={{ position: 'absolute', left: left + '%', top: '50%', width: 12, height: 12, borderRadius: '50%', background: '#fff', border: '3px solid ' + col, transform: 'translate(-50%,-50%)', boxShadow: '0 1px 3px rgba(20,20,12,0.25)' }} />;
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #efedf3', borderRadius: 18, boxShadow: '0 1px 2px rgba(20,20,12,0.03)', overflow: 'hidden', position: 'relative', zIndex: 6 }}>
+    <div style={{ background: '#fff', border: '1px solid #ece9f2', borderRadius: 20, overflow: 'hidden', position: 'relative', zIndex: 6 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: 1, background: '#f1eff5' }}>
         {/* Risk */}
         <div style={cellS(1.15, 232)}>{lbl('Risk', RED)}
@@ -951,11 +951,14 @@ export function Editor() {
       {/* header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap', padding: '6px 2px 0' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <span onClick={() => (editing ? planActions.cancelEdit() : planActions.setView('board'))} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 700, fontSize: 11.5, color: '#b0aea3', width: 'max-content' }}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>{editing ? 'Cancel' : 'Back to Plans'}
+          <span onClick={() => (editing ? planActions.cancelEdit() : planActions.setView('board'))}
+            onMouseEnter={(e) => { e.currentTarget.style.color = editing ? '#df5338' : '#7c5cff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#b0aea3'; }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 700, fontSize: 11.5, color: '#b0aea3', width: 'max-content', transition: 'color .15s' }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>{editing ? 'Cancel edit' : 'Back to Plans'}
           </span>
           <span style={{ fontWeight: 800, fontSize: 24, letterSpacing: '-0.025em', color: '#1a1813', lineHeight: 1.08 }}>{editing ? 'Edit plan.' : 'Plan this trade.'}</span>
-          <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>{editing ? `Updating ${TP_MARKETS[d.sym].label} ${d.dir} — change levels, size, leverage or thesis.` : 'Lock the specifics — levels, size, leverage, thesis. You’ll still execute manually on TradingView.'}</span>
+          <span style={{ fontWeight: 500, fontSize: 14, color: '#897f70', lineHeight: 1.5, maxWidth: 560 }}>{editing ? `Updating ${tpPlanName(editing)} — change levels, size, leverage or thesis.` : 'Lock the specifics — levels, size, leverage, thesis. You’ll still execute manually on TradingView.'}</span>
         </div>
         <span style={{ alignSelf: 'flex-start', marginTop: -4 }}><DirLevHeading d={d} /></span>
       </div>
@@ -969,7 +972,7 @@ export function Editor() {
           <GroupHead label="Theory" color="#7c5cff" gradient="linear-gradient(180deg,#ffffff 0%,#faf8ff 45%,#ece5fb 100%)" border="#e6ddfb" allOpen={theoryAllOpen} onToggleAll={() => setGroup(['thesis', 'chart'], !theoryAllOpen)} />
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, padding: '9px 18px', borderBottom: '1px solid #f3f1f7' }}>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, gap: 5 }}>
-              <input value={d.name} onChange={(e) => planActions.setDraft({ name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Tab' && !e.shiftKey && !d.name.trim() && tpAutoName(d)) { e.preventDefault(); planActions.setDraft({ name: tpAutoName(d) }); } }} placeholder={tpAutoName(d)} style={{ width: '100%', minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: '#1a1813', padding: 0 }} />
+              <input value={d.name} onChange={(e) => planActions.setDraft({ name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Tab' && !e.shiftKey && !d.name.trim() && tpAutoName(d)) { e.preventDefault(); planActions.setDraft({ name: tpAutoName(d) }); } }} placeholder={tpAutoName(d)} style={{ width: '100%', minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: "var(--font-grotesk), 'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 22, letterSpacing: '-0.02em', color: '#1a1813', padding: 0 }} />
               <span style={{ height: 2, width: '100%', background: 'linear-gradient(90deg,#c9bcff,rgba(201,188,255,0))', borderRadius: 2 }} />
             </div>
             <ExpectedDate d={d} />
@@ -995,7 +998,7 @@ export function Editor() {
             <SecHead title="Levels" open={secOpen.levels} onToggle={() => toggleSec('levels')} fixedH
               collapsedRight={<LevelsSummary d={d} c={c} />} />
             {secOpen.levels && (
-            <div style={{ padding: '4px 18px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ padding: '13px 18px', display: 'flex', flexDirection: 'column', gap: 11 }}>
               {/* ENTRY */}
               {d.entryMode === 'zone' ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -1009,7 +1012,7 @@ export function Editor() {
                 </div>
               )}
               {/* RISK — stop + liquidation */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+              <div style={{ paddingTop: 13, display: 'flex', flexDirection: 'column', gap: 11 }}>
                 <SectionHeader text="Risk" color="#df5338" tip={RISK_TIP} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignItems: 'start' }}>
                   <StopField d={d} c={c} />
@@ -1017,7 +1020,7 @@ export function Editor() {
                 </div>
               </div>
               {/* TARGETS */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              <div style={{ paddingTop: 13, display: 'flex', flexDirection: 'column', gap: 9 }}>
                 <SectionHeader text="Targets" color="#1f9d55" tip={TARGETS_TIP} right={<BanksTotal c={c} />} />
                 <TargetsLadder d={d} c={c} />
               </div>
@@ -1103,7 +1106,7 @@ export function Editor() {
               onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(124,92,255,0.4)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(124,92,255,0.08)'; }}
               style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 11, cursor: 'pointer', background: 'linear-gradient(180deg,#f7f3ff,#efe7ff)', border: '1px solid #e3d8fb', borderRadius: 12, padding: '11px 12px 11px 18px', boxShadow: '0 1px 2px rgba(124,92,255,0.08)', transition: 'box-shadow .2s ease' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}><span style={{ fontWeight: 800, fontSize: 14.5, color: '#5a3ff0', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>{editing ? 'Update plan' : 'Save to Plans'}</span><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#5a3ff0', background: '#fff', border: '1px solid #e3d8fb', padding: '3px 8px', borderRadius: 99 }}>{editing ? editing.status : 'Ideas'}</span></span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}><span style={{ fontWeight: 800, fontSize: 14.5, color: '#5a3ff0', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>{editing ? 'Update plan' : 'Save to Plans'}</span><span style={{ fontWeight: 800, fontSize: 9, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#5a3ff0', background: '#fff', border: '1px solid #e3d8fb', padding: '3px 8px', borderRadius: 99 }}>{editing ? ({ idea: 'Ideas', armed: 'Armed', triggered: 'Triggered' } as Record<string, string>)[editing.status] || 'Ideas' : 'Ideas'}</span></span>
               <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 27, height: 27, borderRadius: 99, background: 'linear-gradient(150deg,#9d82ff,#7c5cff)', boxShadow: '0 3px 9px -2px rgba(124,92,255,0.6)', flex: '0 0 auto' }}><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span>
             </span>
           ) : (
