@@ -502,6 +502,39 @@ function SectionHeader({ text, color, tip, right }: { text: string; color: strin
   );
 }
 
+// Stop loss field with a $/% unit toggle: price mode, or equity-drawdown mode
+// (type a % of equity — or tap −10/−20/−30% — and it back-solves the stop price).
+function StopField({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
+  const RED = '#df5338', INK = '#1a1813';
+  const [unit, setUnit] = useState<'price' | 'dd'>('price');
+  const [ddText, setDdText] = useState<string | null>(null);
+  const [foc, setFoc] = useState(false);
+  const equity = c.Q, qty = c.qty, E = c.E, isLong = d.dir === 'long';
+  const ddNow = isFinite(c.S) && isFinite(qty) && qty > 0 && equity > 0 && isFinite(E) ? (Math.abs(E - c.S) * qty) / equity * 100 : NaN;
+  const ddShown = ddText != null ? ddText : (isFinite(ddNow) ? String(Math.round(ddNow * 10) / 10) : '');
+  const solveDd = (D: number) => { if (!isFinite(D) || !isFinite(qty) || qty <= 0 || !isFinite(E) || !(equity > 0)) return; const dist = ((D / 100) * equity) / qty; const stop = isLong ? E - dist : E + dist; if (isFinite(stop) && stop > 0) planActions.setDraft({ stop: String(Math.round(stop)) }); };
+  const toggle = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); setUnit((u) => (u === 'dd' ? 'price' : 'dd')); setDdText(null); };
+  const inStyle: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 3px 8px 24px', border: `1px solid ${foc ? RED : '#f4e4dd'}`, borderRadius: 12, fontFamily: MONOF, fontWeight: 600, fontSize: 13.5, letterSpacing: '-0.02em', color: INK, background: '#fffcfb', outline: 'none', fontVariantNumeric: 'tabular-nums' };
+  const cap = unit === 'dd' ? 'equity drawdown → stop' : 'blank = ride to liq';
+  const active = Math.round(isFinite(ddNow) ? ddNow : -1);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+      <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: RED }}>Stop loss <span style={{ color: '#d3beb7' }}>· {cap}</span></span>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'relative' }}>
+          <button onClick={toggle} title="Toggle price / equity drawdown" style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', padding: 3, cursor: 'pointer', fontFamily: MONOF, fontWeight: 800, fontSize: 13, lineHeight: 1, color: unit === 'dd' ? RED : '#cbc9c0' }}>{unit === 'dd' ? '%' : '$'}</button>
+          {unit === 'dd'
+            ? <input value={ddShown} onChange={(e) => { const t = e.target.value; setDdText(t); solveDd(parseFloat(t.replace(/[^0-9.]/g, ''))); }} onFocus={() => setFoc(true)} onBlur={() => { setFoc(false); setDdText(null); }} inputMode="decimal" placeholder="0" style={inStyle} />
+            : <input value={tpFmtNum(d.stop)} onChange={(e) => planActions.setDraft({ stop: e.target.value.replace(/,/g, '') })} onFocus={() => setFoc(true)} onBlur={() => setFoc(false)} inputMode="decimal" placeholder="0.00" style={inStyle} />}
+        </div>
+        {unit === 'dd' ? (
+          <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>{[10, 20, 30].map((v) => { const on = active === v; return <button key={v} onClick={() => { setDdText(null); solveDd(v); }} style={{ flex: 1, border: '1px solid ' + (on ? RED : '#f0ddd6'), background: on ? RED : '#fdf3f0', color: on ? '#fff' : RED, borderRadius: 8, padding: '3px 0', cursor: 'pointer', fontFamily: MONOF, fontWeight: 800, fontSize: 10.5 }}>{'-' + v + '%'}</button>; })}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function LiqCell({ d, c }: { d: PlanDraft; c: ReturnType<typeof tpCompute> }) {
   // Auto liquidation from the current entry (falls back to the live mark before an entry is typed),
   // so the cell always previews where liq sits at this leverage. Editing leverage is the only mover.
@@ -978,11 +1011,8 @@ export function Editor() {
               {/* RISK — stop + liquidation */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
                 <SectionHeader text="Risk" color="#df5338" tip={RISK_TIP} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                    <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#df5338' }}>Stop loss <span style={{ color: '#d3beb7' }}>· blank = ride to liq</span></span>
-                    <PriceInput value={d.stop} onChange={(v) => planActions.setDraft({ stop: v })} placeholder="0.00" accent="#df5338" tint="#f2ddd6" bg="#fffcfb" />
-                  </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignItems: 'start' }}>
+                  <StopField d={d} c={c} />
                   <LiqCell d={d} c={c} />
                 </div>
               </div>
