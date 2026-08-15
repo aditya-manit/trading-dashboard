@@ -83,6 +83,7 @@ const VDiv = () => <div style={{ width: 1, alignSelf: 'stretch', background: C.l
 
 // Threshold coloring (risk ramp): ≤5× safe green → amber → red → dark red.
 const levCol = (l: number) => (l <= 5 ? '#1f9d55' : l <= 7 ? IDEA : l < 10 ? '#df5338' : '#b5341f');
+const marCol = (v: number) => (v <= 50 ? '#1f9d55' : v <= 65 ? IDEA : v <= 80 ? '#df5338' : '#b5341f');
 // Conviction ramp: High green · Med amber (caution) · Low grey.
 const convHi = '#1f9d55', convMe = IDEA, convLo = '#c2bfb4';
 const fmtPct = (v: number) => (isFinite(v) ? v.toFixed(2) + '%' : '—');
@@ -99,22 +100,30 @@ export function StatsBar({ plans }: { plans: Plan[] }) {
     if (stage[p.status] !== undefined) stage[p.status]++;
     const cv = p.conv || 'med'; if (conv[cv] !== undefined) conv[cv]++;
     const L = parseInt(String(p.lev), 10); if (L) levMap[L] = (levMap[L] || 0) + 1;
-    const rr = parseFloat(String(p.rr)); const risk = parseFloat(String(p.riskPctLabel || '').replace('%', ''));
-    if (isFinite(risk)) { riskSum += risk; riskN++; if (isFinite(rr)) { rewSum += risk * rr; rewN++; } }
-    if (isFinite(rr)) { rrSum += rr; rrN++; }
-    try { const c = tpCompute(planToDraft(p)); if (c && isFinite(c.marginPct)) marginVals.push(c.marginPct); } catch { /* skip */ }
+    // risk% / reward% / R:R derive from the live compute (same pipeline as the cards),
+    // so the aggregates populate for real plans; reward% = risk% × R:R (the zip's identity).
+    try {
+      const c = tpCompute(planToDraft(p));
+      if (c) {
+        if (isFinite(c.marginPct)) marginVals.push(c.marginPct);
+        const risk = c.riskPct, rr = c.rrList[0] ? c.rrList[0].r : NaN;
+        if (isFinite(risk)) { riskSum += risk; riskN++; if (isFinite(rr)) { rewSum += risk * rr; rewN++; } }
+        if (isFinite(rr)) { rrSum += rr; rrN++; }
+      }
+    } catch { /* skip */ }
   });
   const levBuckets = Object.keys(levMap).map(Number).sort((a, b) => a - b).map((l) => ({ lev: l, n: levMap[l] }));
 
-  // Margin bucketed into the SAME fixed threshold bands as the color ramp, so
-  // each color is its own bar: ≤50 green · 50–65 amber · 65–80 red · >80 dark.
-  const marBars = [
-    { label: '≤50%', col: '#1f9d55', lo: -Infinity, hi: 50, n: 0 },
-    { label: '50–65%', col: IDEA, lo: 50, hi: 65, n: 0 },
-    { label: '65–80%', col: '#df5338', lo: 65, hi: 80, n: 0 },
-    { label: '>80%', col: '#b5341f', lo: 80, hi: Infinity, n: 0 },
-  ];
-  marginVals.forEach((v) => { const bk = marBars.find((b) => v > b.lo && v <= b.hi); if (bk) bk.n++; });
+  // Margin histogram: each plan's margin rounded to the nearest 10, one bar per
+  // 10-step from lo to hi, labelled with that single number (50, 60, 70…), colored
+  // by the same thresholds as the ramp (matches the board handoff).
+  const mrounded = marginVals.map((v) => Math.round(v / 10) * 10);
+  let marBars: Bar[];
+  if (mrounded.length) {
+    const lo = Math.min(...mrounded), hi = Math.max(...mrounded);
+    marBars = [];
+    for (let k = lo; k <= hi; k += 10) marBars.push({ n: mrounded.filter((r) => r === k).length, label: String(k), col: marCol(k) });
+  } else marBars = [{ n: 0, label: '—', col: '#1f9d55' }];
   const avgRisk = riskN ? riskSum / riskN : NaN, avgReward = rewN ? rewSum / rewN : NaN, avgRR = rrN ? rrSum / rrN : NaN;
   const MAXR = 2.0, MAXW = 5.0;
 
