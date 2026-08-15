@@ -28,12 +28,8 @@ const money = (v: number) => (isFinite(v) ? tpMoney(v, v < 1000 ? 2 : 0) : '—'
 
 const MONO5 = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
 const NEWS5 = "var(--font-news), 'Newsreader', Georgia, serif";
-// Per-status tint table for the 5a card's identity panel (base A→B gradient, hover H1/H2, label + separator).
-const T5: Record<Status, { a: string; b: string; h1: string; h2: string; lbl: string; sep: string }> = {
-  idea: { a: '#fffaf3', b: '#fbeeda', h1: '#fdf4e6', h2: '#f6ddb4', lbl: '#bd9c6a', sep: '#e6d3b4' },
-  armed: { a: '#f8f5ff', b: '#efe9fd', h1: '#f4edff', h2: '#e2d5fb', lbl: '#9a8fc0', sep: '#c9c1e2' },
-  triggered: { a: '#f4fbf7', b: '#e2f3ea', h1: '#ecf7f0', h2: '#c9e8d6', lbl: '#84ac94', sep: '#bcdcc8' },
-};
+// Ivory identity panel (v2): near-white, clean, reads against any column color.
+const T5 = { a: '#fffefb', b: '#f8f6f0', lbl: '#9a9890', sep: '#e4e0d8' };
 // planned-window date labels for a card (single date via relDateLabel; range when startDate is set).
 function cardDateLabels(p: Plan): { main: string; sub: string | null } | null {
   const rel = relDateLabel(p.tradeDate);
@@ -71,7 +67,9 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
   const rewardUSD = tp1 ? tp1.rewardUSD : NaN, rewardPct = isFinite(rewardUSD) ? (rewardUSD / c.Q) * 100 : NaN;
   const mp = Math.max(0, Math.min(100, c.marginPct || 0));
   const cvn = ({ high: { n: 3, col: '#7c5cff' }, med: { n: 2, col: '#9d86f5' }, low: { n: 1, col: '#c3b6f2' } } as const)[p.conv || 'med'] || { n: 2, col: '#9d86f5' };
-  const t5 = T5[p.status] || T5.armed;
+  const t5 = T5;
+  const rrVal = isFinite(rewardUSD) && isFinite(c.riskUSD) && c.riskUSD > 0 ? rewardUSD / c.riskUSD : null;
+  const rrInt = rrVal != null ? Math.floor(rrVal) : 0, rrDec = rrVal != null ? Math.round((rrVal - rrInt) * 10) : 0;
   const eqRisk = c.riskPct, eqRew = rewardPct;
   const ladderOk = isFinite(eqRisk) && isFinite(eqRew) && eqRisk + eqRew > 0;
   const eTop = ladderOk ? (eqRisk / (eqRisk + eqRew)) * 100 : 50;
@@ -88,12 +86,12 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
       onClick={() => { if (Date.now() - dragAt.current > 250) onOpen(p); }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ position: 'relative', background: '#fff', border: archived ? '1.5px dotted #c4c0b6' : '1px solid #efedea', borderRadius: 16, overflow: menuOpen ? 'visible' : 'hidden', zIndex: menuOpen ? 20 : undefined, cursor: dragging ? 'grabbing' : 'pointer', display: 'flex', flexDirection: 'column', opacity: dragging ? 0.45 : 1, boxShadow: dragging ? '0 12px 28px rgba(20,20,12,0.16)' : '0 1px 3px rgba(20,20,12,0.04)', transition: 'box-shadow .12s, opacity .12s, border-color .12s' }}>
-      {/* ARCHIVED tag (top-left) */}
+      {/* ARCHIVED tag — full-width top strip (v2) */}
       {archived ? (
-        <span style={{ position: 'absolute', top: 8, left: 0, zIndex: 6, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px 3px 13px', borderRadius: '0 99px 99px 0', background: '#efede9', boxShadow: '0 1px 2px rgba(20,20,12,0.06)' }}>
+        <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 5, padding: '5px 14px', background: '#f5f4f1', borderBottom: '1px solid #e8e5de' }}>
           <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#8a857b" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><rect x={3} y={4} width={18} height={4} rx={1} /><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" /></svg>
           <span style={{ fontWeight: 800, fontSize: 8, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#8a857b' }}>Archived</span>
-        </span>
+        </div>
       ) : null}
       {/* corner: kebab only (date moved into the identity panel) */}
       <div style={{ position: 'absolute', top: 8, right: 11, zIndex: 6, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
@@ -124,10 +122,10 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
       ) : null}
 
       <div style={{ display: 'flex', alignItems: 'stretch' }}>
-        {/* LEFT — status-tinted identity panel */}
-        <div style={{ position: 'relative', flex: '0 0 56%', minWidth: 0, overflow: 'hidden', padding: '18px 16px 17px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 196, background: `linear-gradient(160deg, ${t5.a}, ${t5.b})` }}>
-          {/* hover overlay: near-white top → deeper tint bottom */}
-          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(160deg, #ffffff 0%, ${t5.h1} 45%, ${t5.h2} 100%)`, opacity: hover ? 1 : 0, transition: 'opacity .3s ease', pointerEvents: 'none', zIndex: 0 }} />
+        {/* LEFT — ivory identity panel */}
+        <div style={{ position: 'relative', flex: '0 0 56%', minWidth: 0, overflow: 'hidden', padding: '18px 16px 17px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 196, background: `linear-gradient(155deg, ${t5.a}, ${t5.b})`, boxShadow: hover ? 'inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.06), 0 0 0 1.5px rgba(255,255,255,0.7)' : 'inset 0 1px 0 rgba(255,255,255,0.9), inset 0 -1px 0 rgba(0,0,0,0.04)', transition: 'box-shadow .22s ease' }}>
+          {/* hover overlay: intensifying ivory (near-white top → stronger ivory bottom, no color) */}
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, #ffffff 0%, #fffdf8 35%, #f5efe2 100%)', opacity: hover ? 1 : 0, transition: 'opacity .18s ease', pointerEvents: 'none', zIndex: 0 }} />
           {/* 1. meta row */}
           <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
             <CoinIcon sym={p.sym} />
@@ -161,12 +159,12 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
                 )}
               </button>
             )}</PlanInlineDate>
-            {ts && p.status === 'triggered' ? (
-              <span title={ts.sub} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 99, background: ts.tint, border: '1px solid ' + ts.bd }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: ts.dot, flex: '0 0 auto' }} />
-                <span style={{ fontWeight: 800, fontSize: 8.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: ts.ink }}>{ts.label}</span>
+            {ts && p.status === 'triggered' ? (() => { const ex = tradeState === 'executed'; return (
+              <span title={ex ? 'trade taken' : 'no trade taken'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 5px', borderRadius: 99, background: ex ? '#edfaf3' : '#f5f4f2', border: '1px solid ' + (ex ? '#b8e6cc' : '#e0ddd8') }}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={ex ? '#1f9d55' : '#9a958a'} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}>{ex ? <path d="M20 6 9 17l-5-5" /> : <path d="M18 6 6 18M6 6l12 12" />}</svg>
+                <span style={{ fontWeight: 700, fontSize: 10, color: ex ? '#178a48' : '#7a766e', letterSpacing: '-0.005em' }}>{ex ? 'Executed' : 'Closed'}</span>
               </span>
-            ) : null}
+            ); })() : null}
           </div>
           {/* 4. entry + margin (pushed to the bottom) */}
           <div style={{ position: 'relative', zIndex: 1, marginTop: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px 8px', flexWrap: 'wrap', paddingTop: 5 }}>
@@ -175,29 +173,32 @@ function BoardCard({ p, onOpen, tradeState }: { p: Plan; onOpen: (p: Plan) => vo
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{vLbl('Margin · eq', t5.lbl)}
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 16, height: 16, borderRadius: '50%', background: `conic-gradient(#7c5cff 0% ${mp}%, #e3ddf6 ${mp}% 100%)`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f4f0fd', display: 'block' }} /></span>
+                <span style={{ width: 16, height: 16, borderRadius: '50%', background: `conic-gradient(#7c5cff 0% ${mp}%, #e4e0d8 ${mp}% 100%)`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fffefb', display: 'block' }} /></span>
                 <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 19, color: '#7c5cff', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>{isFinite(c.marginPct) ? Math.round(c.marginPct) + '%' : '—'}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* RIGHT — to-scale vertical risk/reward ladder */}
-        <div style={{ flex: 1, display: 'flex', padding: '18px 14px 17px 13px', gap: 11, minWidth: 0 }}>
+        {/* RIGHT — to-scale vertical risk/reward ladder + R:R stamp */}
+        <div style={{ flex: 1, display: 'flex', padding: '18px 14px 17px 13px', gap: 11, minWidth: 0, position: 'relative', overflow: 'hidden' }}>
+          {rrVal != null ? (
+            <div style={{ position: 'absolute', bottom: 0, right: 0, background: '#fffefb', border: '1px solid #e8e5de', borderBottom: 'none', borderRight: 'none', padding: '5px 10px 5px 12px', borderRadius: '10px 0 0 0', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', zIndex: 2 }}>
+              <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 12, color: '#7c5cff', letterSpacing: '-0.02em', lineHeight: 1 }}>{rrInt + (rrDec ? '.' + rrDec : '') + 'R'}</span>
+            </div>
+          ) : null}
           <div style={{ position: 'relative', flex: '0 0 5px' }}>
             <div style={{ position: 'absolute', left: 0, top: 0, width: 5, height: eTop + '%', borderRadius: '3px 3px 0 0', background: 'linear-gradient(180deg,#df5338,#f0917f)' }} />
             <div style={{ position: 'absolute', left: 0, top: eTop + '%', width: 5, height: (100 - eTop) + '%', borderRadius: '0 0 3px 3px', background: 'linear-gradient(180deg,#5fbd88,#1f9d55)' }} />
             <span style={{ position: 'absolute', left: -2, top: `calc(${eTop}% - 4px)`, width: 9, height: 9, borderRadius: '50%', background: '#1a1813', border: '2px solid #ffffff', boxShadow: '0 0 0 1px #1a1813' }} />
           </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
             <div style={zoneStyle(eqRisk)}>{vLbl('Risk · eq', '#df5338')}
-              <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 18.5, letterSpacing: '-0.01em', color: '#df5338', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(eqRisk) ? '-' + Math.round(eqRisk) + '%' : '—'}</span>
-              <span style={{ fontFamily: MONO5, fontSize: 11, color: '#e0a89e', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : ''}</span>
+              <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 15, letterSpacing: '-0.01em', color: '#df5338', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(eqRisk) && isFinite(c.riskUSD) ? Math.round(eqRisk) + '% · ' + money(c.riskUSD) : '—'}</span>
             </div>
             <div style={{ height: 8 }} />
             <div style={zoneStyle(eqRew)}>{vLbl('Reward · eq', '#1f9d55')}
-              <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 18.5, letterSpacing: '-0.01em', color: '#1f9d55', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(eqRew) ? '+' + Math.round(eqRew) + '%' : '—'}</span>
-              <span style={{ fontFamily: MONO5, fontSize: 11, color: '#8fcaa7', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(rewardUSD) ? '+' + money(rewardUSD) : ''}</span>
+              <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 15, letterSpacing: '-0.01em', color: '#1f9d55', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(eqRew) && isFinite(rewardUSD) ? Math.round(eqRew) + '% · ' + money(rewardUSD) : '—'}</span>
             </div>
           </div>
         </div>
@@ -259,6 +260,13 @@ function ArchiveToggle({ st, count, active, onToggle }: { st: Status; count: num
   );
 }
 
+// Variation-C column header chip tokens (light→mid gradient, border, accent number, subtitle, blob glow).
+const COL: Record<Status, { light: string; mid: string; border: string; accent: string; subtitle: string; blob: string; blobOp: number }> = {
+  idea: { light: '#fff8ee', mid: '#fbecd4', border: '#f0ddb8', accent: '#e8920f', subtitle: '#c9a46a', blob: '#ffa31a', blobOp: 0.28 },
+  armed: { light: '#f8f5ff', mid: '#ece5fd', border: '#ddd0f7', accent: '#7c5cff', subtitle: '#9a8fc0', blob: '#7c5cff', blobOp: 0.22 },
+  triggered: { light: '#f3fbf6', mid: '#d9f0e4', border: '#c4e6d3', accent: '#1f9d55', subtitle: '#84ac94', blob: '#1f9d55', blobOp: 0.22 },
+};
+
 export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
   const store = usePlanStore();
   const [overCol, setOverCol] = useState<Status | null>(null);
@@ -299,27 +307,27 @@ export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
           const items = showArch ? all : all.filter((p) => !p.archived);
           const isOver = overCol === lane.key;
           const emptyCfg = archivedCount && !showArch ? { ...lane.empty, title: ARCH[lane.key].emptyTitle } : lane.empty;
+          const t = COL[lane.key];
           return (
-            <div key={lane.key} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* lane glow halo */}
-              <div style={{ position: 'absolute', top: 30, left: '50%', transform: 'translateX(-50%)', width: '84%', height: 170, borderRadius: '50%', background: lane.glow, filter: 'blur(58px)', opacity: lane.glowOp, pointerEvents: 'none', zIndex: 0 }} />
-              {/* number-led header */}
-              <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 11, padding: '0 6px', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                  <span style={{ fontWeight: 800, fontSize: 34, lineHeight: 0.85, letterSpacing: '-0.03em', color: lane.num, fontVariantNumeric: 'tabular-nums' }}>{all.length}</span>
+            <div key={lane.key} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* floating header chip (Variation C) */}
+              <div style={{ position: 'relative', overflow: 'hidden', background: `linear-gradient(135deg, ${t.light}, ${t.mid})`, border: '1px solid ' + t.border, borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 11, justifyContent: 'space-between' }}>
+                <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: t.blob, filter: 'blur(40px)', opacity: t.blobOp, pointerEvents: 'none' }} />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 11 }}>
+                  <span style={{ fontFamily: MONO5, fontWeight: 800, fontSize: 34, lineHeight: 0.85, letterSpacing: '-0.03em', color: t.accent, fontVariantNumeric: 'tabular-nums' }}>{all.length}</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#1a1813' }}>{lane.label}</span>
-                    <span style={{ fontWeight: 700, fontSize: 10.5, color: '#a8a69b' }}>{lane.caption}</span>
+                    <span style={{ fontWeight: 700, fontSize: 10.5, color: t.subtitle }}>{lane.caption}</span>
                   </div>
                 </div>
-                <ArchiveToggle st={lane.key} count={archivedCount} active={showArch} onToggle={() => setShowArchived((s) => ({ ...s, [lane.key]: !s[lane.key] }))} />
+                <div style={{ position: 'relative' }}><ArchiveToggle st={lane.key} count={archivedCount} active={showArch} onToggle={() => setShowArchived((s) => ({ ...s, [lane.key]: !s[lane.key] }))} /></div>
               </div>
-              {/* drop zone */}
+              {/* card list / drop zone */}
               <div
                 onDragOver={(e) => { e.preventDefault(); if (overCol !== lane.key) setOverCol(lane.key); }}
                 onDragLeave={() => setOverCol((s) => (s === lane.key ? null : s))}
                 onDrop={(e) => { e.preventDefault(); setOverCol(null); const id = (window as unknown as { __tpDrag?: string }).__tpDrag; if (id) planActions.movePlan(id, lane.key); }}
-                style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 11, flex: 1, minHeight: 88, borderRadius: 14, padding: 6, transition: 'background .12s, box-shadow .12s', background: isOver ? lane.drop.tint : 'transparent', boxShadow: isOver ? 'inset 0 0 0 2px ' + lane.drop.ring : 'inset 0 0 0 1px transparent' }}>
+                style={{ display: 'flex', flexDirection: 'column', gap: 11, flex: 1, minHeight: 88, borderRadius: 14, padding: 6, transition: 'background .12s, box-shadow .12s', background: isOver ? lane.drop.tint : 'transparent', boxShadow: isOver ? 'inset 0 0 0 2px ' + lane.drop.ring : 'inset 0 0 0 1px transparent' }}>
                 {items.length === 0 ? <EmptyLane e={emptyCfg} /> : items.map((p) => <BoardCard key={p.id} p={p} onOpen={onOpen} tradeState={lane.key === 'triggered' ? (linkedPlanIds.has(p.id) ? 'executed' : 'closed') : null} />)}
               </div>
             </div>
