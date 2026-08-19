@@ -69,7 +69,7 @@ const THESIS: { field: 'rationale' | 'trigger' | 'invalidation' | 'targetNote'; 
   { field: 'targetNote', lab: 'Target / exit', dot: '#c9821f' },
 ];
 function ThesisCard({ p }: { p: Plan }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <div style={cardBox}>
       <CardHead label="Thesis" icon={bulbIcon} chevron open={open} onClick={() => setOpen((v) => !v)} />
