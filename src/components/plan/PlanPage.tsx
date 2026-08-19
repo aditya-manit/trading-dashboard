@@ -748,24 +748,15 @@ export function PlanPage() {
   const [showAll, setShowAll] = useState(false);
   const [newsQuery, setNewsQuery] = useState('');
 
-  // Restore persisted progress
+  // The workbook is a pre-trade checklist you re-walk EVERY time — it always starts
+  // fresh on load (step 1, nothing checked). Wipe any stale persisted progress and
+  // never restore or re-persist it.
   useEffect(() => {
-    try {
-      const s = localStorage.getItem('tdplan_step');
-      const f = localStorage.getItem('tdplan_fin');
-      const c = localStorage.getItem('tdplan_checks_v2');
-      if (s !== null) setStep(Math.max(0, Math.min(4, +s)));
-      if (f !== null) setFinished(f === '1');
-      if (c !== null) setChecks(JSON.parse(c) || {});
-    } catch { /* ignore */ }
+    try { localStorage.removeItem('tdplan_step'); localStorage.removeItem('tdplan_fin'); localStorage.removeItem('tdplan_checks_v2'); } catch { /* ignore */ }
   }, []);
 
-  const persistPlan = (s: number, f: boolean) => {
-    try { localStorage.setItem('tdplan_step', String(s)); localStorage.setItem('tdplan_fin', f ? '1' : '0'); } catch { /* ignore */ }
-  };
-  const persistChecks = (c: Record<string, boolean>) => {
-    try { localStorage.setItem('tdplan_checks_v2', JSON.stringify(c)); } catch { /* ignore */ }
-  };
+  const persistPlan = (_s: number, _f: boolean) => { /* no-op: workbook resets on every load */ };
+  const persistChecks = (_c: Record<string, boolean>) => { /* no-op: workbook resets on every load */ };
 
   const goStep = (s: number) => { const ns = Math.max(0, Math.min(4, s)); persistPlan(ns, finished); setStep(ns); };
   const toggleCheck = (k: string) => {

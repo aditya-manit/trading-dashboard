@@ -57,7 +57,7 @@ src/
       planDiagrams.ts                 # 5 step SVGs, verbatim from handoff 15
     heatmap/
       HeatmapPage.tsx                 # Liquidation heatmap: themed canvas + zoom/pan/crosshair + profile + strip (handoff 32)
-      HeatmapOverlay.tsx              # full-screen launcher wrapper (reads heatmap-launch store)
+  app/heatmap/page.tsx               # standalone heatmap route (opens in a new tab)
       HeatmapLaunchCard.tsx           # launch card — 'card' variant (Step 5) / 'row' variant (editor Levels)
       HeatMatrixIcon.tsx              # unified green→red heat-matrix glyph (header btn + both launch cards)
   hooks/
@@ -69,7 +69,6 @@ src/
     apify-heatmap.ts                  # shared Apify Actor fetch (used by /api/heatmap + daily capture)
     heatmap-metrics.ts                # liquidation magnets / strongest wall / center-of-gravity (absolute USD)
     heatmap-capture.ts                # captureDailyHeatmapMetrics() — pull+compute+upsert (cron + on-load)
-    heatmap-launch.ts                 # tiny store to open the heatmap overlay (from Step 5 / editor)
     event-insight.ts                  # Claude (web-search) event insights + Gate BTC "2 prints" %
     formatters.ts
   types/gate.ts
@@ -108,12 +107,13 @@ src/
 
 ## Pages & tab sections
 Top-level `page` state in `page.tsx` toggles between **Plan (default)** and **Dashboard**
-(2-way `PAGES` toggle in `Topbar.tsx`). The **liquidation heatmap is NOT a top-level page** —
-it's a full-screen overlay (`<HeatmapOverlay/>`, always mounted in `page.tsx`) launched on
-demand from the workbook Step 5 card and the plan editor's Levels card via
-`heatmapLaunch.open(symbol)` (`lib/heatmap-launch.ts`). Closing it (back button) reveals the
-page underneath unchanged. (It used to be a 3rd toggle pill — removed; it's market context,
-not a workflow.)
+(2-way `PAGES` toggle in `Topbar.tsx`). The **liquidation heatmap opens in a NEW BROWSER TAB**
+at its own route `src/app/heatmap/page.tsx` (`/heatmap?symbol=BTC|ETH|SOL`). Every entry point —
+the workbook Step 5 card, the plan editor's Levels card (`HeatmapLaunchCard`), and the global
+Topbar button — does `window.open('/heatmap?symbol=…','_blank')`. The route renders `HeatmapPage`
+with `onClose={() => window.close()}`; auth is the same owner+MFA gate (shared session cookie).
+(Previously a full-screen overlay via a `heatmap-launch` store + `HeatmapOverlay` — both removed;
+it's not a top-level toggle pill either, it's market context, not a workflow.)
 ```
 Plan (default) → PlanFunnel  (Topbar tabs: Workbook / Plans / Journal — ALL live)
    view switcher (lib/plan-store `view`): workbook → PlanPage · editor → Editor ·
@@ -124,7 +124,7 @@ Dashboard:
   #positions  → PositionsTable
   #reports    → KeyMetricsRow
   #history    → PositionHistoryTable
-Liquidation heatmap → full-screen overlay, launched from workbook Step 5 / editor Levels
+Liquidation heatmap → new browser tab (/heatmap route), launched from workbook Step 5 / editor Levels / Topbar
 ```
 
 ---
@@ -244,12 +244,13 @@ The whole Plan funnel is ported and live. Files under `components/plan/`:
 - Math/model in `lib/plan-model.ts` (`tpCompute`, `planToDraft`); store in
   `lib/plan-store.ts`; journal logic in `lib/journal.ts`.
 
-### Liquidation Heatmap (handoff 32 — redesign + full-screen launcher)
-`HeatmapPage` was rewritten from `project/Liquidation Heatmap (light).dc.html`. It is now a
-**full-screen overlay** (`HeatmapOverlay`, `height:100vh`, `z-index:120`), launched from the
-workbook Step 5 card, the plan editor Levels card, AND a **global Topbar "Heatmap" button**
-(handoff 34, slim pill left of the Read-only/Synced pill — access from any view), all via
-`heatmapLaunch.open(symbol)`. NOT a top-level page. **All three entry points share the
+### Liquidation Heatmap (handoff 32 — redesign; now a new-tab route)
+`HeatmapPage` was rewritten from `project/Liquidation Heatmap (light).dc.html`. **UPDATE: it now
+opens in a NEW BROWSER TAB** at `/heatmap?symbol=…` (`src/app/heatmap/page.tsx`) — the full-screen
+overlay + `heatmap-launch` store were removed. Launched from the workbook Step 5 card, the plan
+editor Levels card, AND the **global Topbar "Heatmap" button** (handoff 34, slim pill left of the
+Read-only/Synced pill — access from any view), all via `window.open('/heatmap?symbol=…','_blank')`.
+The route's Back button is `window.close()`. **All three entry points share the
 `HeatMatrixIcon`** (green→red 4×4 grid). Launch-card variants: `card` (Step 5, "Shorts vs longs"
 eyebrow) · `row` (editor Levels, borderless top-divider row, "Liquidation heatmap" eyebrow). Its own header carries a **Back** button (`onClose` → `heatmapLaunch.close()`),
 the LIVE·SYMBOL/USDT eyebrow + title, **refresh** + **theme toggle**, and the **spec-table nav**

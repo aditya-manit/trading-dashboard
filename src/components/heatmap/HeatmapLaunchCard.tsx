@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { heatmapLaunch } from '@/lib/heatmap-launch';
 import { HeatMatrixIcon } from './HeatMatrixIcon';
 import type { HeatSymbol } from '@/hooks/useHeatmap';
 
@@ -25,7 +24,7 @@ export function HeatmapLaunchCard({
     : 'Liquidation heatmap';
   return (
     <button
-      onClick={() => heatmapLaunch.open(symbol)}
+      onClick={() => window.open('/heatmap?symbol=' + symbol, '_blank', 'noopener')}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{

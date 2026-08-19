@@ -11,7 +11,6 @@ import { PositionsTable } from '@/components/positions/PositionsTable';
 import { KeyMetricsRow } from '@/components/stats/KeyMetricsRow';
 import { PositionHistoryTable } from '@/components/positions-history/PositionHistoryTable';
 import { PlanFunnel } from '@/components/plan/PlanFunnel';
-import { HeatmapOverlay } from '@/components/heatmap/HeatmapOverlay';
 
 export default function DashboardPage() {
   const [page, setPage] = useState<'dashboard' | 'plan'>('plan');
@@ -40,7 +39,6 @@ export default function DashboardPage() {
         </div>
       </div>
       {/* Full-screen liquidation heatmap, launched from workbook Step 5 / plan editor */}
-      <HeatmapOverlay />
     </div>
   );
 }

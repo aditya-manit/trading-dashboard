@@ -5,7 +5,6 @@ import { useSWRConfig } from 'swr';
 import { ProfileMenu } from './ProfileMenu';
 import { usePlanStore, planActions, type PlanView } from '@/lib/plan-store';
 import { usePositionHistory } from '@/hooks/usePositionHistory';
-import { heatmapLaunch } from '@/lib/heatmap-launch';
 import { HeatMatrixIcon } from '@/components/heatmap/HeatMatrixIcon';
 
 const TABS = [
@@ -207,7 +206,7 @@ function HeatmapButton() {
   const [hov, setHov] = useState(false);
   return (
     <button
-      onClick={() => heatmapLaunch.open('BTC')}
+      onClick={() => window.open('/heatmap?symbol=BTC', '_blank', 'noopener')}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       title="Liquidation heatmap"
