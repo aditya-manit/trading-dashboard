@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { usePlanStore, planActions } from '@/lib/plan-store';
-import { tpCompute, planToDraft, tpPlanName, TP_EQUITY, tpEntryRungs, pctNum, tpNum, type Plan, type Status, type PlanDraft, type Level } from '@/lib/plan-model';
+import { tpCompute, planToDraft, tpPlanName, tpMoney, TP_EQUITY, tpEntryRungs, pctNum, tpNum, type Plan, type Status, type PlanDraft, type Level } from '@/lib/plan-model';
 import { useAccount } from '@/hooks/useAccount';
 import { usePositions } from '@/hooks/usePositions';
 import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { CoinIcon } from './coins';
 import { CalIcon } from './MiniCalendar';
 import { PlanInlineDate, planWindowLabel } from './PlanInlineDate';
-import { EquityStrip, DirLevHeading } from './Editor';
+import { DirLevHeading } from './Editor';
 import { useLevelsProgress, levelsProgress } from '@/lib/levels-progress';
 
 const MONO = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
@@ -20,7 +20,108 @@ const STATUSES: { k: Status; label: string; c: string; bg: string }[] = [
   { k: 'triggered', label: 'Triggered', c: '#c9821f', bg: '#fbf2e3' },
 ];
 const CONVS = [{ k: 'low', label: 'Low', n: 1 }, { k: 'med', label: 'Medium', n: 2 }, { k: 'high', label: 'High', n: 3 }] as const;
-const hexRgba = (hex: string, a: number) => { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+
+// ── "3a Verdict-last" stat strip (drawer only; the editor keeps tp4aStrip/EquityStrip) ──
+const S_PURP = '#7c5cff', S_GREEN = '#1f9d55', S_RED = '#df5338', S_ORANGE = '#ff7a00', S_INK = '#1a1813', S_MUT = '#a8a294', S_DIM = '#c6c1b6';
+function Tp3aStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
+  const money = (v: number, dec = 0) => (isFinite(v) ? tpMoney(v, dec) : '—');
+  const chipSt: React.CSSProperties = { background: '#fff', border: '1px solid #ece9f2', borderRadius: 16, padding: '13px 17px', display: 'flex', flexDirection: 'column', gap: 8 };
+  const cap = (t: string) => <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 8.5, letterSpacing: '0.15em', color: S_MUT, whiteSpace: 'nowrap' }}>{t}</span>;
+  const pct = (txt: string, col: string, tag: string) => <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: col, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{txt}<span style={{ color: S_DIM, fontWeight: 500 }}>{' ' + tag}</span></span>;
+
+  const slices = (c.levels || []).filter((l) => isFinite(l.rewardUSD));
+  const denom = slices.reduce((s, l) => s + (l.rewardUSD > 0 ? l.rewardUSD : 0), 0);
+  const segCol = (l: Level) => (l.isRunner ? '#57c98a' : S_GREEN);
+  const totalReward = c.planReward, hasReward = c.planRewardHas, planR = c.planR;
+  const rrStr = isFinite(planR) ? planR.toFixed(2) : '—';
+  const rrColor = !isFinite(planR) ? '#b3b0a6' : planR >= 2.5 ? S_GREEN : planR >= 1.5 ? '#c9821f' : S_RED;
+  const rrVerd = !isFinite(planR) ? 'Set levels' : planR >= 2.5 ? 'Strong edge' : planR >= 1.5 ? 'Fair edge' : 'Thin edge';
+  let finalMove = NaN; (c.levels || []).forEach((l) => { if (l.hasPrice && isFinite(l.distPct)) { if (!isFinite(finalMove) || l.distPct > finalMove) finalMove = l.distPct; } });
+  const rewEqPct = isFinite(totalReward) && isFinite(c.Q) && c.Q > 0 ? (totalReward / c.Q) * 100 : NaN;
+  const bignum = (txt: string, col: string, fs = 22) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: fs, lineHeight: 1, letterSpacing: fs >= 22 ? '-0.025em' : '-0.02em', color: col, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{txt}</span>;
+
+  const riskChip = (
+    <div style={{ ...chipSt, flex: '0 0 auto' }}>{cap('RISK')}
+      {bignum(isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : '—', S_RED)}
+      <div style={{ display: 'flex', gap: 11 }}>{isFinite(c.distStopPct) ? pct(c.distStopPct.toFixed(2) + '%', '#3a352c', 'pos') : null}{isFinite(c.riskPct) ? pct(c.riskPct.toFixed(2) + '%', S_PURP, 'eq') : null}</div>
+    </div>
+  );
+  const rewChip = (
+    <div style={{ ...chipSt, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 20 }}>
+      <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>{cap('REWARD · PLAN')}
+        {bignum(hasReward ? '+' + money(totalReward) : '—', S_GREEN)}
+        <div style={{ display: 'flex', gap: 11 }}>{isFinite(finalMove) ? pct(finalMove.toFixed(2) + '%', '#3a352c', 'pos') : null}{isFinite(rewEqPct) ? pct(rewEqPct.toFixed(2) + '%', S_PURP, 'eq') : null}</div>
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ display: 'flex', gap: 3, height: 6 }}>{slices.map((l, i) => { const s = denom > 0 ? Math.max(0, l.rewardUSD) / denom : 0; return s > 0 ? <div key={i} style={{ flexGrow: s, flexShrink: 1, flexBasis: 0, minWidth: 2, background: segCol(l), borderRadius: 99 }} /> : null; })}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>{slices.map((l, i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: i === 0 ? 'flex-start' : i === slices.length - 1 ? 'flex-end' : 'center' }}>
+            <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: S_GREEN, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(l.rewardUSD) ? '+' + money(l.rewardUSD) : '—'}</span>
+            <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 9, color: '#b3ada0', whiteSpace: 'nowrap' }}>{(l.isRunner ? 'Run' : 'TP' + l.i) + ' · ' + Math.round(l.pct) + '%'}</span>
+          </div>
+        ))}</div>
+      </div>
+    </div>
+  );
+
+  const price = c.mkt.mark;
+  const liqDist = isFinite(c.liq) ? (Math.abs(price - c.liq) / price) * 100 : NaN;
+  const stopDist = isFinite(c.S) ? (Math.abs(price - c.S) / price) * 100 : NaN;
+  const cushion = isFinite(liqDist) && isFinite(stopDist) && stopDist > 0 ? liqDist / stopDist : NaN;
+  const verd = !isFinite(cushion) ? { t: '—', c: '#b3b0a6' } : cushion >= 3 ? { t: 'Clear of liq', c: S_GREEN } : cushion >= 1.5 ? { t: 'Near liq', c: '#c9821f' } : { t: 'Close to liq', c: S_RED };
+  const stopPos = isFinite(liqDist) && isFinite(stopDist) && liqDist > 0 ? Math.max(4, Math.min(96, (1 - stopDist / liqDist) * 100)) : 50;
+  const tdot = (left: number, col: string) => <span style={{ position: 'absolute', left: left + '%', top: '50%', width: 11, height: 11, borderRadius: '50%', background: '#fff', border: '2.3px solid ' + col, transform: 'translate(-50%,-50%)' }} />;
+  const liqChip = (
+    <div style={{ ...chipSt, flex: 1, minWidth: 0, order: -1, gap: 9 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>{cap('STOP VS LIQ')}<span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 10.5, color: verd.c, whiteSpace: 'nowrap' }}>{verd.t}</span></div>
+      <div style={{ position: 'relative', height: 13, display: 'flex', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, height: 5, borderRadius: 99, background: S_ORANGE, overflow: 'hidden' }}><div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '9%', background: S_RED }} /></div>
+        {tdot(1, S_ORANGE)}{tdot(stopPos, S_RED)}{tdot(99, S_PURP)}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
+        <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10, color: '#3a352c', whiteSpace: 'nowrap' }}><span style={{ color: S_ORANGE }}>LIQ </span>{isFinite(c.liq) ? money(c.liq) : '—'}</span>
+        <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10, color: '#3a352c', whiteSpace: 'nowrap' }}><span style={{ color: S_RED }}>STOP </span>{isFinite(c.S) ? money(c.S) : '—'}</span>
+        <span style={{ marginLeft: 'auto', fontFamily: MONO, fontWeight: 600, fontSize: 10, color: S_PURP, whiteSpace: 'nowrap' }}>{'PRICE ' + money(price)}</span>
+      </div>
+    </div>
+  );
+  const posChip = (
+    <div style={{ ...chipSt, flex: '0 0 auto', gap: 7 }}>{cap('POSITION')}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>{bignum(isFinite(c.qty) ? c.qty.toFixed(c.qty < 10 ? 3 : 2) : '—', S_INK, 20)}<CoinIcon sym={d.sym} size={17} /></div>
+      <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 10.5, color: '#b3ada0', whiteSpace: 'nowrap' }}>{isFinite(c.notional) ? money(c.notional) + ' notional' : '—'}</span>
+    </div>
+  );
+  const marChip = (
+    <div style={{ ...chipSt, flex: '0 0 auto', gap: 7 }}>{cap('MARGIN')}
+      {bignum(isFinite(c.margin) ? money(c.margin) : '—', S_INK, 20)}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 84, flex: '0 0 auto', height: 5, borderRadius: 99, background: '#f0edf9', overflow: 'hidden', display: 'block' }}><span style={{ display: 'block', height: '100%', width: Math.max(0, Math.min(100, c.marginPct || 0)) + '%', background: S_PURP, borderRadius: 99 }} /></span>
+        <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10.5, color: S_PURP, flex: '0 0 auto' }}>{isFinite(c.marginPct) ? c.marginPct.toFixed(0) + '%' : '—'}</span>
+      </div>
+    </div>
+  );
+
+  const rLevels = (c.levels || []).filter((l) => isFinite(l.r));
+  const rTotal = rLevels.reduce((s, l) => s + (l.r > 0 ? l.r : 0), 0);
+  const hero = (
+    <div style={{ width: 226, flex: '0 0 auto', background: '#fff', border: '1px solid #ece9f2', borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>{cap('R : R')}
+      <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 48, lineHeight: 1, letterSpacing: '-0.045em', color: rrColor, fontVariantNumeric: 'tabular-nums' }}>{rrStr}</span>
+      <span style={{ alignSelf: 'flex-start', fontWeight: 700, fontSize: 11.5, color: '#c9821f', background: '#fdf3e3', borderRadius: 6, padding: '4px 9px' }}>{rrVerd}</span>
+      {rLevels.length ? <div style={{ display: 'flex', gap: 3, height: 5, marginTop: 3 }}>{rLevels.map((l, i) => { const s = rTotal > 0 ? Math.max(0, l.r) / rTotal : 0; return s > 0 ? <div key={i} style={{ flexGrow: s, flexShrink: 1, flexBasis: 0, minWidth: 2, background: i % 2 ? '#6cc492' : S_GREEN, borderRadius: 99 }} /> : null; })}</div> : null}
+      {rLevels.length ? <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>{rLevels.map((l, i) => <span key={i} style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: '#3a352c', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{l.r.toFixed(2) + 'R'}</span>)}</div> : null}
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', background: 'transparent', flexShrink: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10 }}>{riskChip}{rewChip}</div>
+        <div style={{ display: 'flex', gap: 10 }}>{posChip}{marChip}{liqChip}</div>
+      </div>
+      {hero}
+    </div>
+  );
+}
 
 // downscale a chart screenshot to a data URL, then persist it onto the plan.
 function readChart(file: File | undefined | null, id: string) {
@@ -57,40 +158,8 @@ function CardHead({ label, icon, chevron, open, onClick }: { label: string; icon
     </div>
   );
 }
-const cardBox: React.CSSProperties = { background: '#fff', border: '1px solid #e9e6e0', borderRadius: 20, overflow: 'hidden' };
-const bulbIcon = <><path d="M9 18h6" /><path d="M10 22h4" /><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" /></>;
+const cardBox: React.CSSProperties = { background: '#fff', border: '1px solid #ece9f2', borderRadius: 20, overflow: 'hidden' };
 const imgIcon = <><rect x={3} y={3} width={18} height={18} rx={2} /><circle cx={8.5} cy={8.5} r={1.6} /><path d="m21 15-5-5L5 21" /></>;
-
-// ── Thesis card — collapsible, four inline-editable rows ──
-const THESIS: { field: 'rationale' | 'trigger' | 'invalidation' | 'targetNote'; lab: string; dot: string }[] = [
-  { field: 'rationale', lab: 'Rationale', dot: '#7c5cff' },
-  { field: 'trigger', lab: 'Trigger', dot: '#1f9d55' },
-  { field: 'invalidation', lab: 'Invalidation', dot: '#df5338' },
-  { field: 'targetNote', lab: 'Target / exit', dot: '#c9821f' },
-];
-function ThesisCard({ p }: { p: Plan }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={cardBox}>
-      <CardHead label="Thesis" icon={bulbIcon} chevron open={open} onClick={() => setOpen((v) => !v)} />
-      {open ? (
-        <div>
-          {THESIS.map((t, i) => (
-            <div key={t.field} className="pd-thesis-row" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 18px', borderBottom: i < 3 ? '1px solid #f3f2ef' : 'none', ['--tint' as string]: hexRgba(t.dot, 0.05) } as React.CSSProperties}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 9.5, letterSpacing: '0.07em', textTransform: 'uppercase', color: hexRgba(t.dot, 0.92) }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.dot, flex: '0 0 auto' }} />{t.lab}
-              </span>
-              <textarea key={p.id + '_' + t.field} defaultValue={(p[t.field] as string) || ''} placeholder={'Add ' + t.lab.toLowerCase() + '…'} rows={1}
-                onClick={(e) => e.stopPropagation()}
-                onBlur={(e) => { const v = e.target.value.trim(); if (v !== ((p[t.field] as string) || '')) planActions.updateThesis(p.id, t.field, v); }}
-                style={{ display: 'block', width: '100%', maxWidth: '100%', margin: 0, padding: 0, boxSizing: 'border-box', resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontWeight: 500, fontSize: 13, lineHeight: 1.55, color: '#3a382f', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', overflowX: 'hidden', fieldSizing: 'content' } as React.CSSProperties} />
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 // ── Your chart card — screenshot with tools, or a dashed drop zone ──
 function ChartCard({ p, onFull }: { p: Plan; onFull: (src: string) => void }) {
@@ -144,16 +213,8 @@ function LevelsMap({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
   const hasStop = c.hasStop, stop = c.S, liq = c.liq;
   const liqUSD = isFinite(liq) && isFinite(qty) ? Math.abs(E - liq) * qty : NaN;
   const riskUSD = c.riskUSD;
-  const shell = (body: React.ReactNode) => (
-    <div style={cardBox}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '13px 20px', background: 'linear-gradient(180deg,#ffffff 0%,#f6fbf8 45%,#e9f6ee 100%)', borderBottom: '1px solid #d3ecdd' }}>
-        <span style={{ width: 7, height: 7, borderRadius: 2, background: GREEN, flex: '0 0 auto' }} />
-        <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}><path d="M3 3v18h18" /><path d="m7 14 4-4 3 3 5-6" /></svg>
-        <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.15em', textTransform: 'uppercase', color: GREEN }}>Levels map</span>
-      </div>
-      {body}
-    </div>
-  );
+  // no section header (v: the content self-identifies); the card just holds the body
+  const shell = (body: React.ReactNode) => <div style={cardBox}>{body}</div>;
 
   if (!targets.length && !fills.length) {
     return shell(
@@ -174,7 +235,11 @@ function LevelsMap({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
 
   const keyFor = (n: LNode) => n.kind === 'tp' ? 'tp' + n.t.i : n.kind === 'trail' ? 'trail' + n.t.i : n.kind === 'fill' ? 'fill' + n.f.i : n.kind;
   const grpOf = (n: LNode): 'targets' | 'entry' | 'risk' => (n.kind === 'tp' || n.kind === 'trail') ? 'targets' : n.kind === 'fill' ? 'entry' : 'risk';
-  const grpMeta = { targets: { t: 'Targets', sub: 'bank & trail out', c: GREEN }, entry: { t: 'Entry', sub: 'limit-ladder in', c: PURPD }, risk: { t: 'Risk', sub: 'stop & liquidation', c: RED } };
+  const grpMeta = {
+    targets: { t: 'Targets', sub: 'bank & trail out', c: GREEN, field: 'targetNote' as const, ph: 'how you scale out, and why here', order: 1 },
+    entry: { t: 'Entry', sub: 'limit-ladder in', c: PURPD, field: 'trigger' as const, ph: 'what has to happen before you fill', order: 2 },
+    risk: { t: 'Risk', sub: 'stop & liquidation', c: RED, field: 'invalidation' as const, ph: 'what would prove this thesis wrong', order: 3 },
+  };
   const segBelow = (n: LNode): { bg: string; dashed: boolean } => {
     if (n.kind === 'tp') return hit['tp' + n.t.i] ? { bg: GREEN, dashed: false } : { bg: '#d8d3ca', dashed: true };
     if (n.kind === 'trail') return hit['trail' + n.t.i] ? { bg: GREEN, dashed: false } : { bg: '#cdbef0', dashed: true };
@@ -195,6 +260,7 @@ function LevelsMap({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
     if (firstInSec) { const m = grpMeta[g]; rows.push(
       <div key={'h' + i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: isFirst ? 0 : 17, marginBottom: 11 }}>
         <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '.09em', textTransform: 'uppercase', color: m.c }}>{m.t}</span>
+        <sup style={{ fontFamily: "'Newsreader',Georgia,serif", fontWeight: 500, fontSize: 10, color: m.c, marginLeft: -4, opacity: 0.75 }}>{m.order}</sup>
         <span style={{ fontWeight: 700, fontSize: 9.5, color: MUT }}>{m.sub}</span>
         <div style={{ flex: 1, height: 1, background: '#efece5' }} />
       </div>); }
@@ -310,7 +376,20 @@ function LevelsMap({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
         </div>
         <div style={{ display: 'flex', height: 7, borderRadius: 99, overflow: 'hidden', background: '#eceae3' }}>{segs}</div>
       </div>
-      <div style={{ padding: '16px 20px 20px' }}>{rows}</div>
+      <div style={{ padding: '16px 20px 20px' }}>{rows}
+        {/* footnotes: the dissolved thesis fields, numbered to their group markers */}
+        <div style={{ marginTop: 20, paddingTop: 13, borderTop: '1px solid #efece5', display: 'flex', flexDirection: 'column', gap: 9 }}>
+          {(['targets', 'entry', 'risk'] as const).map((g) => { const m = grpMeta[g]; return (
+            <div key={'fn' + g} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <sup style={{ fontFamily: "'Newsreader',Georgia,serif", fontWeight: 500, fontSize: 11, lineHeight: 1.7, color: m.c, flex: '0 0 auto', opacity: 0.85 }}>{m.order}</sup>
+              <textarea key={p.id + '_' + m.field} defaultValue={(p[m.field] as string) || ''} placeholder={m.ph} rows={1}
+                onClick={(e) => e.stopPropagation()}
+                onBlur={(e) => { const v = e.target.value.trim(); if (v !== ((p[m.field] as string) || '')) planActions.updateThesis(p.id, m.field, v); }}
+                style={{ display: 'block', width: '100%', boxSizing: 'border-box', margin: 0, padding: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontFamily: "'Newsreader',Georgia,serif", fontWeight: 400, fontSize: 12.5, lineHeight: 1.55, color: '#5f5c52', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', overflowX: 'hidden', fieldSizing: 'content' } as React.CSSProperties} />
+            </div>
+          ); })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -357,7 +436,7 @@ function PopRow({ children, active, onClick }: { children: React.ReactNode; acti
   );
 }
 
-const KF = `@keyframes pdIn{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes pdFade{from{opacity:0}to{opacity:1}}@keyframes lmpop{0%{transform:scale(1)}45%{transform:scale(1.42)}100%{transform:scale(1)}}@keyframes lmglow{0%{box-shadow:0 0 0 0 rgba(31,157,85,.5)}100%{box-shadow:0 0 0 13px rgba(31,157,85,0)}}.lmdot{cursor:pointer;transition:transform .15s ease}.lmdot:hover{transform:scale(1.13)}.lmnode{cursor:pointer;border-radius:11px;transition:background .14s}.lmnode:hover{background:#faf8f4}.lmpop{animation:lmpop .5s cubic-bezier(.34,1.56,.64,1)}.lmring{animation:lmglow .7s ease-out}.lmghost2:hover{background:#f1efe9 !important;color:#6a6357 !important}.pd-thesis-row{transition:background .12s}.pd-thesis-row:focus-within{background:var(--tint)}.pd-thesis-row textarea::placeholder{color:#c5c3b9;font-style:italic}.pd-icobtn:hover{background:#1a1813 !important;border-color:#1a1813 !important;color:#fff !important}.pd-icobtn-del:hover{background:#df5338 !important;border-color:#df5338 !important;color:#fff !important}.pd-resize::before{content:"";position:absolute;left:0;top:0;height:100%;width:3px;background:transparent;transition:background .15s}.pd-resize:hover::before{background:#7c5cff}.pd-resize::after{content:"";position:absolute;left:3px;top:50%;transform:translateY(-50%);width:4px;height:34px;border-radius:3px;background:#d8d4ea;opacity:0;transition:opacity .15s}.pd-resize:hover::after{opacity:1}.pd-chartbtn{background:rgba(255,255,255,0.82) !important;color:#26221c !important;border:1px solid rgba(255,255,255,0.9) !important;box-shadow:0 2px 10px -2px rgba(20,18,12,0.28),0 0 0 0.5px rgba(20,18,12,0.04);backdrop-filter:blur(10px) saturate(1.3);transition:background .14s,transform .1s}.pd-chartbtn:hover{background:#fff !important;transform:translateY(-1px)}.pd-chartbtn-del{color:#c23d28 !important}.pd-chartbtn-del:hover{background:#fdece8 !important;color:#b8341f !important}`;
+const KF = `@keyframes pdIn{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes pdFade{from{opacity:0}to{opacity:1}}@keyframes lmpop{0%{transform:scale(1)}45%{transform:scale(1.42)}100%{transform:scale(1)}}@keyframes lmglow{0%{box-shadow:0 0 0 0 rgba(31,157,85,.5)}100%{box-shadow:0 0 0 13px rgba(31,157,85,0)}}.lmdot{cursor:pointer;transition:transform .15s ease}.lmdot:hover{transform:scale(1.13)}.lmnode{cursor:pointer;border-radius:11px;transition:background .14s}.lmnode:hover{background:#faf8f4}.lmpop{animation:lmpop .5s cubic-bezier(.34,1.56,.64,1)}.lmring{animation:lmglow .7s ease-out}.lmghost2:hover{background:#f1efe9 !important;color:#6a6357 !important}.pd-icobtn:hover{background:#1a1813 !important;border-color:#1a1813 !important;color:#fff !important}.pd-icobtn-del:hover{background:#df5338 !important;border-color:#df5338 !important;color:#fff !important}.pd-resize::before{content:"";position:absolute;left:0;top:0;height:100%;width:3px;background:transparent;transition:background .15s}.pd-resize:hover::before{background:#7c5cff}.pd-resize::after{content:"";position:absolute;left:3px;top:50%;transform:translateY(-50%);width:4px;height:34px;border-radius:3px;background:#d8d4ea;opacity:0;transition:opacity .15s}.pd-resize:hover::after{opacity:1}.pd-chartbtn{background:rgba(255,255,255,0.82) !important;color:#26221c !important;border:1px solid rgba(255,255,255,0.9) !important;box-shadow:0 2px 10px -2px rgba(20,18,12,0.28),0 0 0 0.5px rgba(20,18,12,0.04);backdrop-filter:blur(10px) saturate(1.3);transition:background .14s,transform .1s}.pd-chartbtn:hover{background:#fff !important;transform:translateY(-1px)}.pd-chartbtn-del{color:#c23d28 !important}.pd-chartbtn-del:hover{background:#fdece8 !important;color:#b8341f !important}`;
 
 // the plan drawer has its own wide, independently-persisted width (tdplan_pdrawer_w)
 const PDW_MIN = 760;
@@ -408,6 +487,11 @@ export function PlanDrawer() {
               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2 }}>
                 <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a99ce4' }}>Trade plan</span>
                 <span style={{ fontWeight: 800, fontSize: 24, lineHeight: 1.08, letterSpacing: '-0.025em', color: '#1a1813', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tpPlanName(p)}</span>
+                {/* rationale — the dissolved thesis's one-line "why", moved beside the title */}
+                <textarea key={p.id + '_rationale'} rows={1} defaultValue={p.rationale || ''} placeholder="why this trade — the one-line case" spellCheck={false}
+                  onClick={(e) => e.stopPropagation()}
+                  onBlur={(e) => { const v = e.target.value.trim(); if (v !== (p.rationale || '')) planActions.updateThesis(p.id, 'rationale', v); }}
+                  style={{ display: 'block', width: '100%', boxSizing: 'border-box', margin: '3px 0 0', padding: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontFamily: "'Newsreader',Georgia,serif", fontStyle: 'italic', fontWeight: 400, fontSize: 15, lineHeight: 1.45, color: '#5f5c52', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', overflowX: 'hidden', fieldSizing: 'content' } as React.CSSProperties} />
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -432,9 +516,9 @@ export function PlanDrawer() {
         </div>
         {/* body */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', padding: '22px 26px 36px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <EquityStrip c={c} d={d} />
+          <Tp3aStrip c={c} d={d} />
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,65fr) minmax(0,35fr)', gap: 20, alignItems: 'start', flexShrink: 0 }}>
-            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><ThesisCard p={p} /><ChartCard p={p} onFull={setFull} /></div>
+            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><ChartCard p={p} onFull={setFull} /></div>
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><LevelsMap p={p} c={c} d={d} /></div>
           </div>
         </div>
