@@ -29,7 +29,18 @@ export function PlanInlineDate({ plan, children }: { plan: Plan; children: (o: {
 
   const onToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!open) { const r = e.currentTarget.getBoundingClientRect(); setPos({ top: r.bottom + 9, left: Math.max(8, Math.min(r.left, window.innerWidth - 300)) }); setView(vw); }
+    if (!open) {
+      const r = e.currentTarget.getBoundingClientRect();
+      const POP_H = 372; // approx calendar height — used to keep the fixed popover on-screen
+      let top = r.bottom + 9;
+      // prefer below; if it would overflow the bottom, flip above; else clamp up so it stays visible
+      if (top + POP_H > window.innerHeight - 8) {
+        const above = r.top - 9 - POP_H;
+        top = above >= 8 ? above : Math.max(8, window.innerHeight - POP_H - 8);
+      }
+      setPos({ top, left: Math.max(8, Math.min(r.left, window.innerWidth - 300)) });
+      setView(vw);
+    }
     setOpen((v) => !v);
   };
   const pick = (dt: Date) => {
@@ -52,7 +63,7 @@ export function PlanInlineDate({ plan, children }: { plan: Plan; children: (o: {
       {open && mounted && pos ? createPortal(
         <>
           <div onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 200 }} />
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 201, width: 288, boxSizing: 'border-box', background: '#fff', border: '1px solid #ecebe6', borderRadius: 14, boxShadow: '0 14px 40px -12px rgba(20,20,12,0.28)', padding: 16, animation: 'pkUp .16s ease both' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 201, width: 288, boxSizing: 'border-box', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto', background: '#fff', border: '1px solid #ecebe6', borderRadius: 14, boxShadow: '0 14px 40px -12px rgba(20,20,12,0.28)', padding: 16, animation: 'pkUp .16s ease both' }}>
             <style>{`@keyframes pkUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <span style={{ fontWeight: 800, fontSize: 14.5, color: '#1a1813', letterSpacing: '-0.01em' }}>{MON[vw.m] + ' ' + vw.y}</span>
