@@ -31,9 +31,38 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
 ];
 
+// The vendored live chart (public/candle-chart.html) is embedded in the plan drawer via a
+// same-origin <iframe> and fetches candles from Binance + its font from Google Fonts. It needs
+// a relaxed CSP: framing by our own origin, and those two external hosts. Everything else keeps
+// the strict policy above (frame-ancestors 'none' / X-Frame-Options DENY).
+const chartCsp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob:",
+  "font-src 'self' https://fonts.gstatic.com",
+  `connect-src 'self' https://api.binance.com https://data.binance.com https://api.gateio.ws${dev ? " ws://localhost:* http://localhost:*" : ""}`,
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
+const chartHeaders = [
+  { key: "Content-Security-Policy", value: chartCsp },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+];
+
 const nextConfig: NextConfig = {
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/candle-chart.html", headers: chartHeaders },
+      { source: "/((?!candle-chart\\.html).*)", headers: securityHeaders },
+    ];
   },
 };
 

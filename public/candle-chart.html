@@ -1,0 +1,2316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BTC/USDT · 4H · Volume Candles</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'JetBrains Mono',monospace}
+#root{display:flex;flex-direction:column;width:100%;height:100%}
+#legend{position:absolute;top:8px;left:10px;z-index:5;display:flex;flex-direction:column;gap:3px;pointer-events:none;font-family:-apple-system,'Segoe UI',Roboto,sans-serif}
+#legend > *{pointer-events:auto}
+#symrow{display:flex;flex-direction:column;gap:3px;width:max-content}
+.kicker{display:flex;align-items:center;gap:7px}
+.krule{width:12px;height:2px;border-radius:1px;background:#f7931a;flex-shrink:0}
+.mainrow{display:inline-flex;align-items:flex-start;gap:10px}
+.coin{width:32px;height:32px;border-radius:50%;background:#f7931a;color:#fff;font-size:18px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:3px}
+.symtxt{font-size:29px;font-weight:450;color:#131722;letter-spacing:-1px;line-height:1}
+.sep{display:none}
+.symtf{font-size:18px;font-weight:700;color:#f7931a;letter-spacing:.1px;margin-top:3px}
+.symex{font-size:9.5px;font-weight:700;color:#a3a8b3;letter-spacing:1.4px;text-transform:uppercase}
+#lvlChips{position:absolute;top:8px;left:clamp(300px,22%,360px);right:clamp(96px,22%,360px);z-index:6;display:flex;align-items:center;justify-content:center;gap:12px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif}
+/* the rail: chips sit at their true price positions */
+.lvlrail{position:relative;flex:1;min-width:0;height:28px}
+.lvlrail.flat{display:inline-flex;align-items:stretch;justify-content:center;gap:0;flex:0 0 auto;
+  min-width:max-content;height:auto;background:transparent;box-shadow:none}
+/* the capsule surface owns the chips AND the fill cell */
+#lvlChips.capsule{left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:calc(100% - 40px);
+  gap:0;background:#fff;border-radius:9px;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(26,24,19,.09),0 1px 2px rgba(26,24,19,.06)}
+.lvlrail.flat .railline,.lvlrail.flat .railtick{display:none}
+.lvlrail.flat .lchip{position:static!important;left:auto!important;transform:none!important;top:auto!important;border-radius:0;
+  background:transparent;box-shadow:none;padding:4px 10px;height:auto}
+.lvlrail.flat .lchip + .lchip{box-shadow:inset 1px 0 0 #eeebe6}
+.lvlrail.flat .lchip:hover{background:#faf9f7}
+.lvlrail.flat + .cdiv{display:none}
+#lvlChips.capsule .fmeterwrap{gap:7px;padding:0 11px;box-shadow:inset 1px 0 0 #eeebe6;align-self:stretch}
+#lvlChips.capsule .fmeter,#lvlChips.capsule .fmicon{display:none}
+#lvlChips.capsule .fmdots{display:flex;gap:2.5px}
+.fmdots{display:none}
+.fmdots i{width:4px;height:4px;border-radius:50%;background:#7c5cff;display:block}
+.fmdots i.off{background:#e6ddff}
+.lvlrail .railline{position:absolute;left:0;right:0;top:13px;height:1px;background:#e3d9d8}
+.lchip{position:absolute;top:13px;display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:550;
+  letter-spacing:-.1px;padding:3px 8px;border-radius:100px;border:none;cursor:pointer;background:#fff;
+  color:#9aa0ab;white-space:nowrap;z-index:3;
+  box-shadow:0 0 0 1px rgba(26,24,19,.07),0 1px 3px rgba(26,24,19,.05);
+  transform:translateY(-50%);
+  transition:background .14s ease,color .14s ease,box-shadow .14s ease}
+.lchip .ldot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0;opacity:.35;transition:opacity .14s ease}
+.lchip.on .ldot{opacity:1}
+.lchip .lpx{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:500;opacity:.62;letter-spacing:-.2px}
+.lchip:hover{transform:translateY(calc(-50% - 1px))}
+.lchip:active{transform:translateY(-50%) scale(.96)}
+.railtick{position:absolute;top:22px;width:1px;height:5px;background:#ded4d2}
+.cdiv{width:1px;height:14px;background:#e0e3eb;align-self:center;flex-shrink:0}
+.fmeter{display:flex;align-items:center;gap:2px;min-width:0}
+.fmicon{display:inline-flex;align-items:center;color:#7c5cff;opacity:.9;cursor:default;margin-left:2px}
+.fmicon:hover{opacity:1}
+.fmeter span{height:5px;border-radius:1.5px;background:#7c5cff;opacity:.85}
+.fmeter span.rest{background:#e6ddff;opacity:1}
+.fchip{font-variant-numeric:tabular-nums}
+#fetchbar{display:flex;align-items:center;gap:8px;flex-shrink:0;position:relative;z-index:20;
+  font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:#fff;
+  border-bottom:1px solid #eceef2;padding:8px 12px}
+.fgrp{display:inline-flex;align-items:stretch;background:#f6f7f9;border:1px solid #e8eaef;border-radius:8px;overflow:hidden}
+.fseg{font-family:inherit;font-size:11.5px;font-weight:600;color:#131722;background:transparent;border:none;
+  padding:5px 9px;outline:none;cursor:pointer;transition:background .13s}
+.fseg:hover{background:#eef0f4}
+.fseg:focus{background:#fff;box-shadow:inset 0 0 0 1.5px #7c5cff}
+.fcon{width:86px;cursor:text;letter-spacing:-.1px}
+.fsel{-webkit-appearance:none;appearance:none;padding-right:20px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='6' viewBox='0 0 9 6'><path d='M1 1l3.5 3.5L8 1' fill='none' stroke='%23787b86' stroke-width='1.6' stroke-linecap='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 7px center}
+.fvr{width:1px;background:#e8eaef;flex-shrink:0}
+.fwrap{position:relative;display:inline-flex}
+.frange{display:inline-flex;align-items:center;gap:8px;font-family:inherit;font-size:13px;font-weight:600;
+  color:#0e1420;background:none;border:none;border-radius:0;padding:0 1px 4px;cursor:pointer;
+  border-bottom:1.5px solid #131722;line-height:1;
+  transition:border-color .14s,color .14s}
+.frange:hover{border-bottom-color:#7c5cff}
+.frange.open{border-bottom-color:#7c5cff;color:#7c5cff}
+.frange svg{display:none}
+.rgcv{color:#9aa0ab;flex-shrink:0;margin-left:-2px;transition:transform .16s ease,color .14s}
+.frange:hover .rgcv,.frange.open .rgcv{color:#7c5cff}
+.frange.open .rgcv{transform:rotate(180deg)}
+#fRangeTxt{display:inline-flex;align-items:center;gap:8px}
+.rgdate{font-variant-numeric:tabular-nums;letter-spacing:-.1px;font-size:13px;font-weight:600}
+.rgarrow{color:#9aa0ab;font-size:11px;margin:0 -2px}
+.rglive{color:#00a37a;font-weight:700;font-size:13px}
+.flivedot{position:relative;width:5px;height:5px;border-radius:50%;background:#00c48c;flex-shrink:0;
+  box-shadow:0 0 0 1px rgba(0,196,140,.35)}
+.flivedot::after{content:'';position:absolute;inset:-3px;border-radius:50%;
+  border:1.5px solid #00c48c;opacity:.7;animation:livering 1.8s ease-out infinite}
+@keyframes livering{0%{transform:scale(.6);opacity:.55}70%{transform:scale(1.5);opacity:0}100%{opacity:0}}
+.fbtn{font-family:inherit;font-size:11.5px;font-weight:650;color:#fff;background:#7c5cff;border:none;
+  border-radius:8px;padding:6px 14px;cursor:pointer;transition:background .13s}
+.fbtn:hover{background:#6b49f5}
+.fbtn:disabled{background:#cdd0d8;cursor:default}
+.metarow{cursor:default}
+.chiptip{position:fixed;z-index:70;white-space:nowrap;
+  background:#1a1813;color:#fbfbf9;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+  font-size:11.5px;font-weight:500;line-height:1.5;letter-spacing:0;
+  padding:6px 10px;border-radius:8px;box-shadow:0 8px 24px rgba(26,24,19,.22);
+  opacity:0;visibility:hidden;transform:translateY(-3px);
+  transition:opacity .15s,visibility .15s,transform .15s;pointer-events:none}
+.chiptip.on{opacity:1;visibility:visible;transform:translateY(0)}
+.chiptip b{color:#c9b8ff;font-weight:700}
+.mcount{display:flex;align-items:baseline;gap:6px}
+.mhint{position:relative;cursor:help}
+.mhinttip{position:absolute;top:calc(100% + 8px);left:-6px;width:240px;white-space:normal;
+  background:#1a1813;color:#fbfbf9;font-size:11.5px;font-weight:500;line-height:1.5;letter-spacing:0;
+  text-transform:none;padding:9px 12px;border-radius:8px;box-shadow:0 8px 24px rgba(26,24,19,.22);
+  opacity:0;visibility:hidden;transform:translateY(-3px);
+  transition:opacity .15s,visibility .15s,transform .15s;pointer-events:none;z-index:70}
+.mhint:hover .mhinttip{opacity:1;visibility:visible;transform:translateY(0)}
+.mhinttip b{color:#c9b8ff;font-weight:700}
+.fstat{font-size:11px;font-weight:600;color:#6b7280;line-height:1;min-width:4px;max-width:250px;font-variant-numeric:tabular-nums;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fstat.err{color:#ef5350}
+.fstat.ok{color:#00a37a}
+
+/* calendar popover — range model borrowed from the plan-date picker */
+.fcal{position:absolute;top:calc(100% + 7px);left:0;z-index:60;width:286px;background:#fff;
+  border:1px solid #e4e6ec;border-radius:12px;padding:12px;
+  box-shadow:0 12px 34px rgba(19,23,34,.13),0 2px 6px rgba(19,23,34,.06)}
+.fcalhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.fcalmo{font-size:12px;font-weight:650;color:#131722;letter-spacing:-.1px}
+.fcalnav{display:flex;gap:2px}
+.fcalnav button{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:none;
+  background:transparent;border-radius:6px;cursor:pointer;color:#787b86;font-size:13px;line-height:1;transition:background .13s}
+.fcalnav button:hover{background:#f2f3f6;color:#131722}
+.fcaldow{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:3px}
+.fcaldow span{font-size:9px;font-weight:700;color:#b2b5be;text-align:center;letter-spacing:.4px}
+.fcalgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
+.fday{position:relative;height:30px;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:550;color:#131722;background:transparent;border:none;cursor:pointer;
+  border-radius:7px;transition:background .12s,color .12s}
+.fday:hover:not(.dis){background:#f2f3f6}
+.fday.dis{color:#d4d7de;cursor:default}
+.fday.oth{color:#c9ccd6}
+.fday.inr{background:#f1ecff;border-radius:0}
+.fday.inr:hover{background:#e7dfff}
+.fday.pre{background:#f7f4ff;border-radius:0}
+.fday.end1,.fday.end2{background:#7c5cff;color:#fff;font-weight:700}
+.fday.end1{border-radius:7px 0 0 7px}
+.fday.end2{border-radius:0 7px 7px 0}
+.fday.solo{background:#7c5cff;color:#fff;font-weight:700;border-radius:7px}
+.fday.precap{background:#a98ffa;color:#fff;border-radius:0 7px 7px 0}
+.fday.today::after{content:'';position:absolute;bottom:4px;width:3px;height:3px;border-radius:50%;background:#7c5cff}
+.fday.end1.today::after,.fday.end2.today::after,.fday.solo.today::after{background:#fff}
+.ftimes{display:flex;gap:6px;margin-top:10px}
+.ftime{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:1px;background:#f6f7f9;
+  border:1px solid #e8eaef;border-radius:8px;padding:4px 8px;transition:opacity .13s,border-color .13s}
+.ftime.off{opacity:.6;background:#f1f2f5}
+.ftime:focus-within{background:#fff;border-color:#7c5cff}
+.ftlab{font-size:8.5px;font-weight:700;color:#a3a8b3;letter-spacing:.5px;text-transform:uppercase;line-height:1}
+.ftin{width:100%;min-width:0;font-family:inherit;font-size:11px;font-weight:650;color:#131722;
+  background:transparent;border:none;outline:none;padding:0;font-variant-numeric:tabular-nums}
+.ftin::-webkit-calendar-picker-indicator{opacity:.4;cursor:pointer}
+.fcalhint{font-size:10.5px;font-weight:600;color:#9aa0ab;padding:7px 4px 2px;text-align:center}
+.fcalhint b{color:#7c5cff;font-weight:750}
+.fcalsep{height:1px;background:#eceef2;margin:11px -12px 10px}
+.flivrow{display:flex;align-items:center;gap:9px;width:100%;padding:8px 9px;border:1px solid #e4e6ec;
+  background:#fff;border-radius:9px;cursor:pointer;text-align:left;transition:background .13s,border-color .13s}
+.flivrow:hover{background:#f6f7f9}
+.flivrow.on{background:#e9f7f4;border-color:#9fd8ce}
+.flivttl{display:block;font-size:11.5px;font-weight:650;color:#131722;line-height:1.25}
+.flivsub{display:block;font-size:9.5px;font-weight:550;color:#9aa0ab;line-height:1.25}
+.flivchk{margin-left:auto;font-size:11px;color:#1d8577;font-weight:700}
+.fpre{display:flex;gap:5px;margin-top:9px}
+.fpre button{flex:1;font-family:inherit;font-size:10px;font-weight:650;color:#787b86;background:#f6f7f9;
+  border:none;border-radius:6px;padding:5px 0;cursor:pointer;transition:background .13s,color .13s}
+.fpre button:hover{background:#ede8ff;color:#7c5cff}
+.fcalft{margin-top:10px;font-size:10px;font-weight:600;color:#9aa0ab;text-align:center}
+.fitbtn{position:absolute;top:9px;right:84px;z-index:6;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;font-size:10px;font-weight:600;color:#787b86;background:#f2f3f6;border:none;padding:3px 9px;border-radius:100px;cursor:pointer;transition:background .14s,color .14s}
+.fitbtn.on{background:#ede8ff;color:#7c5cff}
+.fpct{font-size:10px;font-weight:650;color:#7c5cff;background:#ede8ff;padding:3px 8px;border-radius:100px;letter-spacing:.2px;align-self:center;font-variant-numeric:tabular-nums}
+.fsel{display:none !important}
+.fdd{position:relative;display:flex}
+.fddbtn{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.fddbtn.open{background:#fff;box-shadow:inset 0 0 0 1.5px #7c5cff}
+.fddcv{color:#9aa0ab;flex-shrink:0;transition:transform .16s ease}
+.fddbtn.open .fddcv{transform:rotate(180deg);color:#7c5cff}
+.fddmenu[hidden],.fcal[hidden]{display:none !important}
+.fddmenu{position:fixed;z-index:60;
+  background:#fff;border:1px solid #e8eaef;border-radius:11px;padding:5px;
+  box-shadow:0 12px 30px rgba(19,23,34,.13),0 2px 6px rgba(19,23,34,.06);
+  display:flex;flex-direction:column;gap:1px;transform-origin:top left;
+  animation:ddin .15s cubic-bezier(.2,.9,.3,1)}
+@keyframes ddin{from{opacity:0;transform:translateY(-5px) scale(.97)}to{opacity:1;transform:none}}
+.fddopt{display:flex;align-items:center;gap:8px;font:inherit;font-size:12px;font-weight:500;
+  color:#131722;background:none;border:none;border-radius:7px;padding:7px 11px 7px 8px;
+  cursor:pointer;text-align:left;white-space:nowrap;transition:background .1s}
+.fddopt:hover{background:#f4f5f8}
+.fddopt .fddck{width:13px;flex-shrink:0;color:#7c5cff;opacity:0}
+.fddopt.sel{background:#f3efff;color:#7c5cff;font-weight:650}
+.fddopt.sel .fddck{opacity:1}
+.fspin{display:inline-block;width:11px;height:11px;border-radius:50%;
+  border:1.6px solid rgba(124,92,255,.22);border-top-color:#7c5cff;
+  animation:fspin .62s linear infinite;vertical-align:-1px;margin-right:6px}
+@keyframes fspin{to{transform:rotate(360deg)}}
+.fstat.busy{color:#6b7280}
+#chartbox{flex:1;position:relative;min-height:0}
+#needdates{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;background:#fff}
+#needdates[hidden]{display:none}
+.ndinner{display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;max-width:330px;color:#b0aca2}
+.ndttl{font:600 13.5px -apple-system,'Segoe UI',Roboto,sans-serif;color:#131722;letter-spacing:-.1px}
+.ndsub{font:500 11.5px -apple-system,'Segoe UI',Roboto,sans-serif;color:#8b8f9a;line-height:1.55}
+html[data-embed] body{background:#fff}
+html[data-embed] #root{height:100%}
+canvas{display:block}
+.kicker{display:flex;align-items:center;gap:7px}
+.mainrow{display:flex;align-items:center;gap:10px;margin-top:1px;line-height:1}
+.metarow{display:flex;align-items:baseline;gap:10px;margin-top:-4px;padding-left:40px}
+.mdot{width:5px;height:5px;border-radius:50%;background:#00c48c;flex-shrink:0;position:relative;top:-1px;
+  animation:mblink 1.6s ease-in-out infinite}
+@keyframes mblink{0%,100%{opacity:1}50%{opacity:.25}}
+.mdot.off{background:#c2c6d0;animation:none}
+/* the ticker itself is the contract control */
+button.symtxt{font:inherit;font-size:29px;font-weight:450;letter-spacing:-.6px;color:#131722;
+  background:none;border:none;padding:0 2px;margin:0 -2px;border-radius:6px;cursor:pointer;
+  line-height:1.05;transition:background .12s,box-shadow .12s}
+button.symtxt:hover{background:#f4f5f8}
+button.symtxt.open{background:#f3efff;box-shadow:inset 0 0 0 1.5px #7c5cff}
+.conedit{font:inherit;font-size:29px;font-weight:450;letter-spacing:-.6px;color:#131722;
+  background:#fff;border:none;border-radius:6px;padding:0 4px;margin:0 -4px;line-height:1.05;
+  box-shadow:inset 0 0 0 1.5px #7c5cff;outline:none;width:210px}
+/* timeframe chip trigger */
+.tfbtn{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:17px;font-weight:700;
+  color:#f7931a;background:none;border:none;padding:2px 5px;border-radius:6px;cursor:pointer;
+  transition:background .12s,box-shadow .12s}
+.tfbtn:hover{background:#fff6ec}
+.tfbtn.open{background:#fff6ec;box-shadow:inset 0 0 0 1.5px #f7931a}
+/* venue trigger sits in the kicker */
+.srcbtn{display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:10px;font-weight:750;
+  letter-spacing:.13em;text-transform:uppercase;color:#4b5563;background:none;border:none;
+  padding:1px 4px;border-radius:4px;cursor:pointer;transition:background .12s,color .12s}
+.srcbtn:hover{background:#f4f5f8;color:#131722}
+.srcbtn.open{background:#f3efff;color:#7c5cff}
+
+</style>
+</head>
+<body>
+<div id="root">
+  <div id="needdates" hidden>
+    <div class="ndinner">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      <div class="ndttl">Set trade dates to load the chart</div>
+      <div class="ndsub">This plan has no start date yet. Set one on the plan and the chart will load from there — leave the exit open and it follows live.</div>
+    </div>
+  </div>
+  <div id="chartbox">
+    <canvas id="cv"></canvas>
+    <div id="legend">
+      <div id="symrow">
+        <div class="kicker">
+          <span class="krule"></span>
+          <select id="fSource" class="fsel">
+            <option value="binance" selected>Binance</option>
+            <option value="gate">Gate</option>
+          </select>
+          <span id="fSrcTxt" class="symex">perpetual</span>
+        </div>
+        <div class="mainrow">
+          <span class="coin">₿</span>
+          <button id="fConBtn" class="symtxt" type="button">BTCUSDT.P</button>
+          <input id="fContract" class="conedit" value="BTC_USDT" spellcheck="false" hidden>
+          <select id="fInterval" class="fsel">
+            <option>15m</option><option>30m</option><option selected>1h</option>
+            <option>4h</option><option>8h</option><option>1d</option>
+          </select>
+        </div>
+        <div class="metarow">
+          <div class="fwrap">
+            <button id="fRange" class="frange">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+              <span id="fRangeTxt">—</span>
+              <svg class="rgcv" width="9" height="6" viewBox="0 0 9 6" fill="none"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </button>
+            <div id="fCal" class="fcal" hidden></div>
+          </div>
+          <span class="mcount"><span class="mdot"></span><span class="mhint"><span id="fStatus" class="fstat"></span><span class="mhinttip" id="fStatTip"></span></span></span>
+          <button id="fLoad" hidden></button>
+        </div>
+      </div>
+    </div>
+    <div id="lvlChips"></div>
+    <button id="fitBtn" class="fitbtn">Fit plan</button>
+
+  </div>
+</div>
+<script>
+var RAW = [{"t":1782806400,"o":59497.6,"h":59531.9,"l":59085,"c":59163.9,"v":107862399,"vma":107620822.75,"ema":60896.425119745705},{"t":1782820800,"o":59154.7,"h":59250,"l":58168,"c":58358.9,"v":396296185,"vma":124726500.4,"ema":60796.91433073607},{"t":1782835200,"o":58358.9,"h":58812,"l":58227.2,"c":58794.4,"v":125145842,"vma":129047504.25,"ema":60718.38435698172},{"t":1782849600,"o":58788.8,"h":58850,"l":58480,"c":58602,"v":50692560,"vma":127682716.95,"ema":60635.38889200204},{"t":1782864000,"o":58602,"h":59304.8,"l":57746.3,"c":59169.3,"v":222876185,"vma":135081049.5,"ema":60577.89520996274},{"t":1782878400,"o":59169.4,"h":59446.2,"l":58510,"c":58746.6,"v":128446311,"vma":138452287.4,"ema":60506.07971153283},{"t":1782892800,"o":58746.6,"h":59072.5,"l":58457.9,"c":58590.6,"v":102003476,"vma":141575129.9,"ema":60430.96286010017},{"t":1782907200,"o":58590.7,"h":60508,"l":58301.6,"c":60112.9,"v":371730167,"vma":156884454.6,"ema":60418.489806762904},{"t":1782921600,"o":60117.1,"h":60330.5,"l":59757.2,"c":60002.6,"v":101959503,"vma":158643093.15,"ema":60402.18040257612},{"t":1782936000,"o":60002.6,"h":61313,"l":59843.4,"c":60006.2,"v":179732316,"vma":163695676.45,"ema":60386.651759337845},{"t":1782950400,"o":60006.2,"h":61097,"l":59560.3,"c":61032.7,"v":170747154,"vma":166194889.1,"ema":60411.98698446185},{"t":1782964800,"o":61032.6,"h":61033.8,"l":60082.4,"c":60126.2,"v":123438346,"vma":165377593.25,"ema":60400.77965173786},{"t":1782979200,"o":60126.2,"h":61409.9,"l":60116.1,"c":61316.7,"v":192048037,"vma":166029621.8,"ema":60436.698096767745},{"t":1782993600,"o":61316.7,"h":62178.9,"l":61120,"c":61579,"v":297481865,"vma":175548042.4,"ema":60481.494249835676},{"t":1783008000,"o":61582.3,"h":61932.1,"l":61105,"c":61448.1,"v":115305721,"vma":175059907.05,"ema":60519.400357685256},{"t":1783022400,"o":61448.1,"h":61635.6,"l":61306,"c":61537,"v":41922726,"vma":156626996.75,"ema":60559.30622601132},{"t":1783036800,"o":61534.4,"h":61714.6,"l":61216.8,"c":61410.1,"v":74617604,"vma":152605782.85,"ema":60592.67068773637},{"t":1783051200,"o":61411.1,"h":61842,"l":61310,"c":61728.7,"v":58753264,"vma":153482202.45,"ema":60637.220856844746},{"t":1783065600,"o":61728.8,"h":62068.2,"l":61482.5,"c":61987.7,"v":87886013,"vma":152576933.05,"ema":60690.18082324299},{"t":1783080000,"o":61987.8,"h":62373.4,"l":61653.8,"c":61896.2,"v":152962782,"vma":155095422.8,"ema":60737.47569291974},{"t":1783094400,"o":61896.2,"h":62285,"l":61879.1,"c":62176.3,"v":48075625,"vma":152106084.1,"ema":60793.90017555034},{"t":1783108800,"o":62176.3,"h":62929,"l":62148.6,"c":62552.5,"v":116394807,"vma":138111015.2,"ema":60862.864874548366},{"t":1783123200,"o":62552.5,"h":62933.8,"l":62374,"c":62602.5,"v":70673098,"vma":135387378,"ema":60931.08585986019},{"t":1783137600,"o":62602.5,"h":62719.6,"l":62305.1,"c":62536.1,"v":48698937,"vma":135287696.85,"ema":60994.02759084607},{"t":1783152000,"o":62536.2,"h":62642.1,"l":62381.7,"c":62454.2,"v":32697988,"vma":125778787,"ema":61051.28925395014},{"t":1783166400,"o":62454.2,"h":63053,"l":62454.2,"c":62898.5,"v":80538765,"vma":123383409.7,"ema":61123.72889105014},{"t":1783180800,"o":62898.4,"h":63435.5,"l":62747,"c":63258.8,"v":107949814,"vma":123680726.6,"ema":61207.45716983249},{"t":1783195200,"o":63258.9,"h":63420,"l":62896.3,"c":63109.6,"v":45556339,"vma":107372035.2,"ema":61282.051006309644},{"t":1783209600,"o":63109.5,"h":63113.8,"l":62569,"c":62739.5,"v":67631396,"vma":105655629.85,"ema":61339.20586880731},{"t":1783224000,"o":62739.4,"h":63032.8,"l":62626.5,"c":62989.1,"v":46731591,"vma":99005593.6,"ema":61403.90759944232},{"t":1783238400,"o":62989.2,"h":63079.3,"l":62422,"c":62625,"v":65388133,"vma":93737642.55,"ema":61451.793575934775},{"t":1783252800,"o":62630.5,"h":62926,"l":62535,"c":62709.6,"v":49539686,"vma":90042709.55,"ema":61501.11931805498},{"t":1783267200,"o":62709.7,"h":62868.3,"l":62565.5,"c":62740.8,"v":37198591,"vma":82300237.25,"ema":61549.73424675871},{"t":1783281600,"o":62743.9,"h":63961.2,"l":62576.4,"c":63601.7,"v":143236254,"vma":74587956.7,"ema":61630.203491983855},{"t":1783296000,"o":63601.7,"h":63894.1,"l":63106,"c":63270.1,"v":106639316,"vma":74154636.45,"ema":61694.51315896488},{"t":1783310400,"o":63275.1,"h":63373.8,"l":62857,"c":63060.9,"v":97177072,"vma":76917353.75,"ema":61748.09695665253},{"t":1783324800,"o":63060.9,"h":63217.4,"l":62456,"c":62456,"v":117875781,"vma":79080262.6,"ema":61775.85786031322},{"t":1783339200,"o":62456.1,"h":63519.5,"l":61280.1,"c":63511,"v":470773511,"vma":99681274.95,"ema":61843.90265010486},{"t":1783353600,"o":63511,"h":63944.1,"l":63352.6,"c":63705.3,"v":189566846,"vma":104765316.6,"ema":61916.89862461055},{"t":1783368000,"o":63705.3,"h":64731,"l":63562.8,"c":64019.5,"v":121534132,"vma":103193884.1,"ema":61999.35358050818},{"t":1783382400,"o":64019.4,"h":64290.3,"l":63123.4,"c":63166.1,"v":125685738,"vma":107074389.75,"ema":62045.108342056876},{"t":1783396800,"o":63166.1,"h":63427.2,"l":62767.6,"c":63059.3,"v":131144590,"vma":107811878.9,"ema":62084.880563937},{"t":1783411200,"o":63059.3,"h":63446,"l":62949.7,"c":63375,"v":82339293,"vma":108395188.65,"ema":62135.47348299829},{"t":1783425600,"o":63375,"h":64084.4,"l":62637.7,"c":63906.7,"v":289789363,"vma":120449709.95,"ema":62204.93334641012},{"t":1783440000,"o":63909.4,"h":64218.1,"l":63356,"c":63796.3,"v":143151219,"vma":125972371.5,"ema":62267.33988184502},{"t":1783454400,"o":63792.6,"h":63878.1,"l":63184,"c":63330.8,"v":64664257,"vma":125178646.1,"ema":62309.04420020404},{"t":1783468800,"o":63333,"h":63730.9,"l":62503.1,"c":62740.3,"v":127057021,"vma":126134006.45,"ema":62325.9561923529},{"t":1783483200,"o":62740.2,"h":62876.5,"l":62441.5,"c":62853,"v":87015951,"vma":128206987.05,"ema":62346.62457696652},{"t":1783497600,"o":62856.8,"h":62910,"l":61701,"c":62274.2,"v":223189307,"vma":135984882.6,"ema":62343.78439747763},{"t":1783512000,"o":62274.3,"h":62394,"l":61516.9,"c":61675.2,"v":182021484,"vma":142749377.25,"ema":62317.56540149812},{"t":1783526400,"o":61671.2,"h":62362.9,"l":61664,"c":62248.2,"v":102430144,"vma":144601477.8,"ema":62314.84518967466},{"t":1783540800,"o":62261,"h":62327.7,"l":61924.3,"c":62254.7,"v":53535715,"vma":144801279.25,"ema":62312.48655478546},{"t":1783555200,"o":62253.2,"h":62617,"l":61617.9,"c":61937.2,"v":126922992,"vma":149287499.3,"ema":62297.76943498995},{"t":1783569600,"o":61937.3,"h":63246.9,"l":61923.7,"c":62970,"v":180053442,"vma":151128358.7,"ema":62324.131417931516},{"t":1783584000,"o":62970.1,"h":63064,"l":62583.4,"c":62754.9,"v":84836774,"vma":150038231.6,"ema":62341.02430350283},{"t":1783598400,"o":62754.8,"h":63226.5,"l":62431.9,"c":62830.2,"v":229570093,"vma":156657882.65,"ema":62360.20766414978},{"t":1783612800,"o":62830.1,"h":63469,"l":62529.8,"c":63217.3,"v":107997800,"vma":156163983.6,"ema":62393.81912830077},{"t":1783627200,"o":63217.3,"h":63392,"l":63030,"c":63199.4,"v":42739534,"vma":134762284.75,"ema":62425.41053503407},{"t":1783641600,"o":63199.5,"h":64039.1,"l":62885.6,"c":63916.8,"v":138566305,"vma":132212257.7,"ema":62483.89639640528},{"t":1783656000,"o":63916.8,"h":64175.4,"l":63775.8,"c":63948.6,"v":80589632,"vma":130165032.7,"ema":62541.335753408996},{"t":1783670400,"o":63948.7,"h":64466,"l":63944.9,"c":64394.2,"v":117472393,"vma":129754365.45,"ema":62613.99709641257},{"t":1783684800,"o":64394.3,"h":64675.6,"l":63795.9,"c":64020.7,"v":174926683,"vma":131943470.1,"ema":62669.161916161094},{"t":1783699200,"o":64014.6,"h":64206,"l":63712.9,"c":63903.9,"v":78336314,"vma":131743321.15,"ema":62717.58301748811},{"t":1783713600,"o":63903.8,"h":64185.5,"l":63627,"c":64135.7,"v":43208061,"vma":119414256.05,"ema":62773.195448174854},{"t":1783728000,"o":64135.7,"h":64289.4,"l":63955.5,"c":64121.4,"v":34325380,"vma":113972964.1,"ema":62826.066214913095},{"t":1783742400,"o":64121.4,"h":64243.1,"l":64049.3,"c":64130.6,"v":24519398,"vma":111965721.15,"ema":62877.22440256356},{"t":1783756800,"o":64130.5,"h":64271.2,"l":64112,"c":64175.5,"v":20184238,"vma":106622082,"ema":62928.13717109048},{"t":1783771200,"o":64175.4,"h":64479,"l":63902.7,"c":64144.5,"v":76277980,"vma":106085183.45,"ema":62975.83767418497},{"t":1783785600,"o":64144.5,"h":64375.4,"l":64054.1,"c":64263.2,"v":34384367,"vma":96644936.45,"ema":63026.32247127576},{"t":1783800000,"o":64263.2,"h":64432,"l":63786,"c":63786,"v":46774751,"vma":89882599.8,"ema":63056.113746912},{"t":1783814400,"o":63786,"h":64197,"l":63676.9,"c":64191.8,"v":61006678,"vma":87811426.5,"ema":63100.65046271937},{"t":1783828800,"o":64191.8,"h":64221.9,"l":63583.1,"c":63855.6,"v":60845233,"vma":88176902.4,"ema":63130.25632692646},{"t":1783843200,"o":63855.5,"h":64079.9,"l":63736.9,"c":63986.1,"v":51278994,"vma":84394702.5,"ema":63163.818823909736},{"t":1783857600,"o":63986.1,"h":64276.9,"l":63925.8,"c":64146.2,"v":44355805,"vma":77609820.65,"ema":63202.34357591328},{"t":1783872000,"o":64146.2,"h":64246.3,"l":63983.1,"c":64206.2,"v":25359098,"vma":74635936.85,"ema":63241.710494504914},{"t":1783886400,"o":64206.2,"h":64232,"l":63640.1,"c":63747.8,"v":62677806,"vma":66291322.5,"ema":63261.55714177923},{"t":1783900800,"o":63747.8,"h":64400,"l":62702.4,"c":62783.3,"v":246443575,"vma":73213611.25,"ema":63242.80195974867},{"t":1783915200,"o":62783.3,"h":63024,"l":62468,"c":62954.1,"v":120179246,"vma":77085596.85,"ema":63231.48031426833},{"t":1783929600,"o":62954.1,"h":63257.3,"l":62827.6,"c":62878.3,"v":79890933,"vma":74151828.25,"ema":63217.63010586565},{"t":1783944000,"o":62878.3,"h":62957.5,"l":62066,"c":62588.7,"v":231713362,"vma":81708014.75,"ema":63192.966180145435},{"t":1783958400,"o":62588.7,"h":62614.6,"l":61802,"c":62259.6,"v":132312513,"vma":82450020.75,"ema":63156.36358484561},{"t":1783972800,"o":62259.6,"h":62317,"l":61846.9,"c":62306.1,"v":63267510,"vma":76867062.1,"ema":63123.01991485166},{"t":1783987200,"o":62306.2,"h":62655.7,"l":62240.1,"c":62540.5,"v":86494273,"vma":77274960.05,"ema":63100.17599662219},{"t":1784001600,"o":62536.1,"h":62846,"l":62478.3,"c":62520.9,"v":70202797,"vma":78624696.85,"ema":63077.4592908723},{"t":1784016000,"o":62521,"h":62903.4,"l":62464.4,"c":62810.1,"v":58765234,"vma":79846689.55,"ema":63066.97461279888},{"t":1784030400,"o":62810.2,"h":64955,"l":62748.1,"c":64727.9,"v":411780652,"vma":99209752.25,"ema":63132.10894170873},{"t":1784044800,"o":64727.8,"h":64880,"l":64263.4,"c":64551.1,"v":107204408,"vma":103560760.75,"ema":63187.755649877014},{"t":1784059200,"o":64551.1,"h":65104,"l":64392.1,"c":65009.9,"v":83809825,"vma":103937353,"ema":63259.212291058306},{"t":1784073600,"o":65010,"h":65038.8,"l":64461.6,"c":64763.2,"v":62663143,"vma":105351291.8,"ema":63318.192201212885},{"t":1784088000,"o":64763.3,"h":65260.9,"l":64455.1,"c":64528.3,"v":104113350,"vma":108218221.75,"ema":63365.64740900846},{"t":1784102400,"o":64528.3,"h":64892.7,"l":64528.3,"c":64711.3,"v":53403828,"vma":107838079.25,"ema":63418.41809885127},{"t":1784116800,"o":64711.3,"h":65596.4,"l":64571.5,"c":65386.2,"v":237732607,"vma":116682447.95,"ema":63495.58601654338},{"t":1784131200,"o":65389.8,"h":65432.6,"l":64714.6,"c":64947.1,"v":102348423,"vma":119235919.4,"ema":63552.508133541676},{"t":1784145600,"o":64947.1,"h":65023,"l":64658.7,"c":64723.9,"v":27284143,"vma":118382336.3,"ema":63598.44506948122},{"t":1784160000,"o":64723.8,"h":64822.2,"l":64365.5,"c":64593.6,"v":57750057,"vma":120001884.25,"ema":63637.470753030975},{"t":1784174400,"o":64593.7,"h":64972.6,"l":64018.2,"c":64205.9,"v":84083144,"vma":121072151.15,"ema":63659.762096049366},{"t":1784188800,"o":64205.9,"h":64341.2,"l":63855,"c":64222.1,"v":97035669,"vma":113601755.85,"ema":63681.81456287096},{"t":1784203200,"o":64222,"h":64871,"l":63827.4,"c":64676.9,"v":154845764,"vma":115335081.75,"ema":63720.837521189744},{"t":1784217600,"o":64676.9,"h":64689,"l":63960.8,"c":64238.3,"v":74787003,"vma":115079885.25,"ema":63741.1301674176},{"t":1784232000,"o":64241.5,"h":64254.8,"l":63706.1,"c":63794.4,"v":47004237,"vma":105844429,"ema":63743.219180460044},{"t":1784246400,"o":63794.5,"h":64040.1,"l":63362,"c":63537.8,"v":103324307,"vma":104395018.7,"ema":63735.16352632436},{"t":1784260800,"o":63537.8,"h":63552,"l":62667,"c":62795.9,"v":134599853,"vma":107961635.85,"ema":63698.32966254693},{"t":1784275200,"o":62795.9,"h":63329.9,"l":62628,"c":63270,"v":80049859,"vma":107639415.15,"ema":63681.53242087842},{"t":1784289600,"o":63270,"h":63488,"l":62508,"c":63428,"v":178195071,"vma":113039028.85,"ema":63671.58997300084},{"t":1784304000,"o":63428.1,"h":64358,"l":63282.3,"c":64125.2,"v":135221794,"vma":116861856.85,"ema":63689.37860151061},{"t":1784318400,"o":64119.1,"h":64190,"l":63856,"c":63908.4,"v":31200838,"vma":97832866.15,"ema":63697.967675961176},{"t":1784332800,"o":63908.3,"h":64000,"l":63861,"c":63982.6,"v":19048892,"vma":93425090.35,"ema":63709.12972788427},{"t":1784347200,"o":63982.7,"h":63993,"l":63900,"c":63971.1,"v":9438738,"vma":89706536,"ema":63719.40307188881},{"t":1784361600,"o":63971.1,"h":64074.9,"l":63909.3,"c":64031.8,"v":9992275,"vma":87072992.6,"ema":63731.65393181474},{"t":1784376000,"o":64031.8,"h":64235.7,"l":63932,"c":64089.5,"v":32469143,"vma":83490782.25,"ema":63745.68711095926},{"t":1784390400,"o":64089.6,"h":64653,"l":64061.6,"c":64518.4,"v":53896593,"vma":83515420.5,"ema":63775.98957719615},{"t":1784404800,"o":64518.5,"h":64838.7,"l":64472.9,"c":64805.1,"v":48904380,"vma":74074009.15,"ema":63816.34684867866},{"t":1784419200,"o":64805,"h":65013.6,"l":64596,"c":64681.3,"v":44201922,"vma":71166684.1,"ema":63850.26658010302},{"t":1784433600,"o":64681.2,"h":64783.6,"l":64581.8,"c":64688.4,"v":19430032,"vma":70773978.55,"ema":63883.134557353886},{"t":1784448000,"o":64688.5,"h":64722,"l":64415.3,"c":64441.3,"v":34971290,"vma":69635040.2,"ema":63905.02339824197},{"t":1784462400,"o":64440.5,"h":64655.3,"l":64246.2,"c":64550.7,"v":46165356,"vma":67739150.8,"ema":63930.3440492913},{"t":1784476800,"o":64550.8,"h":64736.2,"l":64262.1,"c":64428.3,"v":40834808,"vma":64929107.75,"ema":63949.87173363282},{"t":1784491200,"o":64428.3,"h":64874.4,"l":64311.5,"c":64697.7,"v":45215341,"vma":59447586.6,"ema":63979.198332313885},{"t":1784505600,"o":64697.7,"h":65090.3,"l":64383.6,"c":64836.9,"v":90037890,"vma":60210130.95,"ema":64012.83369183099},{"t":1784520000,"o":64835.7,"h":64840,"l":63727.8,"c":64246.5,"v":113210114,"vma":63520424.8,"ema":64021.997076465064},{"t":1784534400,"o":64246.5,"h":65041.9,"l":63854.8,"c":64967.3,"v":104305541,"vma":63569486.5,"ema":64059.067779348785},{"t":1784548800,"o":64967.3,"h":65647.3,"l":64038,"c":65559.1,"v":198790174,"vma":66779002.55,"ema":64117.8925723155},{"t":1784563200,"o":65559.9,"h":65766.8,"l":65010.8,"c":65110.5,"v":122567308,"vma":68904875,"ema":64156.81835379332},{"t":1784577600,"o":65110.5,"h":65414.3,"l":65024.9,"c":65225.3,"v":36259718,"vma":61808107.35,"ema":64198.719594821036},{"t":1784592000,"o":65225.3,"h":65630,"l":65113.6,"c":65530.7,"v":58904156,"vma":57992225.45,"ema":64250.954120514325},{"t":1784606400,"o":65530.7,"h":66220,"l":65445.7,"c":66154.8,"v":107668389,"vma":61815603,"ema":64325.61474323925},{"t":1784620800,"o":66154.8,"h":66385.6,"l":66092.9,"c":66308.7,"v":82198880,"vma":64973102.4,"ema":64403.38279252399},{"t":1784635200,"o":66308.7,"h":66932.3,"l":66231,"c":66642.9,"v":164832210,"vma":72742776,"ema":64491.206996738736},{"t":1784649600,"o":66642.8,"h":66729.6,"l":66060.1,"c":66414.9,"v":77109035,"vma":76098614,"ema":64566.6459380431},{"t":1784664000,"o":66416.2,"h":66544.5,"l":66174.6,"c":66527.5,"v":29770319,"vma":75963672.8,"ema":64643.542175766896},{"t":1784678400,"o":66527.6,"h":66711.1,"l":66146,"c":66182.7,"v":57585639,"vma":76148125.1,"ema":64703.90130612898},{"t":1784692800,"o":66177.8,"h":66393.5,"l":65670.1,"c":65811.2,"v":82349883,"vma":77820400.25,"ema":64747.32478432},{"t":1784707200,"o":65811.2,"h":66132,"l":65811.2,"c":65986.8,"v":57861890,"vma":78503398.65,"ema":64795.931655523134},{"t":1784721600,"o":65986.8,"h":66166,"l":65524.6,"c":66005.6,"v":133957986,"vma":84229796.35,"ema":64843.36962981635},{"t":1784736000,"o":66005.7,"h":66355.8,"l":65663,"c":65890.7,"v":73496566,"vma":86156060.15,"ema":64884.44140903924},{"t":1784750400,"o":65890.7,"h":66110,"l":65760,"c":66083.6,"v":27800576,"vma":85237821.15,"ema":64931.46723613574},{"t":1784764800,"o":66083.6,"h":66278.7,"l":65555.5,"c":65629,"v":71174507,"vma":86754806.1,"ema":64958.82146216963},{"t":1784779200,"o":65629,"h":65785.1,"l":65318.4,"c":65408.7,"v":58128146,"vma":87400446.35,"ema":64976.46375777082},{"t":1784793600,"o":65408.7,"h":65756,"l":65384.1,"c":65531.1,"v":40558996,"vma":84926501.65,"ema":64998.214198642556},{"t":1784808000,"o":65531.1,"h":65559.8,"l":64688.5,"c":64929.7,"v":183324096,"vma":88432200.75,"ema":64995.52736732324},{"t":1784822400,"o":64931.9,"h":64932,"l":64624.4,"c":64814.6,"v":61556074,"vma":86294727.4,"ema":64988.432176447815},{"t":1784836800,"o":64814.5,"h":65195.1,"l":64800,"c":65067.3,"v":42296348,"vma":78470036.1,"ema":64991.52503227339},{"t":1784851200,"o":65067.4,"h":65430,"l":64725,"c":65419.9,"v":76495581,"vma":76166449.75,"ema":65008.324050615614},{"t":1784865600,"o":65420,"h":65773,"l":65204.3,"c":65468.7,"v":86567822,"vma":78681854.95,"ema":65026.378009415},{"t":1784880000,"o":65469,"h":65479,"l":64812.7,"c":65048.3,"v":76498573,"vma":79561575.8,"ema":65027.23769532029},{"t":1784894400,"o":65050,"h":65108.5,"l":63701.2,"c":64060.4,"v":294667214,"vma":88911517.05,"ema":64989.32249158224},{"t":1784908800,"o":64060.5,"h":64262.4,"l":63853,"c":64195.6,"v":51278535,"vma":87365499.8,"ema":64958.19611936333},{"t":1784923200,"o":64197.1,"h":64255,"l":64093,"c":64113.7,"v":16307924,"vma":79939285.5,"ema":64925.07862448634},{"t":1784937600,"o":64113.7,"h":64152.4,"l":63975,"c":64048.1,"v":28751102,"vma":77521388.85,"ema":64890.68730587904},{"t":1784952000,"o":64048.1,"h":64171.4,"l":63927.8,"c":63972,"v":16418620,"vma":76853803.9,"ema":64854.66035270731},{"t":1784966400,"o":63971.9,"h":64079.3,"l":63751,"c":64037,"v":31771179,"vma":75563080.9,"ema":64822.59524083643},{"t":1784980800,"o":64037.1,"h":64251.2,"l":64003.6,"c":64150.5,"v":30151012,"vma":72953137.35,"ema":64796.2385647252},{"t":1784995200,"o":64150.5,"h":64415.9,"l":64083.7,"c":64362.3,"v":26781039,"vma":71399094.8,"ema":64779.221366108526},{"t":1785009600,"o":64362.2,"h":64396.6,"l":64225.1,"c":64337.1,"v":14579286,"vma":65430159.8,"ema":64761.88327331996},{"t":1785024000,"o":64337.1,"h":64545,"l":64313.2,"c":64514.7,"v":23880424,"vma":62949352.7,"ema":64752.18981162114},{"t":1785038400,"o":64514.8,"h":64574.5,"l":64237.3,"c":64336.4,"v":24922074,"vma":62805427.6,"ema":64735.88432881246},{"t":1785052800,"o":64336.4,"h":64546.6,"l":64316,"c":64481.3,"v":13831856,"vma":59938295.05,"ema":64725.90062964334},{"t":1785067200,"o":64481.3,"h":64793,"l":64375,"c":64733.4,"v":52668904,"vma":59665332.95,"ema":64726.194722598506},{"t":1785081600,"o":64733.4,"h":64907.2,"l":64632.6,"c":64667.4,"v":29064337,"vma":59090600,"ema":64723.88904720249},{"t":1785096000,"o":64667.4,"h":65546.5,"l":64605.7,"c":65374.6,"v":82310029,"vma":54039896.65,"ema":64749.40712378278},{"t":1785110400,"o":65374.5,"h":65393.9,"l":64871.5,"c":65258.6,"v":59202268,"vma":53922206.35,"ema":64769.37547186973},{"t":1785124800,"o":65258.6,"h":65734.8,"l":65188,"c":65198,"v":66427103,"vma":55128744.1,"ema":64786.18427689445},{"t":1785139200,"o":65198.1,"h":65413,"l":65065,"c":65076.2,"v":47744598,"vma":53691194.95,"ema":64797.55744250643},{"t":1785153600,"o":65076.1,"h":65683.3,"l":64384.2,"c":64520.6,"v":214497482,"vma":60087677.95,"ema":64786.696366329714},{"t":1785168000,"o":64520.7,"h":65063.8,"l":64483.7,"c":64951.8,"v":71697747,"vma":59847636.65,"ema":64793.171018630506},{"t":1785182400,"o":64951.8,"h":65030.4,"l":63568,"c":63729.5,"v":117386427,"vma":50983597.3,"ema":64751.458429664606},{"t":1785196800,"o":63728,"h":63800,"l":63014.4,"c":63318.1,"v":116060286,"vma":54222684.85,"ema":64695.248295167956},{"t":1785211200,"o":63318.1,"h":63628,"l":63190,"c":63472.4,"v":48527848,"vma":55833681.05,"ema":64647.29346006333},{"t":1785225600,"o":63472.3,"h":63568.4,"l":63255,"c":63430.1,"v":42956245,"vma":56543938.2,"ema":64599.5603831981},{"t":1785240000,"o":63430,"h":63990,"l":62712.6,"c":63895,"v":193979116,"vma":65421963,"ema":64571.93056424915},{"t":1785254400,"o":63895,"h":64082.8,"l":63471,"c":63879.6,"v":64056012,"vma":67036204.65,"ema":64544.780346043306},{"t":1785268800,"o":63879.6,"h":64045.4,"l":63522.8,"c":63900.8,"v":41084951,"vma":67582901.6,"ema":64519.52621482592},{"t":1785283200,"o":63900,"h":64190.8,"l":63620.2,"c":63721.7,"v":69255047,"vma":69706602,"ema":64488.23891228373},{"t":1785297600,"o":63721.7,"h":64538,"l":63565,"c":64528.9,"v":68324051,"vma":72393840.25,"ema":64489.83346474319},{"t":1785312000,"o":64528.9,"h":64725.4,"l":64246.7,"c":64480.2,"v":60448540,"vma":74222246.05,"ema":64489.455681812084},{"t":1785326400,"o":64480.1,"h":64690.2,"l":63850.5,"c":63940.4,"v":129342888,"vma":79443286.75,"ema":64467.9240864469},{"t":1785340800,"o":63939.8,"h":64619.6,"l":63454.8,"c":63563.4,"v":195360153,"vma":88519701.6,"ema":64432.45255364506},{"t":1785355200,"o":63570.1,"h":64098.8,"l":63240,"c":63950,"v":84868945,"vma":90129703.65,"ema":64413.53284565898},{"t":1785369600,"o":63950,"h":64388.7,"l":63574.1,"c":64135.2,"v":63788217,"vma":91865897.65,"ema":64402.61783210372},{"t":1785384000,"o":64135.2,"h":64154.7,"l":63882.2,"c":63982.8,"v":37693984,"vma":89635095.4,"ema":64386.154387707495},{"t":1785398400,"o":63982.9,"h":64860,"l":63950,"c":64754.8,"v":83423287,"vma":90846146.35,"ema":64400.611078385635},{"t":1785412800,"o":64759.9,"h":65147,"l":64570.5,"c":64703,"v":122220528,"vma":93635817.6,"ema":64412.46946746855},{"t":1785427200,"o":64702.9,"h":64964.2,"l":64656.1,"c":64776.3,"v":37110452,"vma":93104110.3,"ema":64426.73733148939},{"t":1785441600,"o":64778.8,"h":65080.3,"l":64635.9,"c":64750,"v":44573420,"vma":84607907.2,"ema":64439.414298881966},{"t":1785456000,"o":64750.1,"h":65391.7,"l":64151.4,"c":64340.6,"v":131782283,"vma":87612134,"ema":64435.53922833758},{"t":1785470400,"o":64340.5,"h":64472,"l":63830,"c":63908.5,"v":79641879,"vma":85724906.6,"ema":64414.87102330473},{"t":1785484800,"o":63908.5,"h":63983.2,"l":63576.6,"c":63776.9,"v":66349667,"vma":83239375.65,"ema":64389.852551802585},{"t":1785499200,"o":63776.9,"h":63810,"l":62438.2,"c":62692.7,"v":228449375,"vma":92235452,"ema":64323.29754977111},{"t":1785513600,"o":62696,"h":63266.8,"l":62680,"c":62942.5,"v":60559268,"vma":93115603.15,"ema":64269.14862625067},{"t":1785528000,"o":62945.2,"h":63029.5,"l":62810.1,"c":62855,"v":21452378,"vma":84489266.25,"ema":64213.6918173781},{"t":1785542400,"o":62855,"h":63076.9,"l":62855,"c":62975.8,"v":15262102,"vma":82049570.75,"ema":64165.14704022602},{"t":1785556800,"o":62975.8,"h":63111.2,"l":62962.2,"c":63017.3,"v":9545041,"vma":80472575.25,"ema":64120.13343080539},{"t":1785571200,"o":63017.3,"h":63123,"l":62954.9,"c":63045.9,"v":9241829,"vma":77471914.35,"ema":64078.00662959734},{"t":1785585600,"o":63045.9,"h":63097,"l":62967.1,"c":62972.3,"v":7412044,"vma":74426314,"ema":64034.645585299404},{"t":1785600000,"o":62972.3,"h":62999,"l":62235.2,"c":62502,"v":71098750,"vma":74958824.5,"ema":63974.54183685629},{"t":1785614400,"o":62501.9,"h":62835.5,"l":62453.6,"c":62789,"v":27919527,"vma":69887656.45,"ema":63928.050000116826},{"t":1785628800,"o":62789,"h":63542.2,"l":62780,"c":63433.7,"v":64840267,"vma":63361662.15,"ema":63908.66372560244},{"t":1785643200,"o":63433.8,"h":63632.6,"l":63383.2,"c":63463.4,"v":22482494,"vma":60242339.6,"ema":63891.2024030298},{"t":1785657600,"o":63463.3,"h":63499,"l":62955.9,"c":63006.8,"v":52882007,"vma":59697029.1,"ema":63856.519955852156},{"t":1785672000,"o":63006.7,"h":63218.3,"l":62977.1,"c":63083.3,"v":26760898,"vma":59150374.8,"ema":63826.19760464227},{"t":1785686400,"o":63083.3,"h":63586,"l":63040,"c":63428.3,"v":38596469,"vma":56909033.9,"ema":63810.59377700924},{"t":1785700800,"o":63428.4,"h":63767.3,"l":63306.4,"c":63541.9,"v":53555324,"vma":53475773.7,"ema":63800.05676614613},{"t":1785715200,"o":63542,"h":63584.2,"l":62758,"c":62838.3,"v":62582749,"vma":54749388.55,"ema":63762.34081453256},{"t":1785729600,"o":62838.4,"h":62975.4,"l":62520,"c":62595.2,"v":64421230,"vma":55741779.05,"ema":63716.570586511676},{"t":1785744000,"o":62595.1,"h":62834.9,"l":62271.1,"c":62533.3,"v":92599437,"vma":53782636.75,"ema":63670.16781841318},{"t":1785758400,"o":62533.3,"h":63962.1,"l":62414.4,"c":63662.5,"v":224346571,"vma":61017871.35,"ema":63669.86711965188},{"t":1785772800,"o":63662.6,"h":64072.5,"l":63625.6,"c":63838.8,"v":66658629,"vma":61033319.45,"ema":63676.49193848906},{"t":1785787200,"o":63838.7,"h":64001.9,"l":63366.6,"c":63503.3,"v":42307726,"vma":51726237,"ema":63669.700097764},{"t":1785801600,"o":63503.3,"h":63987.9,"l":63288,"c":63765.4,"v":63175521,"vma":51857049.65,"ema":63673.453035106584},{"t":1785816000,"o":63765.4,"h":64216,"l":63476.4,"c":63661.8,"v":68164671,"vma":54192664.3,"ema":63672.9960533377},{"t":1785830400,"o":63661.8,"h":63924.2,"l":63422,"c":63890.9,"v":43740709,"vma":55616594.65,"ema":63681.541306147985},{"t":1785844800,"o":63891,"h":64212,"l":63575.1,"c":64092.4,"v":126417199,"vma":61460202.55,"ema":63697.65341178924},{"t":1785859200,"o":64092.4,"h":64379.7,"l":63854,"c":64202.1,"v":62796238,"vma":64137923,"ema":63717.43563093476},{"t":1785873600,"o":64202,"h":64530,"l":63975.9,"c":64075.7,"v":57833446,"vma":66658993.1,"ema":63731.485214035354},{"t":1785888000,"o":64075.7,"h":64478,"l":63923.7,"c":64154.3,"v":78706478,"vma":67039379.5,"ema":63748.06618603397},{"t":1785902400,"o":64154.3,"h":64499,"l":63966.1,"c":64141.5,"v":45325911,"vma":67909698.7,"ema":63763.494963052246},{"t":1785916800,"o":64141.6,"h":64254,"l":63986,"c":64047.5,"v":33679287,"vma":66351649.7,"ema":63774.63241548157},{"t":1785931200,"o":64047.4,"h":64707.8,"l":63853.5,"c":64354.1,"v":185503215,"vma":74502685.75,"ema":63797.35663448229},{"t":1785945600,"o":64354.2,"h":64898.6,"l":64348.1,"c":64803.2,"v":70761043,"vma":75396637.55,"ema":63836.80147234573},{"t":1785960000,"o":64803.1,"h":64988,"l":64542,"c":64628.5,"v":45367419,"vma":76326963.6,"ema":63867.84847343021},{"t":1785974400,"o":64628.5,"h":64691.3,"l":64367.2,"c":64500,"v":34579384,"vma":76126109.35,"ema":63892.63872937412},{"t":1785988800,"o":64500.1,"h":64965.1,"l":64464.5,"c":64780.8,"v":50782410,"vma":75987463.65,"ema":63927.46858312416},{"t":1786003200,"o":64780.8,"h":64961.7,"l":64476.5,"c":64589.9,"v":47593561,"vma":75238004.25,"ema":63953.446285746744},{"t":1786017600,"o":64589.9,"h":64950,"l":64145.4,"c":64601.6,"v":144742475,"vma":79254066.5,"ema":63978.86407846256},{"t":1786032000,"o":64601.7,"h":64806.6,"l":64332.1,"c":64418.3,"v":47734022,"vma":77010795.75,"ema":63996.096859699326},{"t":1786046400,"o":64419.2,"h":64505.1,"l":64157,"c":64296.9,"v":25481892,"vma":67067561.8,"ema":64007.89306127974},{"t":1786060800,"o":64296.8,"h":64518.9,"l":64191.6,"c":64267,"v":45260758,"vma":65997668.25,"ema":64018.05411770014},{"t":1786075200,"o":64267,"h":64434.9,"l":64128.8,"c":64283.9,"v":38361977,"vma":65800380.8,"ema":64028.47944641778},{"t":1786089600,"o":64283.8,"h":65177.9,"l":64265.9,"c":64989.9,"v":100691829,"vma":67676196.2,"ema":64066.18221322493},{"t":1786104000,"o":64990,"h":65349.4,"l":64756.5,"c":64891.4,"v":162150521,"vma":72375488.7,"ema":64098.54369505925},{"t":1786118400,"o":64891.4,"h":65048.7,"l":64501,"c":64923.3,"v":63438475,"vma":73360377,"ema":64130.88707956673},{"t":1786132800,"o":64923.3,"h":65070.7,"l":64810,"c":64885,"v":15360662,"vma":67807550.15,"ema":64160.46013527},{"t":1786147200,"o":64885,"h":65049.1,"l":64783,"c":64996.1,"v":14355732,"vma":65385524.85,"ema":64193.230326043726},{"t":1786161600,"o":64996.1,"h":65038.7,"l":64916.8,"c":64926.4,"v":8323762,"vma":62910040.65,"ema":64221.98207796358},{"t":1786176000,"o":64926.5,"h":65020,"l":64910,"c":64933.1,"v":6349266,"vma":59292180.05,"ema":64249.86905529834},{"t":1786190400,"o":64933.2,"h":65172.6,"l":64884.4,"c":65045.3,"v":17243739,"vma":57888071.45,"ema":64281.0624256788},{"t":1786204800,"o":65045.4,"h":65118.6,"l":64984.7,"c":65041.3,"v":5802602,"vma":56494237.2,"ema":64310.87566388748},{"t":1786219200,"o":65041.2,"h":65058.4,"l":64904.8,"c":64930.7,"v":8235148,"vma":47630833.85,"ema":64335.18250059777},{"t":1786233600,"o":64930.6,"h":64979.9,"l":64700.6,"c":64761.4,"v":20896675,"vma":45137615.45,"ema":64351.896912339034},{"t":1786248000,"o":64761.4,"h":64840,"l":64743.6,"c":64789.8,"v":11446808,"vma":43441584.9,"ema":64369.069582443386},{"t":1786262400,"o":64789.8,"h":64971.4,"l":64758.1,"c":64915.2,"v":16840139,"vma":42554622.65,"ema":64390.486461563254},{"t":1786276800,"o":64915.2,"h":65270,"l":64880.7,"c":65197.1,"v":37741518,"vma":41902578.05,"ema":64422.11836503136},{"t":1786291200,"o":65197.2,"h":65229.4,"l":65141,"c":65148.5,"v":8535657,"vma":39949682.85,"ema":64450.603919343856},{"t":1786305600,"o":65148.5,"h":65488,"l":64811.7,"c":64865.6,"v":56437760,"vma":35534447.1,"ema":64466.87827544802},{"t":1786320000,"o":64865.6,"h":65370.8,"l":64796.6,"c":64946.3,"v":65615318,"vma":36428511.9,"ema":64485.67912739123},{"t":1786334400,"o":64946.4,"h":65331,"l":64891.4,"c":65175.6,"v":33120346,"vma":36810434.6,"ema":64512.734847885695},{"t":1786348800,"o":65175.7,"h":65293.2,"l":64934.6,"c":65092.8,"v":38297204,"vma":36462256.9,"ema":64535.482500909784},{"t":1786363200,"o":65092.9,"h":65218,"l":64170,"c":64271.9,"v":174325054,"vma":43260410.75,"ema":64525.145932246654},{"t":1786377600,"o":64271.9,"h":64336.6,"l":63790.5,"c":64017.9,"v":130012802,"vma":44726459.4,"ema":64505.253934903645},{"t":1786392000,"o":64019.9,"h":64169.4,"l":63886.8,"c":63947.7,"v":21495562,"vma":37693711.45,"ema":64483.38907471135},{"t":1786406400,"o":63947.6,"h":64150,"l":63868.1,"c":64112.4,"v":23017296,"vma":35672652.5,"ema":64468.8404835462},{"t":1786420800,"o":64112.4,"h":64127.3,"l":63825.8,"c":64034.3,"v":26231245,"vma":36216181.65,"ema":64451.799680269876},{"t":1786435200,"o":64034.3,"h":64367.9,"l":64013.9,"c":64348.6,"v":44048631,"vma":37700826.6,"ema":64447.75263398478},{"t":1786449600,"o":64348.7,"h":64458.7,"l":63422,"c":63588.6,"v":158357789,"vma":45202527.95,"ema":64414.06037382851},{"t":1786464000,"o":63588.7,"h":63639,"l":63209,"c":63511,"v":77204865,"vma":48745307.9,"ema":64378.646241521514},{"t":1786478400,"o":63510.7,"h":63741.6,"l":63510.7,"c":63563.6,"v":39269225,"vma":49846582.2,"ema":64346.68364381479},{"t":1786492800,"o":63563.5,"h":63875.9,"l":63505,"c":63792.9,"v":45155115,"vma":51814207.85,"ema":64324.96663817499},{"t":1786507200,"o":63792.9,"h":63858,"l":63579.4,"c":63804.9,"v":29919442,"vma":52898422.55,"ema":64304.57186805048},{"t":1786521600,"o":63804.8,"h":64219.6,"l":63734.4,"c":64207.3,"v":45554996,"vma":54131338.6,"ema":64300.757284989675},{"t":1786536000,"o":64207.4,"h":64443.9,"l":63300.2,"c":63423.4,"v":116218958,"vma":59369946.1,"ema":64266.351116950864},{"t":1786550400,"o":63423.3,"h":63562.8,"l":63283.1,"c":63396.1,"v":24579482,"vma":59756913.25,"ema":64232.22362216848},{"t":1786564800,"o":63392,"h":63630,"l":63337.6,"c":63452,"v":19748784,"vma":58857276.55,"ema":64201.62661737756},{"t":1786579200,"o":63452,"h":63698.5,"l":63351.3,"c":63620,"v":29951965,"vma":59928091.95,"ema":64178.81773042158},{"t":1786593600,"o":63620.1,"h":63978.5,"l":63563.4,"c":63838.6,"v":37270087,"vma":58969708.3,"ema":64165.47585864034},{"t":1786608000,"o":63838.6,"h":63890,"l":63330,"c":63467.3,"v":65766898,"vma":58977287.3,"ema":64138.096413203464},{"t":1786622400,"o":63467.3,"h":63975.3,"l":63388,"c":63388.1,"v":122688165,"vma":63455678.25,"ema":64108.68478915627},{"t":1786636800,"o":63389.1,"h":63548.6,"l":62800,"c":63384.8,"v":134700840,"vma":68275860.05,"ema":64080.297150365834},{"t":1786651200,"o":63384.7,"h":63609,"l":63340,"c":63458.5,"v":27852186,"vma":60952216.65,"ema":64055.9129483907},{"t":1786665600,"o":63458.6,"h":63594.5,"l":63270.9,"c":63290.1,"v":38006599,"vma":56351906.5,"ema":64025.88106806165},{"t":1786680000,"o":63290,"h":63448.1,"l":62883.3,"c":62888.2,"v":53882191,"vma":57971237.95,"ema":63981.2661242161},{"t":1786694400,"o":62888.2,"h":62970.2,"l":62669,"c":62842.9,"v":70848117,"vma":60362779,"ema":63936.62431542331},{"t":1786708800,"o":62842.9,"h":63055,"l":62507.6,"c":62950.6,"v":96704190,"vma":63886426.25,"ema":63897.95669521063},{"t":1786723200,"o":62950.6,"h":63210,"l":62792,"c":62936.9,"v":44729134,"vma":63920451.4,"ema":63860.26819735923},{"t":1786737600,"o":62937,"h":63039.5,"l":62770.3,"c":63017.5,"v":14051349,"vma":56705129.4,"ema":63827.21846412946},{"t":1786752000,"o":63017.6,"h":63160.6,"l":62965,"c":63024.8,"v":14777423,"vma":53583757.3,"ema":63795.75107337928},{"t":1786766400,"o":63024.9,"h":63125.2,"l":63003,"c":63048,"v":9542581,"vma":52097425.1,"ema":63766.42750187421},{"t":1786780800,"o":63047.9,"h":63055.3,"l":62888.8,"c":62990.9,"v":13087014,"vma":50494020.05,"ema":63736.01465866346},{"t":1786795200,"o":62990.8,"h":63094.2,"l":62925.4,"c":63069.1,"v":8760038,"vma":49436049.85,"ema":63709.86114263744},{"t":1786809600,"o":63069.2,"h":63094.1,"l":63015,"c":63092.1,"v":4758663,"vma":47396233.2,"ema":63685.63521547519},{"t":1786824000,"o":63092.1,"h":63145.6,"l":63042.6,"c":63057.5,"v":5536066,"vma":41862088.6,"ema":63661.00246192714},{"t":1786838400,"o":63057.6,"h":63124.2,"l":62974.8,"c":63097.7,"v":8139525,"vma":41040090.75,"ema":63638.91216930255},{"t":1786852800,"o":63097.7,"h":63120,"l":63007.2,"c":63035.7,"v":3959402,"vma":40250621.65,"ema":63615.25679011422},{"t":1786867200,"o":63035.6,"h":63045.9,"l":62940.3,"c":62986.4,"v":6488997,"vma":39077473.25,"ema":63590.5957395215},{"t":1786881600,"o":62986.4,"h":63109.1,"l":62965,"c":63109,"v":7160572,"vma":37571997.5,"ema":63571.70963208929},{"t":1786896000,"o":63109.1,"h":63359.4,"l":63064.8,"c":63079.4,"v":26013962,"vma":35584350.7,"ema":63552.40337200736},{"t":1786910400,"o":63079.4,"h":63118.1,"l":62680,"c":62879.4,"v":36808790,"vma":31290381.95,"ema":63526.011082909026},{"t":1786924800,"o":62878,"h":63495.9,"l":62723.2,"c":63398.9,"v":66012703,"vma":27855975.1,"ema":63521.026334559654},{"t":1786939200,"o":63398.9,"h":63683,"l":63398.9,"c":63494.2,"v":56481675,"vma":29287449.55,"ema":63519.974321439666},{"t":1786953600,"o":63494.3,"h":63747,"l":63263.8,"c":63591.4,"v":58458568,"vma":30310048,"ema":63522.77532844203},{"t":1786968000,"o":63591.4,"h":64197,"l":63410,"c":64166.4,"v":104073030,"vma":32819589.95,"ema":63548.015511640384},{"t":1786982400,"o":64166.5,"h":64598.3,"l":63936.4,"c":64281.2,"v":95314541,"vma":34042911.15,"ema":63576.767844517235},{"t":1786996800,"o":64278.7,"h":64546.1,"l":64231.7,"c":64500.1,"v":29037347,"vma":30659569,"ema":63612.97694865381},{"t":1787011200,"o":64500,"h":64557.5,"l":64016.5,"c":64149.8,"v":42323479,"vma":30539286.25,"ema":63634.02883302033},{"t":1787025600,"o":64149.7,"h":64431.5,"l":64047.7,"c":64160.4,"v":37757961,"vma":31724616.85,"ema":63654.67083956856},{"t":1787040000,"o":64160.5,"h":64375.1,"l":64052.1,"c":64319.9,"v":24127804,"vma":32192135.9,"ema":63680.75825762469},{"t":1787054400,"o":64319.9,"h":65035.1,"l":64016.9,"c":64823.2,"v":115284056,"vma":37479209.65,"ema":63725.55989458059},{"t":1787068800,"o":64823.2,"h":64860,"l":64611.1,"c":64620.3,"v":22507288,"vma":37950223.35,"ema":63760.64774185194},{"t":1787083200,"o":64620.4,"h":64755.8,"l":64532.4,"c":64697.8,"v":15967927,"vma":38310617.8,"ema":63797.39881079893},{"t":1787097600,"o":64697.8,"h":64709.8,"l":64250.2,"c":64304.7,"v":33544377,"vma":39749903.5,"ema":63817.29297508132},{"t":1787112000,"o":64304.6,"h":64385,"l":64137,"c":64292.9,"v":23019832,"vma":40624091.8,"ema":63835.944230960486}];
+
+// ── Canvas setup ──────────────────────────────────────────────────────────────
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+var W, H;
+var VOL_H = 150, PAD_L = 0, PAD_R = 72, PAD_T = 26, PAD_B = 30;
+var GAP = 2;          // constant px gap between candles
+var LAYOUT = null;    // {i0, xs[], ws[]} computed each draw
+var LEVEL_HITS = [];  // clickable level pill rects, rebuilt each draw
+var PLOT_TAGS  = [];  // in-plot level/entry tag rects, rebuilt each draw
+var AXIS_SKIP = [];
+var AXIS_BANDS = [];  // {y0,y1} rows in the price axis already spoken for
+var OOR_HITS = [];   // off-screen level markers (rects)
+var EXEC_HITS = [];  // execution badge rects
+var EXEC_DOTS = [];  // execution price glyphs (rects), painted under the tag layer   // y positions where the axis label is suppressed
+
+// one factor for every HTML overlay, tied to viewport width
+function uiScale(){ return Math.max(0.68, Math.min(1, W/1460)); }
+function scaleOverlays(){
+  var s=uiScale();
+  var lg=document.getElementById('legend');
+  if(lg){ lg.style.transformOrigin='top left'; lg.style.transform='scale('+s+')'; }
+  var fb=document.getElementById('fitBtn');
+  if(fb){ fb.style.transformOrigin='top right'; fb.style.transform='scale('+s+')'; }
+}
+
+function resize() {
+  var box = cv.parentElement.getBoundingClientRect();
+  var dpr = window.devicePixelRatio || 1;
+  W = Math.floor(box.width); H = Math.floor(box.height);
+  cv.width = W*dpr; cv.height = H*dpr;
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  VOL_H = Math.round(Math.min(150, Math.max(64, H*0.2)));
+  scaleOverlays();
+  draw();
+}
+window.addEventListener('resize', resize);
+window.addEventListener('resize', function(){
+  var r=document.querySelector('.lvlrail');
+  if(r) requestAnimationFrame(function(){ spreadChips(r); });
+});
+
+// ── Colors ────────────────────────────────────────────────────────────────────
+var C = { bg:'#ffffff', grid:'#e0e3eb', bull:'#26a69a', bear:'#ef5350',
+          volBull:'rgba(38,166,154,0.5)', volBear:'rgba(239,83,80,0.5)',
+          ema:'#2196f3', cross:'#9598a1', axisText:'#787b86', priceBox:'#131722' };
+
+// ── State ─────────────────────────────────────────────────────────────────────
+var candles = RAW;
+var n = candles.length;
+// viewport: number of visible candles and offset
+var viewN  = 170;  // candles in view
+var offset = Math.max(0, n + Math.min(8,Math.max(1,Math.round(n*0.06))) - viewN); // left edge
+var yManualRange = null;
+var crosshairX = -1, crosshairY = -1, hoveredIdx = -1;
+var showEMA = true, showLevels = true;
+var LEVELS = [
+  { id:'liq',   p:79905, col:'#df5338', label:'Liquidation', short:'Liq',   dash:[7,5], lw:1.2, on:true },
+  { id:'entry', p:null,  col:'#7c5cff', label:'Avg entry',   short:'Entry', dash:[7,5], lw:1.6, on:true },
+  { id:'tp1',   p:59400, col:'#4caf7d', label:'TP1',         short:'TP1',   dash:[7,5], lw:1.2, on:true, bank:50 },
+  { id:'tp2',   p:52645, col:'#26a69a', label:'TP2',         short:'TP2',   dash:[7,5], lw:1.2, on:true, bank:50 },
+];
+var POS = { dir:'short', qty:35.25, unit:'BTC' };   // 85% filled -> 29.96 BTC
+var ENTRY_COL = '#7c5cff';
+var FILLS = [
+  { n:1, p:65933, pct:40, filled:true },
+  { n:2, p:66845, pct:30, filled:true },
+  { n:3, p:67395, pct:10, filled:true },
+  { n:4, p:68668, pct:5,  filled:true },
+];
+var FILL_HITS = [];
+var fitPlan = false;
+var CUR_CONTRACT='BTC_USDT', CUR_INTERVAL='1h', CUR_SRC='binance';
+var autoLive=false, liveTimer=null, clockTimer=null, lastPollErr=null;
+// seconds until the in-progress bar closes; null when the series isn't current
+function barCountdown(){
+  if(!candles.length) return null;
+  var step=GATE_STEP[CUR_INTERVAL]; if(!step) return null;
+  var lastT=candles[candles.length-1].t;
+  var nowS=Math.floor(Date.now()/1000);
+  // a historical window has no live bar — don't invent a countdown
+  if(nowS - lastT > step*2) return null;
+  var rem=(lastT+step)-nowS;
+  return rem>0?rem:0;
+}
+function fmtCountdown(s){
+  var h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=Math.floor(s%60);
+  return (h>0?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0');
+}
+var ARMED_AT = 120;   // bar the plan went live (real app: triggeredAt)
+// First touch after arming: limit buys fill on a low, targets on a high.
+function execBars(){
+  var res={fills:{},levels:{}}, lastFill=ARMED_AT;
+  var sh = POS.dir==='short';
+  FILLS.forEach(function(f){
+    if(!f.filled) return;
+    for(var i=ARMED_AT;i<n;i++){
+      var c=candles[i];
+      // short sells into strength (fills on a high); long buys dips (on a low)
+      if(sh ? c.h>=f.p : c.l<=f.p){ res.fills[f.n]=i; if(i>lastFill) lastFill=i; break; }
+    }
+  });
+  LEVELS.forEach(function(lv){
+    if(lv.id==='entry'||!lv.on||lv.p==null) return;
+    var isTp=lv.id.slice(0,2)==='tp';
+    // targets sit opposite the risk level, so each side tests a different extreme
+    var wantLow = sh ? isTp : !isTp;
+    for(var i=lastFill;i<n;i++){
+      var c=candles[i];
+      if(wantLow ? c.l<=lv.p : c.h>=lv.p){ res.levels[lv.id]=i; break; }
+    }
+  });
+  // the position closes on whichever comes first — the stop, or the last target
+  var sb=res.levels['liq'];
+  var tps=Object.keys(res.levels).filter(function(k){ return k!=='liq'; });
+  if(sb!=null){
+    // targets after the stop never happen
+    tps.forEach(function(k){ if(res.levels[k]>sb) delete res.levels[k]; });
+    // if every target banked before the stop, we were already flat
+    var live=Object.keys(res.levels).filter(function(k){ return k!=='liq'; });
+    var allTp=LEVELS.filter(function(l){ return l.id.slice(0,2)==='tp' && l.on; }).length;
+    if(live.length===allTp && allTp>0) delete res.levels['liq'];
+  }
+  return res;
+}
+// Weighted average of the TICKED fills only, renormalised over what's filled.
+function fillState(){
+  var w=0, s=0;
+  FILLS.forEach(function(f){ if(f.filled){ w+=f.pct; s+=f.p*f.pct; } });
+  return { pct:w, avg:w>0?s/w:null, qty:POS.qty*w/100 };
+}
+function fmtQty(q){ return q>=1 ? q.toFixed(2) : (Math.round(q*1000)/1000).toString(); }
+var isDragging = false, dragStartX = 0, dragStartOffset = 0;
+var isYDragging = false, yDragStartY = 0, yDragMid = 0, yDragHalfR = 0;
+var isPinching = false, pinchStartDist = 0, pinchStartViewN = 0;
+
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+// the header is an HTML overlay: measure it so canvas guides can dodge it
+var HEADER_BOX=null;     // union box, kept for reference
+var OVERLAY_BOXES=[];    // every HTML overlay a canvas guide must avoid
+function measureHeader(){
+  HEADER_BOX=null; OVERLAY_BOXES=[];
+  var cvr=cv.getBoundingClientRect();
+  ['legend','lvlChips','fitBtn'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el || el.hidden) return;
+    var r=el.getBoundingClientRect();
+    if(!r.width || !r.height) return;
+    if(getComputedStyle(el).visibility==='hidden') return;
+    OVERLAY_BOXES.push({ id:id, x0:r.left-cvr.left, x1:r.right-cvr.left,
+                         y0:r.top-cvr.top,  y1:r.bottom-cvr.top });
+  });
+  if(OVERLAY_BOXES.length){
+    var right=0, top=Infinity, bot=-Infinity;
+    OVERLAY_BOXES.forEach(function(o){ right=Math.max(right,o.x1); top=Math.min(top,o.y0); bot=Math.max(bot,o.y1); });
+    HEADER_BOX={ right:right, y0:top, y1:bot };
+  }
+}
+// left edge a horizontal guide at row y may start from: clear of every overlay it hits
+function guideStartX(y){
+  var x=PAD_L;
+  for(var i=0;i<OVERLAY_BOXES.length;i++){
+    var o=OVERLAY_BOXES[i];
+    if(y>=o.y0-2 && y<=o.y1+2 && o.x1+10>x) x=o.x1+10;
+  }
+  return x;
+}
+// top edge a vertical guide at column x may start from
+function guideStartY(x){
+  var y=PAD_T;
+  for(var i=0;i<OVERLAY_BOXES.length;i++){
+    var o=OVERLAY_BOXES[i];
+    if(x>=o.x0-2 && x<=o.x1+2 && o.y1+8>y) y=o.y1+8;
+  }
+  return y;
+}
+// ── Guide primitives: overlay avoidance is theirs, not the caller's ──────────
+function hGuide(y, xEnd){
+  var yy=Math.round(y)+0.5, x0=guideStartX(yy);
+  if(x0>=xEnd) return;
+  ctx.beginPath(); ctx.moveTo(x0,yy); ctx.lineTo(xEnd,yy); ctx.stroke();
+}
+function vGuide(x, yEnd){
+  var xx=Math.round(x)+0.5, y0=guideStartY(xx);
+  if(y0>=yEnd) return;
+  ctx.beginPath(); ctx.moveTo(xx,y0); ctx.lineTo(xx,yEnd); ctx.stroke();
+}
+// every axis pill goes through this, so its band is always registered
+function axisBox(y0,y1){ AXIS_BANDS.push({y0:y0,y1:y1}); }
+// empty slots kept to the right of the newest bar, small on short series
+function rightMargin(len){ return Math.min(8, Math.max(1, Math.round(len*0.06))); }
+// TV lets you scroll past the newest candle into empty space.
+function maxOffset(){ return n - viewN * 0.2; }
+
+// ── Scale helpers ─────────────────────────────────────────────────────────────
+function getScale() {
+  var i0 = clamp(Math.floor(offset), 0, n-1);
+  var i1 = clamp(Math.floor(offset + viewN), 0, n);
+  var vis = candles.slice(i0, i1);
+  if (!vis.length) return null;
+  var cmn = Infinity, cmx = -Infinity;
+  vis.forEach(function(c){ if(c.l<cmn)cmn=c.l; if(c.h>cmx)cmx=c.h; });
+  var cr = cmx - cmn || 1;
+  if (yManualRange) { cmn=yManualRange.lo; cmx=yManualRange.hi; cr=cmx-cmn||1; }
+  else if (fitPlan) {
+    var ps=[]; 
+    LEVELS.forEach(function(l){ if(l.on&&l.p!=null) ps.push(l.p); });
+    var fa=fillState().avg; if(fa!=null) ps.push(fa);
+    FILLS.forEach(function(f){ if(f.filled) ps.push(f.p); });
+    ps.forEach(function(p){ if(p<cmn)cmn=p; if(p>cmx)cmx=p; });
+    cr = cmx-cmn||1; cmn -= cr*0.04; cmx += cr*0.04;
+  }
+  else { cmn -= cr*0.03; cmx += cr*0.08; }
+  var cH = H - PAD_T - PAD_B - VOL_H;
+  return { lo:cmn, hi:cmx, cH:cH,
+    y: function(p){ return PAD_T + (1-(p-cmn)/(cmx-cmn))*cH; },
+    inV: function(p){ return p>=cmn&&p<=cmx; } };
+}
+
+function slotW() { return (W-PAD_L-PAD_R)/viewN; }
+
+// Flow layout: proportional widths, CONSTANT gap. Neighbours shift over.
+function buildLayout(vis, maxV, i0) {
+  var availW = W - PAD_L - PAD_R;
+  var raws = vis.map(function(c){
+    var vr = maxV > 0 ? c.v / maxV : 0.5;
+    return 0.31 + 1.4 * vr;   // relative width units
+  });
+  var sumRaw = 0; raws.forEach(function(r){ sumRaw += r; });
+  var avgRaw = raws.length ? sumRaw / raws.length : 1;
+  var totalGap = GAP * Math.max(0, viewN - 1);
+  var scale = avgRaw > 0 ? (availW - totalGap) / (avgRaw * viewN) : 1;
+  // sub-pixel pan offset from the fractional part of `offset`
+  var frac = offset - i0;
+  var shift = -frac * (availW / viewN);
+  var xs = [], ws = [], cur = PAD_L + shift;
+  for (var i = 0; i < vis.length; i++) {
+    var w = Math.max(1, raws[i] * scale);
+    ws.push(w);
+    xs.push(cur + w / 2);
+    cur += w + GAP;
+  }
+  return { i0: i0, xs: xs, ws: ws };
+}
+function cx(i) {
+  if (!LAYOUT) return PAD_L;
+  var k = i - LAYOUT.i0;
+  if (k >= 0 && k < LAYOUT.xs.length) return LAYOUT.xs[k];
+  // extrapolate outside the visible range
+  var availW = W - PAD_L - PAD_R;
+  return PAD_L + (i - offset + 0.5) * (availW / viewN);
+}
+function cwAt(i) {
+  if (!LAYOUT) return 4;
+  var k = i - LAYOUT.i0;
+  if (k >= 0 && k < LAYOUT.ws.length) return LAYOUT.ws[k];
+  return (W - PAD_L - PAD_R) / viewN * 0.7;
+}
+
+// ── Format helpers ────────────────────────────────────────────────────────────
+function fmt(p){ return p.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}); }
+function isRound(p){ return Math.abs(p % 1000) < 0.01; }
+function fmtShort(p){ return p>=1000?(p/1000).toFixed(1)+'k':p.toFixed(0); }
+function fmtVol(v){ return v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(2)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v.toFixed(0); }
+function fmtDate(t){
+  var d=new Date(t*1000);
+  var DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var yy=String(d.getFullYear()).slice(-2);
+  var hh=String(d.getHours()).padStart(2,'0'), mi=String(d.getMinutes()).padStart(2,'0');
+  return DOW[d.getDay()]+' '+d.getDate()+' '+MO[d.getMonth()]+" '"+yy+'   '+hh+':'+mi;
+}
+function fmtDateShort(t){ var d=new Date(t*1000); return (d.getMonth()+1)+'/'+(d.getDate()); }
+
+function sidePill(c,x,y,w,h,rl,rr){
+  c.beginPath(); c.moveTo(x+rl,y); c.lineTo(x+w-rr,y);
+  if(rr) c.arcTo(x+w,y,x+w,y+rr,rr); else c.lineTo(x+w,y);
+  c.lineTo(x+w,y+h-rr);
+  if(rr) c.arcTo(x+w,y+h,x+w-rr,y+h,rr); else c.lineTo(x+w,y+h);
+  c.lineTo(x+rl,y+h);
+  if(rl) c.arcTo(x,y+h,x,y+h-rl,rl); else c.lineTo(x,y+h);
+  c.lineTo(x,y+rl);
+  if(rl) c.arcTo(x,y,x+rl,y,rl); else c.lineTo(x,y);
+  c.closePath();
+}
+function roundRect(c,x,y,w,h,r){
+  c.beginPath(); c.moveTo(x+r,y); c.lineTo(x+w-r,y);
+  c.arcTo(x+w,y,x+w,y+r,r); c.lineTo(x+w,y+h-r);
+  c.arcTo(x+w,y+h,x+w-r,y+h,r); c.lineTo(x+r,y+h);
+  c.arcTo(x,y+h,x,y+h-r,r); c.lineTo(x,y+r);
+  c.arcTo(x,y,x+r,y,r); c.closePath();
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────────
+function draw() {
+  if (!W||!H) return;
+  ctx.clearRect(0,0,W,H);
+
+  var sc = getScale();
+  if (!sc) return;
+  (function(){ var fb=document.getElementById('fitBtn'); if(fb) fb.style.right=(PAD_R+12)+'px'; })();
+measureHeader();
+  var cW = slotW();
+  // body width: min 40% slot, max 85% slot — proportion of volume
+  var maxV = 0;
+  var i0 = clamp(Math.floor(offset),0,n-1);
+  var i1 = clamp(Math.ceil(offset+viewN),0,n);
+  var vis = candles.slice(i0,i1);
+  vis.forEach(function(c){ if(c.v>maxV)maxV=c.v; });
+  LAYOUT = buildLayout(vis, maxV, i0);
+
+  // ── Chart bg
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+
+  // ── Time axis bg
+  ctx.strokeStyle=C.grid; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,H-PAD_B+0.5); ctx.lineTo(W,H-PAD_B+0.5); ctx.stroke();
+
+  // pre-compute occupied axis rows so the grid labels can avoid them
+  AXIS_SKIP = [];
+  AXIS_BANDS = [];
+  (function(){
+    var lastC=candles[n-1];
+    if(lastC && sc.inV(lastC.c)){
+      var ly=sc.y(lastC.c), tall=(barCountdown()!=null);
+      axisBox(ly-9, ly+(tall?21:9));                   // matches the drawn box
+    }
+    // the crosshair pill occupies its row too, whenever it is showing
+    if(crosshairX>=PAD_L && crosshairX<=W-PAD_R && crosshairY>=PAD_T && crosshairY<=H-PAD_B){
+      axisBox(crosshairY-9, crosshairY+9);
+    }
+  })();
+  (function(){
+    var hi=-Infinity, lo=Infinity;
+    vis.forEach(function(c){ if(c.h>hi)hi=c.h; if(c.l<lo)lo=c.l; });
+    [hi,lo].forEach(function(pv){ if(sc.inV(pv)) AXIS_SKIP.push(Math.round(sc.y(pv))+0.5); });
+  })();
+
+  // pre-register level axis pill rows so the grid never prints under them
+  (function(){
+    var av=null, wsum=0, psum=0;
+    FILLS.forEach(function(f){ if(f.filled && isFinite(f.p)){ psum+=f.p*f.pct; wsum+=f.pct; } });
+    if(wsum>0) av=psum/wsum;
+    LEVELS.forEach(function(lv){
+      var p = (lv.id==='entry') ? av : lv.p;
+      if(lv.id!=='entry' && !lv.on) return;
+      if(p==null || !isFinite(p) || !sc.inV(p)) return;
+      var ly=Math.round(sc.y(p))+0.5;
+      AXIS_BANDS.push({ y0:ly-9, y1:ly+9 });
+    });
+  })();
+
+  // ── Price grid
+  var priceRange = sc.hi-sc.lo;
+  var rawStep = priceRange/14;
+  var mag = Math.pow(10,Math.floor(Math.log10(rawStep)));
+  var steps = [1,2,2.5,5,10];
+  var priceStep = mag;
+  for(var si=0;si<steps.length;si++){ var s=steps[si]*mag; if(s>=rawStep){priceStep=s;break;} }
+  var p0=Math.ceil(sc.lo/priceStep)*priceStep;
+  ctx.font='10px JetBrains Mono'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(var p=p0;p<=sc.hi;p+=priceStep){
+    var gy=Math.round(sc.y(p))+0.5;
+    if(gy<PAD_T||gy>H-PAD_B-VOL_H)continue;
+    var clash=false;
+    for(var ai=0;ai<AXIS_SKIP.length;ai++){ if(Math.abs(AXIS_SKIP[ai]-gy)<11){ clash=true; break; } }
+    for(var bi2=0;bi2<AXIS_BANDS.length && !clash;bi2++){
+      var bd=AXIS_BANDS[bi2];
+      if(gy+7 > bd.y0 && gy-7 < bd.y1) clash=true;   // label box overlaps the band
+    }
+    if(clash) continue;
+    ctx.font=(isRound(p)?'bold ':'')+'11px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.fillStyle=isRound(p)?'#131722':C.axisText; ctx.textAlign='right'; ctx.fillText(fmt(p),W-8,gy);
+    ctx.font='10px JetBrains Mono';
+  }
+  ctx.setLineDash([]);
+  // price axis divider
+  ctx.strokeStyle=C.grid; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(W-PAD_R+0.5,0); ctx.lineTo(W-PAD_R+0.5,H-PAD_B); ctx.stroke();
+
+  // ── Time labels
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // candidates = the first visible bar of each calendar day (a day can never repeat)
+  var cands=[];
+  vis.forEach(function(c,i){
+    var gi=i0+i, tx=cx(gi);
+    if(tx<PAD_L+14||tx>W-PAD_R-14) return;
+    var d=new Date(c.t*1000);
+    var prev=(i>0)?new Date(vis[i-1].t*1000):null;
+    if(prev && prev.getDate()===d.getDate() && prev.getMonth()===d.getMonth()) return;
+    cands.push({ tx:tx, d:d, newMonth:!!prev && prev.getMonth()!==d.getMonth() });
+  });
+
+  if(cands.length>=2){
+    // thin to fit, but never drop a month marker
+    var slots=Math.max(1,Math.floor((W-PAD_L-PAD_R)/64));
+    var every=Math.max(1,Math.ceil(cands.length/slots));
+    var lastX=-999;
+    cands.forEach(function(k,ci){
+      if(!k.newMonth && ci%every!==0) return;
+      if(k.tx-lastX<34) return;
+      lastX=k.tx;
+      ctx.font=(k.newMonth?'bold ':'')+'11px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.fillStyle=k.newMonth?'#131722':C.axisText;
+      ctx.fillText(k.newMonth?MON[k.d.getMonth()]:String(k.d.getDate()),k.tx,H-PAD_B+13);
+    });
+  } else {
+    // zoomed inside a single day: label times instead of leaving the axis blank
+    var tLast=-999;
+    vis.forEach(function(c,i){
+      var tx=cx(i0+i);
+      if(tx<PAD_L+18||tx>W-PAD_R-18) return;
+      if(tx-tLast<58) return;
+      var d=new Date(c.t*1000);
+      var dayStart=(d.getHours()===0&&d.getMinutes()===0);
+      tLast=tx;
+      ctx.font=(dayStart?'bold ':'')+'11px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.fillStyle=dayStart?'#131722':C.axisText;
+      ctx.fillText(dayStart?String(d.getDate()):String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'),tx,H-PAD_B+13);
+    });
+  }
+
+  // ── Volume pane bg + divider
+  var volTop=H-PAD_B-VOL_H, volBot=H-PAD_B;
+  ctx.strokeStyle=C.grid; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(PAD_L,volTop+0.5); ctx.lineTo(W-PAD_R,volTop+0.5); ctx.stroke();
+
+
+  // ── Series clip: candles + volume can never paint over the price axis
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(PAD_L, 0, (W-PAD_R)-PAD_L, H-PAD_B);
+  ctx.clip();
+
+  // ── Volume bars (height proportional, width proportional like TV)
+  if(maxV>0){
+    vis.forEach(function(c,i){
+      var x=cx(i0+i);
+      if(x<PAD_L-cW||x>W-PAD_R+cW)return;
+      var bull=c.c>=c.o;
+      var vr=c.v/maxV;
+      var bw=cwAt(i0+i);
+      var bh=Math.max(1,Math.round(vr*(VOL_H-6)));
+      ctx.globalAlpha=1;
+      ctx.fillStyle=bull?C.volBull:C.volBear;
+      ctx.fillRect(Math.round(x-bw/2),volBot-bh,bw,bh);
+    });
+    ctx.globalAlpha=1;
+    // Volume MA line
+    ctx.save();
+    ctx.strokeStyle=C.priceBox; ctx.lineWidth=1.2; ctx.setLineDash([4,3]); ctx.globalAlpha=0.9;
+    ctx.beginPath();
+    var started=false;
+    vis.forEach(function(c,i){
+      if(!c.vma||isNaN(c.vma))return;
+      var vr=c.vma/maxV;
+      var my=volBot-Math.round(vr*(VOL_H-6));
+      var mx=cx(i0+i);
+      if(!started){ctx.moveTo(mx,my);started=true;}else ctx.lineTo(mx,my);
+    });
+    ctx.stroke(); ctx.restore();
+  }
+
+  // ── Candles (volume-proportional body width)
+  vis.forEach(function(c,i){
+    var x=cx(i0+i);
+    if(x<PAD_L-cW||x>W-PAD_R+cW)return;
+    var bull=c.c>=c.o;
+    var col=bull?C.bull:C.bear;
+    var yH=sc.y(c.h),yL=sc.y(c.l);
+    var yO=sc.y(c.o),yC=sc.y(c.c);
+    var top=Math.min(yO,yC),bh=Math.max(1,Math.max(yO,yC)-top);
+    var bw=cwAt(i0+i);
+    // wick
+    ctx.strokeStyle=col; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(Math.round(x)+0.5,yH); ctx.lineTo(Math.round(x)+0.5,yL); ctx.stroke();
+    // body
+    ctx.fillStyle=col;
+    ctx.fillRect(Math.round(x-bw/2),top,bw,bh);
+  });
+  ctx.restore();   // end series clip
+
+  // ── Position marks (TradingView-style) ──────────────────────────────────────
+  LEVEL_HITS = []; FILL_HITS = []; PLOT_TAGS = []; OOR_HITS = []; EXEC_HITS = [];
+  (function(){
+    var fs = fillState();
+    var entryLv = LEVELS.filter(function(l){ return l.id==='entry'; })[0];
+    // the entry line IS the running weighted average of filled rungs
+    if(entryLv) entryLv.p = fs.avg;
+    var showEntry = !!(entryLv && entryLv.on && fs.avg!==null);
+    var riskLv  = LEVELS.filter(function(l){ return l.id==='liq' && l.on; })[0];
+    var tpLvs   = LEVELS.filter(function(l){ return l.id.slice(0,2)==='tp' && l.on; });
+    var xL = PAD_L, xR = W-PAD_R;
+    var plotTop = PAD_T, plotBot = H-PAD_B-VOL_H;
+    function clampY(v){ return Math.max(plotTop, Math.min(plotBot, v)); }
+    var fillTop = 0;                                  // tint reaches the very top
+    function clampFill(v){ return Math.max(fillTop, Math.min(plotBot, v)); }
+
+    // ── zones, anchored on the average entry
+    if(showEntry){
+      var eY = clampFill(sc.y(fs.avg));
+      // a zone whose BOTH edges are off-screen would tint the whole plot with
+      // nothing on screen to explain it — skip those.
+      if(tpLvs.length){
+        var tp = tpLvs.map(function(t){ return t.p; });
+        var tPrice = POS.dir==='short' ? Math.min.apply(null,tp) : Math.max.apply(null,tp);
+        if(sc.inV(fs.avg) || sc.inV(tPrice)){
+          var tY = clampFill(sc.y(tPrice));
+          ctx.fillStyle='rgba(38,166,154,0.055)';
+          ctx.fillRect(xL,Math.min(eY,tY),xR-xL,Math.abs(tY-eY));
+        }
+      }
+      if(riskLv && (sc.inV(fs.avg) || sc.inV(riskLv.p))){
+        var rY = clampFill(sc.y(riskLv.p));
+        ctx.fillStyle='rgba(239,83,80,0.055)';
+        ctx.fillRect(xL,Math.min(eY,rY),xR-xL,Math.abs(rY-eY));
+      }
+    }
+
+    // fill wedge: ring outline + clockwise sweep from 12 o'clock (matches the chip icon)
+  function fillPie(c, cx0, cy0, r, pct){
+    var f=Math.max(0,Math.min(100,pct))/100;
+    c.save();
+    c.strokeStyle='#fff'; c.lineWidth=1.1; c.globalAlpha=0.85;
+    c.beginPath(); c.arc(cx0,cy0,r,0,Math.PI*2); c.stroke();
+    if(f>0){
+      c.globalAlpha=1; c.fillStyle='#fff';
+      c.beginPath();
+      if(f>=1){ c.arc(cx0,cy0,r,0,Math.PI*2); }
+      else { c.moveTo(cx0,cy0); c.arc(cx0,cy0,r,-Math.PI/2,-Math.PI/2+Math.PI*2*f); c.closePath(); }
+      c.fill();
+    }
+    c.restore();
+  }
+
+  // ── money label per level, measured off the average entry & filled size
+    function tagFor(lv){
+      if(lv.id==='entry'){
+        return (POS.dir==='long'?'▲ LONG':'▼ SHORT');
+      }
+      if(fs.avg===null) return lv.short;
+      var share = (lv.bank!=null? lv.bank/100 : 1);
+      var d = (lv.p-fs.avg)*fs.qty*share*(POS.dir==='long'?1:-1);
+      return lv.short+'  '+(d>=0?'+':'−')+'$'+Math.abs(Math.round(d)).toLocaleString('en-US');
+    }
+
+    // Execution glyphs paint BEFORE the level tags: a glyph sits at its level's own
+    // price row by definition, so painting it after would always garble that tag.
+    var EX = execBars();
+    EXEC_DOTS = [];
+    (function(){
+      function dot(bi, price, col){
+        if(bi==null) return;
+        var dx=cx(bi), dy=sc.y(price);
+        if(dx<xL-30||dx>xR+30||dy<plotTop-30||dy>plotBot+30) return;
+        ctx.save();
+        ctx.translate(Math.round(dx)+0.5,Math.round(dy)+0.5);
+        ctx.rotate(Math.PI/4);
+        ctx.fillStyle=col; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.rect(-3.6,-3.6,7.2,7.2); ctx.fill(); ctx.stroke();
+        ctx.restore();
+        EXEC_DOTS.push({ x0:dx-5.9, x1:dx+5.9, y0:dy-5.9, y1:dy+5.9 });
+      }
+      FILLS.forEach(function(f){ if(f.filled) dot(EX.fills[f.n], f.p, ENTRY_COL); });
+      LEVELS.forEach(function(lv){
+        if(lv.id==='entry'||!lv.on||lv.p==null) return;
+        dot(EX.levels[lv.id], lv.p, lv.col);
+      });
+    })();
+
+    var oorQueue = [], oorUp = 0, oorDn = 0;
+    // clear any HTML overlay sharing the chips' column (e.g. the Fit plan button)
+    var oorTop = plotTop+10;
+    OVERLAY_BOXES.forEach(function(o){
+      if(o.x1 > W-PAD_R-130 && o.y1+12 > oorTop) oorTop = o.y1+12;
+    });
+    var act = LEVELS.filter(function(l){
+      if(l.id==='entry') return showEntry;
+      return l.on && l.p!=null;
+    });
+
+    act.forEach(function(lv){
+      if(!sc.inV(lv.p)){
+        oorQueue.push({ lv:lv, above:lv.p>sc.hi });   // row chosen after in-plot tags exist
+        return;
+      }
+      var y = Math.round(sc.y(lv.p))+0.5;
+      var isEntry = lv.id==='entry';
+
+      ctx.save();
+      ctx.strokeStyle=lv.col; ctx.lineWidth=isEntry?1.4:1;
+      ctx.globalAlpha=isEntry?0.6:0.28;
+      ctx.setLineDash(isEntry?[]:[5,4]);
+      ctx.beginPath(); ctx.moveTo(guideStartX(y),y); ctx.lineTo(xR,y); ctx.stroke();
+      ctx.restore();
+
+      var txt = tagFor(lv);
+      ctx.save();
+      ctx.font=(isEntry?'700 ':'600 ')+'10px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.textBaseline='middle'; ctx.textAlign='left';
+      var tw = ctx.measureText(txt).width;
+      var tagW = tw+16, tagX = xR-tagW;
+      ctx.fillStyle=lv.col;
+      sidePill(ctx,tagX,y-9,tagW,18,5,0); ctx.fill();
+      ctx.fillStyle='#fff';
+      ctx.fillText(txt,tagX+8,y);
+      ctx.restore();
+      PLOT_TAGS.push({ id:lv.id, x0:tagX, x1:xR, y0:y-9, y1:y+9 });
+
+      ctx.save(); ctx.font='600 10.5px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.fillStyle=lv.col;
+      sidePill(ctx,xR,y-9,PAD_R-6,18,0,5); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.textBaseline='middle';
+      ctx.textAlign='right'; ctx.fillText(fmt(lv.p),W-9,y); ctx.restore();
+      LEVEL_HITS.push({ id:lv.id, x0:W-PAD_R+1, y0:y-7, x1:W, y1:y+7 });
+    });
+
+    // ── off-screen level markers: nearest free row, never over an in-plot tag
+    function rowBusy(x0,x1,yc){
+      var y0=yc-8, y1=yc+8;
+      function hit(r){ return !(x1<=r.x0 || x0>=r.x1 || y1<=r.y0 || y0>=r.y1); }
+      for(var i=0;i<PLOT_TAGS.length;i++) if(hit(PLOT_TAGS[i])) return true;
+      for(var j=0;j<OOR_HITS.length;j++) if(OOR_HITS[j].x1>0 && hit(OOR_HITS[j])) return true;
+      return false;
+    }
+    oorQueue.forEach(function(q){
+      ctx.save(); ctx.font='600 9.5px -apple-system,Segoe UI,Roboto,sans-serif';
+      var mtxt=(q.above?'↑ ':'↓ ')+q.lv.short+'  '+fmt(q.lv.p);
+      var mw=ctx.measureText(mtxt).width; ctx.restore();
+      var cw0=mw+13, cx0=xR-cw0-4;
+      var slotN = q.above ? oorUp++ : oorDn++;
+      var ay = q.above ? oorTop+slotN*17 : plotBot-10-slotN*17;
+      var step = q.above ? 17 : -17, guard=0;
+      while(guard++<40 && rowBusy(cx0,cx0+cw0,ay)) ay += step;
+      q.ay = ay;
+      OOR_HITS.push({ y:ay, y0:ay-8, y1:ay+8, x0:cx0, x1:cx0+cw0 });
+    });
+    oorQueue.forEach(function(q){
+      var lv=q.lv, txt=(q.above?'↑ ':'↓ ')+lv.short+'  '+fmt(lv.p);
+      ctx.save();
+      ctx.font='600 9.5px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+      var tw=ctx.measureText(txt).width, cw=tw+13, cxx=xR-cw-4;
+      ctx.globalAlpha=0.95; ctx.fillStyle='#fff';
+      roundRect(ctx,cxx,q.ay-8,cw,16,4); ctx.fill();
+      ctx.globalAlpha=0.9; ctx.fillStyle=lv.col;
+      roundRect(ctx,cxx,q.ay-8,cw,16,4); ctx.fill();
+      ctx.globalAlpha=1; ctx.fillStyle='#fff';
+      ctx.fillText(txt,cxx+7,q.ay);
+      ctx.restore();
+    });
+
+    // ── execution markers
+    var slots = {};
+    function execMarker(bi, price, col, label, above){
+      if(bi==null) return;
+      var x = cx(bi);
+      if(x < PAD_L-30 || x > xR+30) return;
+      var py = sc.y(price);
+      if(py < plotTop-30 || py > plotBot+30) return;
+      var c = candles[bi];
+      var bh = 15;
+
+      // measure first, so placement can test the real rect
+      ctx.save();
+      ctx.font='700 9px -apple-system,Segoe UI,Roboto,sans-serif';
+      var bwM = ctx.measureText(label).width+12;
+      ctx.restore();
+
+      if(!slots.rects) slots.rects = [];
+      function free(cy){
+        var t=cy-bh/2, bt=cy+bh/2, l=x-bwM/2, r=x+bwM/2;
+        // must stay inside the plot box — never stray into the header chrome
+        if(t < plotTop+1 || bt > plotBot-1) return false;
+        var i,j,o,list,claimed=[OOR_HITS, PLOT_TAGS, EXEC_DOTS, slots.rects];
+        for(j=0;j<claimed.length;j++){
+          list=claimed[j]||[];
+          for(i=0;i<list.length;i++){
+            o=list[i];
+            if(o.x1<=o.x0) continue;
+            if(!(r<o.x0||l>o.x1) && !(bt<o.y0||t>o.y1)) return false;
+          }
+        }
+        return true;
+      }
+
+      // try the natural side first, then the other one
+      var placed=null, sides = above ? [-1,1] : [1,-1];
+      for(var sIdx=0; sIdx<sides.length && !placed; sIdx++){
+        var cd=sides[sIdx];
+        var base=clampY(cd===-1 ? sc.y(c.h) : sc.y(c.l));
+        for(var kIdx=0; kIdx<10; kIdx++){
+          var cy=base + cd*(14 + kIdx*(bh+3));
+          if(free(cy)){ placed={y:cy,dir:cd,base:base,first:kIdx===0}; break; }
+        }
+      }
+      if(!placed) return;
+      var anchorY=placed.base, dir=placed.dir, bY=placed.y;
+      slots.rects.push({ x0:x-bwM/2, x1:x+bwM/2, y0:bY-bh/2, y1:bY+bh/2 });
+      EXEC_HITS.push({ x0:x-bwM/2, x1:x+bwM/2, y0:bY-bh/2, y1:bY+bh/2 });
+
+      // stem from the badge down/up to the executed price
+      ctx.save();
+      ctx.strokeStyle=col; ctx.globalAlpha=0.4; ctx.lineWidth=1; ctx.setLineDash([2,2]);
+      ctx.beginPath(); ctx.moveTo(Math.round(x)+0.5,py); ctx.lineTo(Math.round(x)+0.5,bY); ctx.stroke();
+      ctx.restore();
+
+      // badge + pointer
+      ctx.save();
+      ctx.font='700 9px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      var bw = bwM;
+      ctx.fillStyle=col;
+      roundRect(ctx,x-bw/2,bY-bh/2,bw,bh,4); ctx.fill();
+      var edgeY = bY - dir*(bh/2);
+      if(placed.first){
+        ctx.beginPath();
+        ctx.moveTo(x-3.5,edgeY); ctx.lineTo(x+3.5,edgeY);
+        ctx.lineTo(x,anchorY+dir*3); ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle='#fff'; ctx.fillText(label,x,bY);
+      ctx.restore();
+
+    }
+
+    // a short sells into highs, so its entry pointers sit above the bar
+    var shortPos = POS.dir==='short';
+    FILLS.forEach(function(f){
+      if(f.filled) execMarker(EX.fills[f.n], f.p, ENTRY_COL, 'Fill '+f.n+' · '+f.pct+'%', shortPos);
+    });
+    LEVELS.forEach(function(lv){
+      if(lv.id==='entry'||!lv.on||lv.p==null) return;
+      var isTp = lv.id.slice(0,2)==='tp';
+      execMarker(EX.levels[lv.id], lv.p, lv.col, lv.short, shortPos ? !isTp : isTp);
+    });
+
+    ctx.setLineDash([]);
+  })();
+
+  // ── High / Low tags for the visible range
+  var visHi=-Infinity, visLo=Infinity;
+  vis.forEach(function(c){ if(c.h>visHi)visHi=c.h; if(c.l<visLo)visLo=c.l; });
+  var HL_ROWS=[];
+  [[visHi,'High'],[visLo,'Low']].forEach(function(pair){
+    var pv=pair[0], tag=pair[1];
+    if(!sc.inV(pv))return;
+    var ty=Math.round(sc.y(pv))+0.5;
+    // Two separate questions, because the obstacles live in different columns.
+    var PILL_H=18, sameBand=function(y0,y1){ return !(ty+PILL_H/2 < y0 || ty-PILL_H/2 > y1); };
+
+    // 1. the AXIS price pill: if its own row is occupied, step to the nearest
+    //    free one rather than abandoning the marker.
+    function axisRowFree(y){
+      for(var ai=0;ai<LEVEL_HITS.length;ai++){
+        var lh2=LEVEL_HITS[ai];
+        if(lh2.x0 >= W-PAD_R-1 && !(y+PILL_H/2 < lh2.y0-2 || y-PILL_H/2 > lh2.y1+2)) return false;
+      }
+      for(var bi=0;bi<AXIS_BANDS.length;bi++){
+        var bd=AXIS_BANDS[bi];
+        if(!(y+PILL_H/2 < bd.y0 || y-PILL_H/2 > bd.y1)) return false;
+      }
+      for(var hi2=0;hi2<HL_ROWS.length;hi2++){
+        if(Math.abs(HL_ROWS[hi2]-y) < PILL_H+1) return false;      // the other H/L pill
+      }
+      return y-PILL_H/2 >= 2 && y+PILL_H/2 <= H-PAD_B-2;
+    }
+    var py=ty;
+    if(!axisRowFree(py)){
+      var found=false;
+      for(var d2=PILL_H+1; d2<=140 && !found; d2+=PILL_H+1){
+        var down=ty+d2, up=ty-d2;
+        var preferDown=(tag==='Low');
+        var cands2=preferDown?[down,up]:[up,down];
+        for(var ci2=0;ci2<cands2.length;ci2++){
+          if(axisRowFree(cands2[ci2])){ py=cands2[ci2]; found=true; break; }
+        }
+      }
+      if(!found) py=ty;   // nowhere better: draw on its own row regardless
+    }
+    HL_ROWS.push(py);
+
+    // 2. the in-plot LABEL pill slides left past anything sharing its band
+    var rightX = W-PAD_R;
+    function avoid(x0,y0,y1){
+      if(x0 >= W-PAD_R) return;            // in the axis column, not our problem
+      if(!sameBand(y0,y1)) return;
+      if(x0-6 < rightX) rightX = x0-6;
+    }
+    for(var oi2=0;oi2<OOR_HITS.length;oi2++){ var oh2=OOR_HITS[oi2]; if(oh2.x1>0) avoid(oh2.x0,oh2.y0-2,oh2.y1+2); }
+    for(var ei2=0;ei2<EXEC_HITS.length;ei2++){ var eh2=EXEC_HITS[ei2]; avoid(eh2.x0,eh2.y0,eh2.y1); }
+    for(var li2=0;li2<LEVEL_HITS.length;li2++){ var lh3=LEVEL_HITS[li2]; avoid(lh3.x0,lh3.y0,lh3.y1); }
+
+    var hlCol0='#8b8f9a';
+    ctx.save();
+    ctx.font='600 10px -apple-system,Segoe UI,Roboto,sans-serif';
+    var twPre=ctx.measureText(tag).width, tagW2=twPre+16, tagX2=(W-PAD_R)-tagW2;
+    var labelFits=(rightX >= W-PAD_R);
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle='#b2b5be'; ctx.lineWidth=1;
+    ctx.globalAlpha=.28; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(guideStartX(ty),ty); ctx.lineTo((labelFits&&py===ty)?tagX2:(W-PAD_R),ty); ctx.stroke();
+    ctx.restore();
+
+    var hlCol='#8b8f9a';
+    // label pill inside the plot (left-rounded), same geometry as the levels
+    ctx.save();
+    ctx.font='600 10px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.textBaseline='middle'; ctx.textAlign='left';
+    if(labelFits && py===ty){
+      ctx.fillStyle=hlCol;
+      sidePill(ctx,tagX2,py-9,tagW2,18,5,0); ctx.fill();
+      ctx.fillStyle='#fff';
+      ctx.fillText(tag,tagX2+8,py);
+    }
+    ctx.restore();
+    // price on the axis (right-rounded), on the resolved row
+    ctx.save();
+    ctx.font='600 10.5px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.fillStyle=hlCol;
+    sidePill(ctx,W-PAD_R,py-9,PAD_R-6,18,0,5); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.textBaseline='middle';
+    if(!labelFits || py!==ty){
+      ctx.font='700 9.5px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.textAlign='left'; ctx.fillText(tag.charAt(0), W-PAD_R+6, py);
+      ctx.font='600 10.5px -apple-system,Segoe UI,Roboto,sans-serif';
+    }
+    ctx.textAlign='right';
+    ctx.fillText(fmt(pv),W-9,py);
+    ctx.restore();
+    AXIS_SKIP.push(py);
+    AXIS_BANDS.push({y0:py-9,y1:py+9});
+  });
+
+  // ── Volume axis labels (Volume MA / Volume), TV places these in the axis
+  var lastC=candles[Math.min(n-1,Math.max(0,Math.round(offset+viewN)-1))]||candles[n-1];
+  if(maxV>0&&lastC){
+    var vmaY=volBot-16, volY=volBot-2;
+    ctx.font='10px -apple-system,Segoe UI,Roboto,sans-serif'; ctx.textBaseline='middle';
+    ctx.font='500 10px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.fillStyle='#131722'; roundRect(ctx,W-PAD_R+3,vmaY-8,PAD_R-9,16,4); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.textAlign='right';
+    ctx.fillText(lastC.vma?fmtVol(lastC.vma):'—',W-9,vmaY);
+    var vbull=lastC.c>=lastC.o;
+    ctx.fillStyle=vbull?C.bull:C.bear; roundRect(ctx,W-PAD_R+3,volY-8,PAD_R-9,16,4); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.textAlign='right'; ctx.fillText(fmtVol(lastC.v),W-9,volY);
+
+  }
+
+  // ── Live price label
+  var last=candles[n-1];
+  if(sc.inV(last.c)){
+    var ly=sc.y(last.c);
+    var bull2=last.c>=last.o;
+    var cd=barCountdown();
+    ctx.fillStyle=bull2?C.bull:C.bear;
+    roundRect(ctx,W-PAD_R+3,ly-9,PAD_R-9,cd!=null?30:18,4); ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.font='650 11.5px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillText(fmt(last.c),W-9,ly);
+    if(cd!=null){
+      ctx.font='500 10px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.globalAlpha=0.85;
+      ctx.fillText(fmtCountdown(cd),W-9,ly+12);
+      ctx.globalAlpha=1;
+    }
+    // dashed guide
+    ctx.strokeStyle=bull2?C.bull:C.bear; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    hGuide(ly, W-PAD_R);
+    ctx.setLineDash([]);
+  }
+
+  // ── Crosshair
+  if(crosshairX>=PAD_L&&crosshairX<=W-PAD_R){
+    ctx.strokeStyle=C.cross; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+    vGuide(crosshairX, H-PAD_B);
+    if(crosshairY>=PAD_T&&crosshairY<=H-PAD_B){
+      var chY=Math.round(crosshairY)+0.5;
+      hGuide(crosshairY, W-PAD_R);
+      // price label on right axis
+      var cp=(1-(crosshairY-PAD_T)/sc.cH)*(sc.hi-sc.lo)+sc.lo;
+      ctx.setLineDash([]);
+      ctx.fillStyle=C.priceBox;
+      roundRect(ctx,W-PAD_R+3,crosshairY-9,PAD_R-9,18,4); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.font='500 11px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.textAlign='right'; ctx.textBaseline='middle';
+      ctx.fillText(fmt(cp),W-9,crosshairY);
+    }
+    ctx.setLineDash([]);
+    // date label
+    if(hoveredIdx>=0&&hoveredIdx<n){
+      var dateLbl=fmtDate(candles[hoveredIdx].t);
+      ctx.font='12px -apple-system,Segoe UI,Roboto,sans-serif'; ctx.textAlign='center';
+      var dlW=ctx.measureText(dateLbl).width+24;
+      var hx=Math.round(cx(hoveredIdx));
+      hx=Math.max(PAD_L+dlW/2,Math.min(W-PAD_R-dlW/2,hx));
+      ctx.fillStyle=C.priceBox;
+      roundRect(ctx,hx-dlW/2,H-PAD_B+2,dlW,21,4); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.textBaseline='middle';
+      ctx.fillText(dateLbl,hx,H-PAD_B+12);
+    }
+    // OHLCV tooltip
+    if(hoveredIdx>=0&&hoveredIdx<n){
+      var hc=candles[hoveredIdx];
+      var bull3=hc.c>=hc.o;
+
+
+    }
+  }
+}
+
+// ── Interaction ───────────────────────────────────────────────────────────────
+function posToIdx(px){
+  if (!LAYOUT || !LAYOUT.xs.length) return Math.round(offset+(px-PAD_L)/slotW()-0.5);
+  var best = 0, bestD = Infinity;
+  for (var k = 0; k < LAYOUT.xs.length; k++) {
+    var d = Math.abs(LAYOUT.xs[k] - px);
+    if (d < bestD) { bestD = d; best = k; }
+  }
+  return LAYOUT.i0 + best;
+}
+
+cv.addEventListener('mousemove',function(e){
+  var r=cv.getBoundingClientRect();
+  crosshairX=e.clientX-r.left; crosshairY=e.clientY-r.top;
+  hoveredIdx=clamp(posToIdx(crosshairX),0,n-1);
+  if(isDragging){
+    var dx=e.clientX-dragStartX;
+    offset=clamp(dragStartOffset-dx/slotW(),0,maxOffset());
+    yManualRange=null;
+  }
+  if(isYDragging){
+    var dy=e.clientY-yDragStartY;
+    var sf=Math.max(0.1,Math.min(8,1+dy/(H-PAD_T-PAD_B)));
+    yManualRange={lo:yDragMid-yDragHalfR*sf,hi:yDragMid+yDragHalfR*sf};
+  }
+  draw();
+});
+cv.addEventListener('mouseleave',function(){ crosshairX=-1;crosshairY=-1;hoveredIdx=-1; draw(); });
+cv.addEventListener('mousedown',function(e){
+  if(e.clientX-cv.getBoundingClientRect().left>W-PAD_R){
+    isYDragging=true;
+    yDragStartY=e.clientY;
+    var sc=getScale();
+    yDragMid=(sc.hi+sc.lo)/2; yDragHalfR=(sc.hi-sc.lo)/2;
+  } else {
+    isDragging=true; dragStartX=e.clientX; dragStartOffset=offset;
+  }
+});
+window.addEventListener('mouseup',function(){ isDragging=false; isYDragging=false; });
+
+cv.addEventListener('wheel',function(e){
+  e.preventDefault();
+  // horizontal scroll (trackpad swipe or shift+wheel) pans instead of zooming
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) {
+    var dxAmt = e.shiftKey ? e.deltaY : e.deltaX;
+    offset = clamp(offset + dxAmt / slotW(), 0, maxOffset());
+    yManualRange = null;
+    draw();
+    return;
+  }
+  var r=cv.getBoundingClientRect();
+  var mx=e.clientX-r.left;
+  var frac=(mx-PAD_L)/(W-PAD_L-PAD_R);
+  var factor=e.deltaY>0?1.02:0.9804;
+  var newViewN=clamp(Math.round(viewN*factor),10,n);
+  var pivotIdx=offset+frac*viewN;
+  viewN=newViewN;
+  offset=clamp(pivotIdx-frac*newViewN,0,maxOffset());
+  yManualRange=null;
+  draw();
+},{passive:false});
+
+// touch pinch
+cv.addEventListener('touchstart',function(e){
+  if(e.touches.length===2){
+    isPinching=true;
+    var dx=e.touches[0].clientX-e.touches[1].clientX;
+    var dy=e.touches[0].clientY-e.touches[1].clientY;
+    pinchStartDist=Math.sqrt(dx*dx+dy*dy);
+    pinchStartViewN=viewN;
+  } else if(e.touches.length===1){
+    isDragging=true; dragStartX=e.touches[0].clientX; dragStartOffset=offset;
+  }
+},{passive:true});
+cv.addEventListener('touchmove',function(e){
+  e.preventDefault();
+  if(isPinching&&e.touches.length===2){
+    var dx=e.touches[0].clientX-e.touches[1].clientX;
+    var dy=e.touches[0].clientY-e.touches[1].clientY;
+    var dist=Math.sqrt(dx*dx+dy*dy);
+    var ratio=pinchStartDist/dist;
+    viewN=clamp(Math.round(pinchStartViewN*ratio),10,n);
+    offset=clamp(offset,0,maxOffset());
+    yManualRange=null;
+  } else if(isDragging&&e.touches.length===1){
+    var dx2=e.touches[0].clientX-dragStartX;
+    offset=clamp(dragStartOffset-dx2/slotW(),0,maxOffset());
+    yManualRange=null;
+  }
+  draw();
+},{passive:false});
+cv.addEventListener('touchend',function(){ isDragging=false; isPinching=false; });
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
+var lvlChips=document.getElementById('lvlChips');
+var CHIPTIP=null;
+function chipTip(){
+  if(!CHIPTIP){ CHIPTIP=document.createElement('div'); CHIPTIP.className='chiptip'; document.body.appendChild(CHIPTIP); }
+  return CHIPTIP;
+}
+function showTip(el, html){
+  var t=chipTip();
+  t.innerHTML=html;
+  t.classList.add('on');
+  var r=el.getBoundingClientRect(), tr=t.getBoundingClientRect();
+  var left=Math.round(r.left);
+  if(left+tr.width > innerWidth-8) left=Math.round(innerWidth-8-tr.width);
+  t.style.left=Math.max(8,left)+'px';
+  t.style.top=Math.round(r.bottom+7)+'px';
+}
+function hideTip(){ if(CHIPTIP) CHIPTIP.classList.remove('on'); }
+function attachTip(el, html){
+  el.addEventListener('mouseenter',function(){ showTip(el, html); });
+  el.addEventListener('mouseleave',hideTip);
+  el.addEventListener('pointerdown',hideTip);
+}
+// nudge overlapping chips apart while their ticks stay at the true price
+var RAIL_RO=null;
+function scheduleSpread(rail){
+  requestAnimationFrame(function(){ spreadChips(rail); });
+  // fonts change chip widths after first paint
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ spreadChips(rail); });
+  if(window.ResizeObserver && !RAIL_RO){
+    RAIL_RO=new ResizeObserver(function(){
+      var r=document.querySelector('.lvlrail');
+      if(r) spreadChips(r);
+    });
+    RAIL_RO.observe(rail.parentElement);
+  }
+}
+function spreadChips(rail){
+  var row=rail.parentElement;
+  if(!row) return;
+  var rowW=row.clientWidth;
+  if(!rowW){ requestAnimationFrame(function(){ spreadChips(rail); }); return; }
+
+  var chips=[].slice.call(rail.querySelectorAll('.lchip'));
+  var pxs =[].slice.call(rail.querySelectorAll('.lchip .lpx'));
+  var sep =row.querySelector('.cdiv');
+  var wrap=row.querySelector('.fmeterwrap');
+  var meter=row.querySelector('.fmeter');
+  var lbl =row.querySelector('.fmlbl');
+  var GAP=6, ROWGAP=12;
+
+  // start from the richest form, then strip back
+  pxs.forEach(function(e){ e.style.display=''; });
+  if(lbl) lbl.style.display='';
+  if(meter) meter.style.display='';
+
+  function chipsW(){
+    var t=0; chips.forEach(function(c){ t+=c.getBoundingClientRect().width; });
+    return t + GAP*Math.max(0,chips.length-1);
+  }
+  function tailW(){
+    var t=0;
+    if(sep)  t+=sep.getBoundingClientRect().width+ROWGAP;
+    if(wrap) t+=wrap.getBoundingClientRect().width+ROWGAP;
+    return t;
+  }
+
+  // stage 1: full — prices + meter
+  var need=chipsW(), avail=rowW-tailW();
+  // stage 2: drop prices
+  if(avail<need){ pxs.forEach(function(e){ e.style.display='none'; }); need=chipsW(); }
+  // stage 3: drop the "filled" word
+  if(avail<need && lbl){ lbl.style.display='none'; avail=rowW-tailW(); }
+  // stage 4: drop the meter bar, keep the percentage
+  if(avail<need && meter){ meter.style.display='none'; avail=rowW-tailW(); }
+
+  // rail mode only when there is genuine slack for positions to mean something
+  rail.classList.remove('flat');
+  if(row) row.classList.remove('capsule');
+  if(avail < need+110){
+    rail.classList.add('flat');
+    if(row) row.classList.add('capsule');
+    [].slice.call(rail.querySelectorAll('.railtick')).forEach(function(t){
+      t.style.left=(parseFloat(t.dataset.pct)||0)+'%';
+    });
+    chips.slice().sort(function(a,b){
+      return (parseFloat(a.dataset.p)||0)-(parseFloat(b.dataset.p)||0);
+    }).forEach(function(el){ el.style.left=''; el.style.transform=''; rail.appendChild(el); });
+    return;
+  }
+
+  var w=rail.getBoundingClientRect().width;
+
+  // inset the scale so the extreme levels still sit on their own ticks
+  var maxHalf=0;
+  chips.forEach(function(c){ maxHalf=Math.max(maxHalf,c.getBoundingClientRect().width/2); });
+  var pad=Math.min(maxHalf, w*0.22);
+  var inner=Math.max(1, w-2*pad);
+  function anchorFor(pct){ return pad + inner*pct/100; }
+
+  // ticks move with the scale so chip and tick always agree
+  [].slice.call(rail.querySelectorAll('.railtick')).forEach(function(t){
+    t.style.left=anchorFor(parseFloat(t.dataset.pct)||0)+'px';
+  });
+
+  var cs=chips.map(function(el){
+    var bw=el.getBoundingClientRect().width;
+    var anchor=anchorFor(parseFloat(el.dataset.pct)||0);
+    return { el:el, bw:bw, left:anchor-bw/2 };
+  }).sort(function(a,b){ return a.left-b.left; });
+
+  for(var i=1;i<cs.length;i++){
+    var minL=cs[i-1].left+cs[i-1].bw+GAP;
+    if(cs[i].left<minL) cs[i].left=minL;
+  }
+  var lastC=cs[cs.length-1];
+  var shift=0;
+  if(lastC.left+lastC.bw > w) shift = w-(lastC.left+lastC.bw);
+  if(cs[0].left+shift < 0)     shift = -cs[0].left;
+  if(shift) cs.forEach(function(c){ c.left+=shift; });
+  cs.forEach(function(c){
+    c.el.style.left=c.left+'px';
+    c.el.style.transform='translateY(-50%)';
+  });
+}
+
+function renderChips(){
+  lvlChips.innerHTML='';
+
+  // ── price rail: each chip sits at its real price position ──────────────────
+  var rail=document.createElement('div'); rail.className='lvlrail';
+  var line=document.createElement('div'); line.className='railline'; rail.appendChild(line);
+
+  var favg=fillState().avg;
+  function levelPrice(l){ return (l.p===null||l.p===undefined) ? favg : l.p; }
+
+  var ps=LEVELS.map(levelPrice).filter(function(p){ return p!==null && p!==undefined; });
+  var lo=Math.min.apply(null,ps), hi=Math.max.apply(null,ps), span=(hi-lo)||1;
+
+  LEVELS.forEach(function(lv){
+    var lp=levelPrice(lv);
+    if(lp===null||lp===undefined) return;      // no price yet: nothing to place
+    var pct=(lp-lo)/span*100;
+    var sx = pct<=1 ? '0%' : pct>=99 ? '-100%' : '-50%';
+
+    var b=document.createElement('button');
+    b.className='lchip'+(lv.on?' on':'');
+    b.style.left=pct+'%';
+    b.dataset.p=lp;
+    b.dataset.pct=pct;      // layout reads this, never the written px value
+    b.dataset.sx=sx;
+    b.style.transform='translateY(-50%)';
+    b.style.color=lv.on?lv.col:'#b5aeab';
+    b.style.background=lv.on?'#fff':'#fbf8f7';
+    b.style.boxShadow=lv.on
+      ? '0 0 0 1px '+lv.col+'55, 0 1px 3px rgba(26,24,19,.09)'
+      : '0 0 0 1px rgba(26,24,19,.07), 0 1px 2px rgba(26,24,19,.04)';
+    b.innerHTML='<span class="ldot"></span>'+lv.short+'<span class="lpx">'+fmtShort(lp)+'</span>';
+    attachTip(b, (lv.on?'Hide':'Show')+' <b>'+lv.label+'</b> &middot; '+fmt(lp));
+    b.addEventListener('click',function(){ lv.on=!lv.on; renderChips(); draw(); });
+    rail.appendChild(b);
+
+    var t=document.createElement('span');
+    t.className='railtick';
+    t.style.left=pct+'%';
+    t.dataset.pct=pct;
+    if(lv.on){ t.style.background=lv.col; t.style.opacity='.5'; }
+    rail.appendChild(t);
+  });
+  lvlChips.appendChild(rail);
+  scheduleSpread(rail);
+
+  var sep=document.createElement('span'); sep.className='cdiv'; lvlChips.appendChild(sep);
+
+  // ── fill meter: one segment per fill, width ~ its share ────────────────────
+  var fs=fillState();
+  var wrap=document.createElement('span');
+  wrap.className='fmeterwrap';
+  wrap.style.cssText='display:flex;align-items:center;gap:7px;flex-shrink:0';
+
+  var meter=document.createElement('span'); meter.className='fmeter';
+  FILLS.forEach(function(f){
+    if(!f.filled) return;
+    var s=document.createElement('span');
+    s.style.width=Math.max(5,Math.round(f.pct*0.7))+'px';
+    meter.appendChild(s);
+  });
+  var restPct=Math.max(0,100-fs.pct);
+  if(restPct>0){
+    var r=document.createElement('span'); r.className='rest';
+    r.style.width=Math.max(5,Math.round(restPct*0.7))+'px';
+    meter.appendChild(r);
+  }
+  wrap.appendChild(meter);
+
+  var pctTxt=document.createElement('span');
+  pctTxt.style.cssText="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;color:#7c5cff";
+  pctTxt.textContent=Math.round(fs.pct)+'%';
+  wrap.appendChild(pctTxt);
+
+  var dots=document.createElement('span');
+  dots.className='fmdots';
+  FILLS.forEach(function(f){
+    var i=document.createElement('i');
+    if(!f.filled) i.className='off';
+    dots.appendChild(i);
+  });
+  wrap.appendChild(dots);
+
+  var lbl=document.createElement('span');
+  lbl.className='fmlbl fmicon';
+  (function(){
+    var f=Math.max(0,Math.min(100,fs.pct))/100;
+    var r=8, cxp=12, cyp=12, wedge='';
+    if(f>=1){
+      wedge='<circle cx="12" cy="12" r="'+r+'" fill="currentColor" opacity=".9"/>';
+    } else if(f>0){
+      var a=-Math.PI/2+2*Math.PI*f, lg=f>0.5?1:0;
+      var ex=(cxp+r*Math.cos(a)).toFixed(2), ey=(cyp+r*Math.sin(a)).toFixed(2);
+      wedge='<path d="M12 12L12 '+(cyp-r)+'A'+r+' '+r+' 0 '+lg+' 1 '+ex+' '+ey+'Z" fill="currentColor" opacity=".9"/>';
+    }
+    lbl.innerHTML=
+      '<svg viewBox="0 0 24 24" width="13" height="13">'
+      + '<circle cx="12" cy="12" r="'+r+'" fill="none" stroke="currentColor" stroke-width="1.8"/>'
+      + wedge
+      + '</svg>';
+  })();
+  attachTip(lbl,'<b>'+Math.round(fs.pct)+'% filled</b> of planned size');
+  lbl.addEventListener('mouseenter',function(e){ e.stopPropagation(); });
+  wrap.appendChild(lbl);
+
+  var nFilled=FILLS.filter(function(f){return f.filled;}).length;
+  attachTip(wrap, fs.avg!==null
+    ? '<b>'+Math.round(fs.pct)+'% filled</b> &middot; avg entry <b>'+fmt(fs.avg)+'</b> &middot; <b>'+fmtQty(fs.qty)+' '+POS.unit+'</b> &middot; '+nFilled+' fills'
+    : nFilled+' fills');
+  lvlChips.appendChild(wrap);
+}
+renderChips();
+
+var fitBtn=document.getElementById('fitBtn');
+attachTip(fitBtn,'Scale the axis to show <b>every plan level</b>');
+fitBtn.addEventListener('click',function(){
+  fitPlan=!fitPlan;
+  fitBtn.classList.toggle('on',fitPlan);
+  yManualRange=null;
+  draw();
+});
+
+// clicking a level pill on the chart hides that level
+cv.addEventListener('click',function(e){
+  var r=cv.getBoundingClientRect();
+  var mx=e.clientX-r.left, my=e.clientY-r.top;
+  for(var i=0;i<LEVEL_HITS.length;i++){
+    var h=LEVEL_HITS[i];
+    if(mx>=h.x0&&mx<=h.x1&&my>=h.y0&&my<=h.y1){
+      var lv=LEVELS.filter(function(l){return l.id===h.id;})[0];
+      if(lv){ lv.on=false; renderChips();
+
+var fitBtn=document.getElementById('fitBtn');
+attachTip(fitBtn,'Scale the axis to show <b>every plan level</b>');
+fitBtn.addEventListener('click',function(){
+  fitPlan=!fitPlan;
+  fitBtn.classList.toggle('on',fitPlan);
+  yManualRange=null;
+  draw();
+}); draw(); }
+      return;
+    }
+  }
+});
+
+// ── Keyboard: arrows pan, +/- zoom ────────────────────────────────────────────
+window.addEventListener('keydown',function(e){
+  var stepN = Math.max(1, Math.round(viewN * 0.06));
+  if (e.key === 'ArrowLeft')  { offset = clamp(offset - stepN, 0, maxOffset()); yManualRange = null; draw(); e.preventDefault(); }
+  if (e.key === 'ArrowRight') { offset = clamp(offset + stepN, 0, maxOffset()); yManualRange = null; draw(); e.preventDefault(); }
+  if (e.key === '+' || e.key === '=') { var nv = clamp(Math.round(viewN*0.9),10,n); var po=offset+(viewN-nv)/2; viewN = nv; offset = clamp(po,0,maxOffset()); yManualRange = null; draw(); }
+  if (e.key === '-' || e.key === '_') { var nv2 = clamp(Math.round(viewN*1.111),10,n); var po2=offset-(nv2-viewN)/2; viewN = nv2; offset = clamp(po2,0,maxOffset()); yManualRange = null; draw(); }
+});
+
+// Seed the legend from the newest candle so it never reads as dashes
+
+// ── Gate.io candlestick fetch ─────────────────────────────────────────────────
+var GATE_STEP = { '15m':900, '30m':1800, '1h':3600, '4h':14400, '8h':28800, '1d':86400 };
+var GATE_MAX  = 1900;              // Gate caps a request; stay under it
+var CACHE_PREFIX = 'vcc_gate_';    // only ever touch our own keys
+var CACHE_KEEP = 8;
+
+function normContract(s){
+  s = (s||'').trim().toUpperCase().replace(/\.P$/,'').replace(/[\/\-\s]+/g,'_');
+  if(s.indexOf('_')===-1){
+    if(/USDT$/.test(s)) s = s.slice(0,-4)+'_USDT';
+    else s = s+'_USDT';
+  }
+  return s;
+}
+function cacheKey(c,i,f,t){ return CACHE_PREFIX+c+'_'+i+'_'+f+'_'+t; }
+function cacheRead(k){
+  try{
+    var raw=localStorage.getItem(k); if(!raw) return null;
+    var a=JSON.parse(raw);
+    if(!Array.isArray(a)||!a.length) return null;
+    return a.map(function(r){ return { t:r[0],o:r[1],h:r[2],l:r[3],c:r[4],v:r[5] }; });
+  }catch(e){ return null; }
+}
+function cacheWrite(k,cs){
+  try{
+    localStorage.setItem(k, JSON.stringify(cs.map(function(c){
+      return [c.t,c.o,c.h,c.l,c.c,Math.round(c.v)];
+    })));
+    // evict our oldest entries only
+    var mine=[];
+    for(var i=0;i<localStorage.length;i++){
+      var kk=localStorage.key(i);
+      if(kk && kk.indexOf(CACHE_PREFIX)===0) mine.push(kk);
+    }
+    while(mine.length>CACHE_KEEP){ localStorage.removeItem(mine.shift()); }
+  }catch(e){ /* quota — caching is optional */ }
+}
+
+// 20-period volume MA, which the volume pane draws
+function addVolMA(cs, period){
+  period = period||20;
+  for(var i=0;i<cs.length;i++){
+    var s=0,k=0;
+    for(var j=Math.max(0,i-(period-1)); j<=i; j++){ s+=cs[j].v; k++; }
+    cs[i].vma = s/k;
+  }
+  return cs;
+}
+
+async function fetchGate(contract, interval, fromSec, toSec){
+  var url='https://api.gateio.ws/api/v4/futures/usdt/candlesticks'
+        +'?contract='+encodeURIComponent(contract)
+        +'&interval='+encodeURIComponent(interval)
+        +'&from='+fromSec+'&to='+toSec;
+  var r=await fetch(url,{ headers:{ 'Accept':'application/json' } });
+  var txt=await r.text();
+  if(!r.ok) throw new Error('Gate '+r.status+': '+txt.slice(0,110));
+  var raw=JSON.parse(txt);
+  if(!Array.isArray(raw)) throw new Error('unexpected response shape');
+  if(!raw.length) throw new Error('no candles for that range');
+  var out=raw.map(function(k){
+    return {
+      t:+k.t, o:+k.o, h:+k.h, l:+k.l, c:+k.c,
+      // futures: v is contracts, sum is quote volume — the bars want quote
+      v: +(k.sum!=null ? k.sum : k.v)
+    };
+  }).filter(function(c){ return isFinite(c.o)&&isFinite(c.c)&&isFinite(c.v); })
+    .sort(function(a,b){ return a.t-b.t; });
+  if(!out.length) throw new Error('candles unparseable');
+  return out;
+}
+
+async function fetchBinance(contract, interval, fromSec, toSec){
+  var sym=contract.replace('_','');
+  var url='https://api.binance.com/api/v3/klines?symbol='+encodeURIComponent(sym)
+        +'&interval='+encodeURIComponent(interval)
+        +'&startTime='+(fromSec*1000)+'&endTime='+(toSec*1000)+'&limit=1000';
+  var r=await fetch(url);
+  var txt=await r.text();
+  if(!r.ok) throw new Error('Binance '+r.status+': '+txt.slice(0,110));
+  var raw=JSON.parse(txt);
+  if(!Array.isArray(raw)||!raw.length) throw new Error('no candles for that range');
+  return raw.map(function(k){
+    return { t:Math.floor(k[0]/1000), o:+k[1], h:+k[2], l:+k[3], c:+k[4], v:+k[7] };
+  }).filter(function(c){ return isFinite(c.o)&&isFinite(c.v); });
+}
+
+var fStatus=document.getElementById('fStatus');
+function setStatus(msg,cls,tip){
+  if(cls==='busy'){
+    fStatus.innerHTML='<span class="fspin"></span>'+(msg||'');
+  } else {
+    fStatus.textContent=msg||'';
+  }
+  fStatus.className='fstat'+(cls?' '+cls:'');
+  var tt=document.getElementById('fStatTip');
+  if(tt){
+    tt.innerHTML=tip||'';
+    var host=tt.parentElement;
+    if(host) host.style.pointerEvents = tip ? 'auto' : 'none';
+  }
+}
+
+function applyCandles(cs, contract, interval, src){
+  candles = addVolMA(cs);
+  n = candles.length;
+  var margin = rightMargin(n);
+  viewN  = Math.min(170, n + margin);
+  offset = Math.max(0, n + margin - viewN);
+  yManualRange = null;
+  ARMED_AT = 0;                       // the fetched window IS the trade window
+  CUR_CONTRACT=contract; CUR_INTERVAL=interval; if(src) CUR_SRC=src;
+  if(typeof syncContract==='function') syncContract();
+  renderChips();
+  draw();
+}
+
+async function doLoad(){
+  var btn=document.getElementById('fLoad');
+  var contract=normContract(document.getElementById('fContract').value);
+  var interval=document.getElementById('fInterval').value;
+  if(!contract){ setStatus('enter a contract','err'); return; }
+  if(!rangeStart){ showNeedDates(true); setStatus('set trade dates','err'); return; }
+  if(rangeEnd===null){ setStatus('pick an end date, or Live','err'); return; }
+  showNeedDates(false);
+  var wantLive = rangeEnd==='live';
+  var fromSec=fromSecs();
+  var toSec  =toSecs();
+  if(!(toSec>fromSec)){ setStatus('end must be after start','err'); return; }
+
+  // keep the request inside Gate's per-call limit
+  var step=GATE_STEP[interval]||3600;
+  var srcNow=document.getElementById('fSource').value;
+  var cap=srcNow==='gate'?GATE_MAX:1000;
+  var bars=Math.floor((toSec-fromSec)/step);
+  var trimmed=false;
+  if(bars>cap){ fromSec=toSec-cap*step; trimmed=true; }
+
+  document.getElementById('fContract').value=contract;
+  btn.disabled=true;
+  setStatus('loading','busy');
+  var src=document.getElementById('fSource').value;
+  // bucket a live window to the bar so the key is stable within a bar
+  var stepK=GATE_STEP[interval]||3600;
+  var keyTo=wantLive ? Math.floor(toSec/stepK)*stepK : toSec;
+  var key=cacheKey(src+'_'+contract,interval,fromSec,keyTo);
+  try{
+    var cs=cacheRead(key), cached=!!cs;
+    if(!cs){
+      cs = src==='gate'
+        ? await fetchGate(contract,interval,fromSec,toSec)
+        : await fetchBinance(contract,interval,fromSec,toSec);
+      cacheWrite(key,cs);
+    }
+    applyCandles(cs,contract,interval,src);
+    // "Live" as the range end IS the follow switch
+    if(wantLive && src!=='gate'){ autoLive=true; startLive(); }
+    else { autoLive=false; stopLive(); }
+    syncRangeBtn();   // dot now reflects real polling state
+    var stampL=new Date().toTimeString().slice(0,8);
+    var tip='<b>'+cs.length+' bars</b> loaded at <b>'+stampL+'</b>'
+      +(cached?' &middot; from cache':'')+(trimmed?' &middot; trimmed to source limit':'');
+    if(wantLive && src==='gate') tip+=' &middot; live polling needs Binance';
+    else if(wantLive) tip+=' &middot; polling for new bars';
+    setStatus(cs.length+' bars','ok',tip);
+  }catch(err){
+    var m=String(err.message||err);
+    // Gate serves no CORS headers, so the browser kills the request outright
+    if(src==='gate' && /Failed to fetch|NetworkError|Load failed/i.test(m)){
+      m='Gate blocks browser requests (no CORS) — needs a proxy. Use Binance.';
+    }
+    setStatus(m,'err');
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+document.getElementById('fLoad').addEventListener('click',doLoad);
+
+
+
+
+
+// ── Live tail polling ─────────────────────────────────────────────────────────
+// Only ever refetches the newest bars and merges them, so history isn't re-pulled
+// and the cache (keyed on a fixed window) is never invalidated.
+async function pollTail(){
+  if(!candles.length) return;
+  var step=GATE_STEP[CUR_INTERVAL]; if(!step) return;
+  var lastT=candles[candles.length-1].t;
+  var fromSec=lastT;                       // re-request the open bar + anything after
+  var toSec=Math.floor(Date.now()/1000);
+  if(toSec<=fromSec) return;
+  var fresh;
+  try{
+    fresh = CUR_SRC==='gate'
+      ? await fetchGate(CUR_CONTRACT,CUR_INTERVAL,fromSec,toSec)
+      : await fetchBinance(CUR_CONTRACT,CUR_INTERVAL,fromSec,toSec);
+    lastPollErr=null;
+  }catch(err){
+    lastPollErr=String(err.message||err);
+    setStatus('live: '+lastPollErr,'err');
+    return;
+  }
+  if(!fresh || !fresh.length) return;
+
+  // were we pinned to the right edge? if so, keep following as bars arrive
+  // following = the newest bar is on screen right now (measured before appending)
+  var following = (n-1) < offset + viewN;
+  var added=0, updated=0;
+  fresh.forEach(function(fc){
+    var lastIdx=candles.length-1;
+    if(candles[lastIdx] && fc.t===candles[lastIdx].t){
+      candles[lastIdx].o=fc.o; candles[lastIdx].h=fc.h;
+      candles[lastIdx].l=fc.l; candles[lastIdx].c=fc.c; candles[lastIdx].v=fc.v;
+      updated++;
+    } else if(!candles[lastIdx] || fc.t>candles[lastIdx].t){
+      candles.push(fc); added++;
+    }
+  });
+  if(!added && !updated) return;
+  n=candles.length;
+  addVolMA(candles);
+  if(added){
+    // only scroll if the new bar actually fell outside the viewport
+    if(following && (n-1) >= offset + viewN){
+      offset = Math.max(0, n + rightMargin(n) - viewN);
+    } else {
+      offset = Math.min(offset, maxOffset());
+    }
+  }
+  draw();
+  // a good poll must clear any stale error, not just report new bars
+  var stamp=new Date().toTimeString().slice(0,8);
+  setStatus(n+' bars'+(added? ' · +'+added : ''),'ok',
+    '<b>'+n+' bars</b> &middot; updated <b>'+stamp+'</b>'
+    +(added? ' &middot; <b>'+added+'</b> new bar'+(added>1?'s':'') : ''));
+}
+
+function startLive(){
+  stopLive();
+  var step=GATE_STEP[CUR_INTERVAL]||3600;
+  // poll often enough to catch a bar close promptly, but never hammer the API
+  var everyMs=Math.max(15000, Math.min(60000, step*1000/60));
+  liveTimer=setInterval(pollTail, everyMs);
+  pollTail();
+}
+function stopLive(){ if(liveTimer){ clearInterval(liveTimer); liveTimer=null; } }
+
+// the countdown needs a tick regardless of polling
+function startClock(){
+  if(clockTimer) return;
+  clockTimer=setInterval(function(){ if(barCountdown()!=null) draw(); },1000);
+}
+
+startClock();
+
+// stop polling when the tab is hidden; resume on return
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden) stopLive();
+  else if(autoLive) startLive();
+});
+
+
+// ── Date range picker (start date → date or Live) ─────────────────────────────
+var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+var MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var NEED_DATES=false;
+var rangeStart=null;                 // no range until a plan supplies one, or the user picks
+var rangeEnd='live';                 // a Date, or 'live' to follow new candles
+var calView=new Date();
+var calHover=null;
+var startTime='00:00', endTime='23:59';   // time-of-day for each end of the range
+function hmsSecs(t){ var p=(t||'0:0').split(':'); return (+p[0])*3600 + (+p[1])*60; }
+function showNeedDates(on){
+  var nd=document.getElementById('needdates'), cb=document.getElementById('chartbox');
+  if(nd) nd.hidden=!on;
+  if(cb) cb.style.display=on?'none':'';
+}
+function fromSecs(){ if(!rangeStart) return 0; return Math.floor(dOnly(rangeStart).getTime()/1000) + hmsSecs(startTime); }
+function toSecs(){
+  if(rangeEnd==='live') return Math.floor(Date.now()/1000);
+  var base = rangeEnd===null ? (calHover||dOnly(new Date())) : rangeEnd;
+  return Math.floor(dOnly(base).getTime()/1000) + hmsSecs(endTime) + 59;
+}
+var calEl=document.getElementById('fCal');
+var rangeBtn=document.getElementById('fRange');
+
+function dOnly(d){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
+function sameDay(a,b){ return a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
+function isoDay(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function endDate(){
+  if(rangeEnd==='live' || rangeEnd===null) return dOnly(new Date());
+  return rangeEnd;
+}
+
+function rangeLabel(){
+  if(!rangeStart) return 'Set dates';
+  var showT = startTime!=='00:00' || (rangeEnd!=='live' && endTime!=='23:59');
+  var s=MON3[rangeStart.getMonth()]+' '+rangeStart.getDate()+(showT?' '+startTime:'');
+  if(rangeEnd===null) return s+' → pick end';
+  if(rangeEnd==='live') return s+' → Live';
+  return s+' → '+MON3[rangeEnd.getMonth()]+' '+rangeEnd.getDate()+(showT?' '+endTime:'');
+}
+function syncRangeBtn(){
+  var t=document.getElementById('fRangeTxt');
+  var raw=rangeLabel();
+  var esc=function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+  var parts=raw.split('\u2192');
+  if(parts.length===2){
+    var left=esc(parts[0].trim()), right=parts[1].trim();
+    var isLive=/^live$/i.test(right);
+    t.innerHTML='<span class="rgdate">'+left+'</span>'
+      + '<span class="rgarrow">\u2192</span>'
+      + (isLive
+          ? '<span class="rglive">now</span>'
+          : '<span class="rgdate">'+esc(right)+'</span>');
+  } else {
+    t.textContent=raw;
+  }
+  var old=rangeBtn.querySelector('.flivedot'); if(old) old.remove();
+  var md=document.querySelector('.mdot');
+  if(md) md.classList.toggle('off', !autoLive);
+}
+
+function barsInRange(){
+  if(!rangeStart) return 0;
+  var step=GATE_STEP[document.getElementById('fInterval').value]||3600;
+  return Math.max(0,Math.floor((toSecs()-fromSecs())/step));
+}
+
+function dayClass(cd, today, eEnd, inMonth){
+  var cls='fday';
+  var disabled=cd>today;
+  if(!inMonth) cls+=' oth';
+  if(disabled) cls+=' dis';
+  if(sameDay(cd,today)) cls+=' today';
+  var isS=sameDay(cd,rangeStart), isE=eEnd&&sameDay(cd,eEnd);
+  if(isS&&isE) cls+=' solo';
+  else if(isS) cls+=(eEnd||(calHover&&rangeStart && calHover>rangeStart))?' end1':' solo';
+  else if(isE) cls+=' end2';
+  else if(eEnd && rangeStart && cd>rangeStart && cd<eEnd) cls+=' inr';
+  else if(!eEnd && rangeEnd==='live' && rangeStart && cd>rangeStart && cd<=today) cls+=' inr';
+  else if(rangeEnd===null && calHover && rangeStart && cd>rangeStart && cd<calHover) cls+=' pre';
+  else if(!eEnd && calHover && rangeStart && cd>rangeStart && cd<calHover) cls+=' pre';
+  if(!eEnd && calHover && sameDay(cd,calHover) && rangeStart && calHover>rangeStart) cls+=' precap';
+  return cls;
+}
+// repaint WITHOUT touching the DOM structure, so a press/release survives
+function repaintDays(){
+  if(!calEl || calEl.hidden || !calEl._days) return;
+  var today=dOnly(new Date());
+  var eEnd=(rangeEnd==='live')?null:rangeEnd;
+  calEl._days.forEach(function(rec){
+    rec.el.className=dayClass(rec.d, today, eEnd, rec.inMonth);
+  });
+  var ft=calEl.querySelector('.fcalft');
+  if(ft) ft.textContent=barsInRange()+' bars at '+document.getElementById('fInterval').value;
+  var hint=calEl.querySelector('.fcalhint');
+  if(hint) hint.innerHTML=(rangeEnd===null?'Now pick the <b>end</b> day':'Pick a day to start a new range');
+  syncLiveRow();
+}
+// Live row + End-time reflect rangeEnd without rebuilding the panel
+function syncLiveRow(){
+  if(!calEl || calEl.hidden) return;
+  var isLive=(rangeEnd==='live');
+  var row=calEl.querySelector('#fLiveRow');
+  if(row){
+    row.classList.toggle('on',isLive);
+    var chk=row.querySelector('.flivchk');
+    if(isLive && !chk){
+      chk=document.createElement('span'); chk.className='flivchk'; chk.textContent='\u2713';
+      row.appendChild(chk);
+    } else if(!isLive && chk){ chk.remove(); }
+  }
+  var t2=calEl.querySelector('#fT2');
+  if(t2){
+    t2.disabled=isLive;
+    var lab=t2.closest('.ftime');
+    if(lab) lab.classList.toggle('off',isLive);
+  }
+}
+function renderCal(){
+  var today=dOnly(new Date());
+  var y=calView.getFullYear(), m=calView.getMonth();
+  var first=new Date(y,m,1), startDow=first.getDay();
+  var daysIn=new Date(y,m+1,0).getDate();
+  var prevDays=new Date(y,m,0).getDate();
+  var eEnd=(rangeEnd==='live')?null:rangeEnd;   // 'live' has no cap on the grid
+
+  var h='<div class="fcalhd"><span class="fcalmo">'+MONTHS[m]+' '+y+'</span>'
+      + '<span class="fcalnav"><button data-mv="-1">‹</button><button data-mv="1">›</button></span></div>'
+      + '<div class="fcaldow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>'
+      + '<div class="fcalgrid">';
+
+  for(var i=0;i<42;i++){
+    var dn=i-startDow+1, cls='fday', inMonth=true, cd;
+    if(dn<1){ cd=new Date(y,m-1,prevDays+dn); inMonth=false; }
+    else if(dn>daysIn){ cd=new Date(y,m+1,dn-daysIn); inMonth=false; }
+    else cd=new Date(y,m,dn);
+    var disabled=cd>today;
+    cls=dayClass(cd, today, eEnd, inMonth);
+    h+='<button class="'+cls+'" data-d="'+isoDay(cd)+'"'+(disabled?' disabled':'')+'>'+cd.getDate()+'</button>';
+  }
+  h+='</div>'
+   + '<div class="ftimes">'
+   + '<label class="ftime"><span class="ftlab">Start</span>'
+   + '<input type="time" id="fT1" class="ftin" value="'+startTime+'"></label>'
+   + '<label class="ftime'+(rangeEnd==='live'?' off':'')+'"><span class="ftlab">End</span>'
+   + '<input type="time" id="fT2" class="ftin" value="'+endTime+'"'+(rangeEnd==='live'?' disabled':'')+'></label>'
+   + '</div>'
+   + '<div class="fcalhint">'+(rangeEnd===null
+        ? 'Now pick the <b>end</b> day'
+        : 'Pick a day to start a new range')+'</div>'
+   + '<div class="fcalsep"></div>'
+   + '<button class="flivrow'+(rangeEnd==='live'?' on':'')+'" id="fLiveRow">'
+   + '<span class="flivedot"></span><span><span class="flivttl">Live</span>'
+   + '<span class="flivsub">follow new candles as they close</span></span>'
+   + (rangeEnd==='live'?'<span class="flivchk">✓</span>':'')+'</button>'
+   + '<div class="fpre"><button data-p="7">7D</button><button data-p="30">30D</button>'
+   + '<button data-p="90">90D</button><button data-p="180">6M</button></div>'
+   + '<div class="fcalft">'+barsInRange()+' bars at '+document.getElementById('fInterval').value+'</div>';
+
+  calEl.innerHTML=h;
+
+  calEl.querySelectorAll('.fcalnav button').forEach(function(bt){
+    bt.addEventListener('click',function(e){
+      e.stopPropagation();
+      calView=new Date(calView.getFullYear(),calView.getMonth()+ +bt.dataset.mv,1);
+      renderCal();
+    });
+  });
+  calEl._days=[].map.call(calEl.querySelectorAll('.fday'),function(bt){
+    return { el:bt, d:new Date(bt.dataset.d+'T00:00:00'), inMonth:!bt.classList.contains('oth') };
+  });
+  calEl.querySelectorAll('.fday').forEach(function(bt){
+    bt.addEventListener('mouseenter',function(){
+      if(rangeEnd===null && !bt.disabled){ calHover=new Date(bt.dataset.d+'T00:00:00'); repaintDays(); }
+    });
+    bt.addEventListener('click',function(e){
+      e.stopPropagation();
+      var d=new Date(bt.dataset.d+'T00:00:00');
+      if(!rangeStart || rangeEnd!==null){
+        // begin a new selection: this click is the start, next click ends it
+        rangeStart=d; rangeEnd=null; calHover=null; syncRangeBtn(); repaintDays();
+      } else if(rangeStart && d<rangeStart){
+        // clicked before the start — swap so the second click still COMPLETES
+        rangeEnd=rangeStart; rangeStart=d;
+        calHover=null; closeCal(); syncRangeBtn(); doLoad();
+      } else {
+        rangeEnd=d; calHover=null; closeCal(); syncRangeBtn(); doLoad();
+      }
+    });
+  });
+  var t1=document.getElementById('fT1'), t2=document.getElementById('fT2');
+  if(t1) t1.addEventListener('change',function(e){
+    e.stopPropagation(); startTime=t1.value||'00:00';
+    calEl.querySelector('.fcalft').textContent=barsInRange()+' bars at '+document.getElementById('fInterval').value;
+    syncRangeBtn();
+  });
+  if(t2) t2.addEventListener('change',function(e){
+    e.stopPropagation(); endTime=t2.value||'23:59';
+    calEl.querySelector('.fcalft').textContent=barsInRange()+' bars at '+document.getElementById('fInterval').value;
+    syncRangeBtn();
+  });
+  [t1,t2].forEach(function(el){ if(el) el.addEventListener('click',function(e){ e.stopPropagation(); }); });
+
+  var lr=document.getElementById('fLiveRow');
+  if(lr) lr.addEventListener('click',function(e){
+    e.stopPropagation(); rangeEnd='live'; calHover=null; closeCal(); syncRangeBtn(); doLoad();
+  });
+  calEl.querySelectorAll('.fpre button').forEach(function(bt){
+    bt.addEventListener('click',function(e){
+      e.stopPropagation();
+      rangeStart=dOnly(new Date(Date.now()- (+bt.dataset.p)*864e5));
+      rangeEnd='live'; calHover=null; calView=new Date();
+      closeCal(); syncRangeBtn(); doLoad();
+    });
+  });
+}
+
+function openCal(){
+  if(typeof closeAllDropdowns==='function') closeAllDropdowns(); calEl.hidden=false; rangeBtn.classList.add('open'); calView=new Date(rangeStart); renderCal(); }
+function closeCal(){ calEl.hidden=true; rangeBtn.classList.remove('open'); }
+rangeBtn.addEventListener('pointerdown',function(e){
+  e.stopPropagation(); e.preventDefault();
+  if(calEl.hidden) openCal(); else closeCal();
+});
+rangeBtn.addEventListener('click',function(e){ e.stopPropagation(); });
+// dismissal handled centrally by dismissPanels (capture phase)
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&!calEl.hidden) closeCal(); });
+document.getElementById('fInterval').addEventListener('change',function(){ if(!calEl.hidden) renderCal(); });
+syncRangeBtn();
+
+// ── Modern dropdowns ─────────────────────────────────────────────────────────
+// The native <select> is kept in the DOM (hidden) as the state holder, so every
+// existing .value read and 'change' listener keeps working untouched.
+// one menu node for every dropdown, mounted on <body> because .fgrp clips
+var SHARED_MENU=null, MENU_OWNER=null;
+function sharedMenu(){
+  if(!SHARED_MENU){
+    SHARED_MENU=document.createElement('div');
+    SHARED_MENU.className='fddmenu';
+    SHARED_MENU.hidden=true;
+    document.body.appendChild(SHARED_MENU);
+  }
+  return SHARED_MENU;
+}
+function closeMenu(){
+  if(!SHARED_MENU) return;
+  SHARED_MENU.hidden=true;
+  SHARED_MENU.innerHTML='';
+  document.querySelectorAll('.fddbtn.open').forEach(function(b){ b.classList.remove('open'); });
+  MENU_OWNER=null;
+}
+function initDropdown(selId,opt){
+  opt=opt||{};
+  var sel=document.getElementById(selId);
+  var wrap=document.createElement('div'); wrap.className='fdd';
+  sel.parentNode.insertBefore(wrap,sel);
+  wrap.appendChild(sel);
+
+  var btn=document.createElement('button');
+  btn.className=(opt.cls||'fseg')+' fddbtn'; btn.type='button';
+  var lbl=document.createElement('span');
+  btn.appendChild(lbl);
+  btn.insertAdjacentHTML('beforeend',
+    '<svg class="fddcv" width="9" height="6" viewBox="0 0 9 6" fill="none"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>');
+  wrap.appendChild(btn);
+
+  var menu=sharedMenu();
+
+  function syncLabel(){
+    var o=sel.options[sel.selectedIndex];
+    var t=o?o.textContent:'';
+    lbl.textContent=opt.fmt?opt.fmt(t):t;
+  }
+  function build(){
+    menu.innerHTML='';
+    [].forEach.call(sel.options,function(o,i){
+      var it=document.createElement('button');
+      it.type='button';
+      it.className='fddopt'+(i===sel.selectedIndex?' sel':'');
+      it.innerHTML='<svg class="fddck" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.6L4 7.5 10 1.3" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>'+o.textContent+'</span>';
+      it.addEventListener('pointerdown',function(e){
+        e.stopPropagation(); e.preventDefault();
+        if(sel.selectedIndex!==i){
+          sel.selectedIndex=i;
+          sel.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+        syncLabel();
+  sel.__ddsync=syncLabel; close();
+      });
+      menu.appendChild(it);
+    });
+  }
+  function place(){
+    var r=btn.getBoundingClientRect();
+    menu.style.minWidth=r.width+'px';
+    menu.style.left=Math.round(r.left)+'px';
+    menu.style.top=Math.round(r.bottom+6)+'px';
+    menu.style.visibility='hidden'; menu.hidden=false;
+    var mh=menu.getBoundingClientRect().height;
+    if(r.bottom+6+mh > innerHeight-8) menu.style.top=Math.round(r.top-6-mh)+'px';
+    var mw=menu.getBoundingClientRect().width;
+    if(r.left+mw > innerWidth-8) menu.style.left=Math.round(innerWidth-8-mw)+'px';
+    menu.style.visibility='';
+  }
+  function open(){
+    closeMenu(); if(typeof closeCal==='function') closeCal();
+    MENU_OWNER=btn; build(); place(); btn.classList.add('open');
+  }
+  function close(){ if(MENU_OWNER===btn) closeMenu(); }
+  function isOpen(){ return MENU_OWNER===btn; }
+
+  // pointerdown so the toggle wins the race with the capture-phase dismisser
+  btn.addEventListener('pointerdown',function(e){
+    e.stopPropagation(); e.preventDefault();
+    isOpen()?close():open();
+  });
+  btn.addEventListener('click',function(e){ e.stopPropagation(); });
+  sel.addEventListener('change',syncLabel);
+  syncLabel();
+  sel.__ddsync=syncLabel;
+  DROPDOWNS.push({close:close, wrap:wrap, menu:menu});
+  return {close:close};
+}
+var DROPDOWNS=[];
+function closeAllDropdowns(){ closeMenu(); }
+function dismissPanels(e){
+  var t=e?e.target:null;
+  // shared dropdown menu
+  if(MENU_OWNER){
+    var inMenu = SHARED_MENU && t && SHARED_MENU.contains(t);
+    var w=MENU_OWNER.closest('.fdd');
+    if(!inMenu && !(w && t && w.contains(t))) closeMenu();
+  }
+  // date calendar — same rules, same events
+  var cal=document.getElementById('fCal'), rb=document.getElementById('fRange');
+  if(cal && !cal.hidden){
+    var inCal = t && cal.contains(t);
+    var onBtn = t && rb && rb.contains(t);
+    if(!inCal && !onBtn) closeCal();
+  }
+}
+var dismissOutside=dismissPanels;
+document.addEventListener('pointerdown',dismissPanels,true);
+document.addEventListener('mousedown',dismissPanels,true);
+document.addEventListener('touchstart',dismissPanels,true);
+document.addEventListener('click',dismissPanels,true);
+window.addEventListener('blur',function(){ dismissPanels(); });
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){ closeMenu(); if(typeof closeCal==='function') closeCal(); }
+});
+window.addEventListener('resize',function(){ closeMenu(); if(typeof closeCal==='function') closeCal(); });
+document.addEventListener('wheel',function(){ closeMenu(); if(typeof closeCal==='function') closeCal(); },{passive:true});
+initDropdown('fSource',{cls:'srcbtn'});
+initDropdown('fInterval',{cls:'tfbtn', fmt:function(t){ return t.toUpperCase(); }});
+
+// ── Contract: the ticker text is the control ─────────────────────────────────
+var conBtn=document.getElementById('fConBtn');
+var conIn=document.getElementById('fContract');
+function fmtContract(v){
+  v=(v||'').trim().toUpperCase();
+  return v.replace(/[_\-\/]/g,'') + '.P';
+}
+function syncContract(){
+  conBtn.textContent=fmtContract(conIn.value);
+  conIn.style.width=Math.max(150, conBtn.getBoundingClientRect().width+34)+'px';
+}
+function editContract(){
+  closeAllDropdowns(); closeCal();
+  conBtn.hidden=true; conIn.hidden=false;
+  conIn.focus(); conIn.select();
+}
+function commitContract(reload){
+  conIn.hidden=true; conBtn.hidden=false;
+  syncContract();
+  if(reload) doLoad();
+}
+conBtn.addEventListener('pointerdown',function(e){ e.preventDefault(); editContract(); });
+conIn.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){ e.preventDefault(); commitContract(true); }
+  if(e.key==='Escape'){ e.preventDefault(); commitContract(false); }
+});
+conIn.addEventListener('blur',function(){ if(!conIn.hidden) commitContract(true); });
+syncContract();
+
+// ── Any control change reloads ───────────────────────────────────────────────
+document.getElementById('fSource').addEventListener('change',function(){
+  var v=this.value;
+  document.getElementById('fSrcTxt').textContent='perpetual';
+  doLoad();
+});
+document.getElementById('fInterval').addEventListener('change',function(){ doLoad(); });
+
+// ── Plan handed in by a host page (#plan=<json>) ──────────────────────────────
+var EMBED=false;
+(function(){
+  var raw=null;
+  try{
+    var hs=(location.hash||'').replace(/^#/,'');
+    hs.split('&').forEach(function(kv){
+      var i=kv.indexOf('=');
+      var k=i<0?kv:kv.slice(0,i), v=i<0?'':decodeURIComponent(kv.slice(i+1));
+      if(k==='plan') raw=v;
+      if(k==='embed') EMBED=true;
+    });
+  }catch(e){}
+  if(EMBED) document.documentElement.setAttribute('data-embed','1');
+  if(!raw) return;
+  var P; try{ P=JSON.parse(raw); }catch(e){ return; }
+
+  if(P.contract) CUR_CONTRACT=P.contract;
+  if(P.interval) CUR_INTERVAL=P.interval;
+  if(P.unit || P.dir || P.qty!=null){
+    POS={ dir:P.dir||POS.dir, qty:(P.qty!=null?P.qty:POS.qty), unit:P.unit||POS.unit };
+  }
+  if(Array.isArray(P.fills) && P.fills.length){
+    FILLS=P.fills.filter(function(f){ return isFinite(f.p); }).map(function(f,i){
+      return { n:i+1, p:+f.p, pct:(f.pct!=null?+f.pct:0), filled:f.filled!==false };
+    });
+  }
+  if(Array.isArray(P.targets) || P.stop!=null || P.liq!=null){
+    var TPC=['#4caf7d','#26a69a','#1f9d55','#3fbf8f','#2fa87a','#57c98a'];
+    var out=[];
+    if(isFinite(P.liq))  out.push({ id:'liq',  p:+P.liq,  col:'#df5338', label:'Liquidation', short:'Liq',  dash:[7,5], lw:1.2, on:true });
+    if(isFinite(P.stop)) out.push({ id:'stop', p:+P.stop, col:'#e0663f', label:'Stop loss',   short:'Stop', dash:[7,5], lw:1.2, on:true });
+    out.push({ id:'entry', p:null, col:'#7c5cff', label:'Avg entry', short:'Entry', dash:[7,5], lw:1.6, on:true });
+    (P.targets||[]).forEach(function(t,i){
+      if(!isFinite(t.p)) return;
+      out.push({ id:'tp'+(i+1), p:+t.p, col:TPC[i%TPC.length], label:'TP'+(i+1), short:'TP'+(i+1),
+                 dash:[7,5], lw:1.2, on:true, bank:(t.pct!=null?+t.pct:null) });
+    });
+    if(out.length>1) LEVELS=out;
+  }
+  if(isFinite(P.armedBar)) ARMED_AT=Math.max(0,Math.round(P.armedBar));
+  if(P.needDates) NEED_DATES=true;
+  if(P.start){
+    var sd=new Date(P.start);
+    if(!isNaN(sd)) rangeStart=new Date(sd.getFullYear(),sd.getMonth(),sd.getDate());
+  }
+  if(P.end && P.end!=='live'){
+    var ed=new Date(P.end);
+    if(!isNaN(ed)) rangeEnd=new Date(ed.getFullYear(),ed.getMonth(),ed.getDate());
+  }
+  // reflect the handed-in contract/interval in the header controls
+  try{
+    document.getElementById('fContract').value=CUR_CONTRACT;
+    var si=document.getElementById('fInterval');
+    for(var oi=0;oi<si.options.length;oi++) if(si.options[oi].textContent.trim()===CUR_INTERVAL) si.selectedIndex=oi;
+    if(typeof syncContract==='function') syncContract();
+    if(si.__ddsync) si.__ddsync();
+  }catch(e){}
+})();
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+resize();
+// seed the strip from the embedded series so the count is never blank,
+// then refresh against the live source the header is advertising
+syncRangeBtn();
+if(NEED_DATES || !rangeStart){
+  showNeedDates(true);
+  setStatus('set trade dates','err','Set a <b>start</b> date on the plan to load its chart');
+} else {
+  setStatus(n+' bars','ok','<b>'+n+' bars</b> from the bundled series');
+  doLoad();
+}
+</script>
+</body>
+</html>

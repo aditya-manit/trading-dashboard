@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { usePlanStore, planActions } from '@/lib/plan-store';
 import { tpCompute, planToDraft, tpPlanName, tpMoney, TP_EQUITY, tpEntryRungs, pctNum, tpNum, type Plan, type Status, type PlanDraft, type Level } from '@/lib/plan-model';
 import { useAccount } from '@/hooks/useAccount';
@@ -123,73 +124,93 @@ function Tp3aStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) 
   );
 }
 
-// downscale a chart screenshot to a data URL, then persist it onto the plan.
-function readChart(file: File | undefined | null, id: string) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const src = String(reader.result || '');
-    if (src.length < 1_400_000) { planActions.updateThesis(id, 'chart', src); return; }
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, 1920 / img.width);
-      const cv = document.createElement('canvas');
-      cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
-      cv.getContext('2d')?.drawImage(img, 0, 0, cv.width, cv.height);
-      planActions.updateThesis(id, 'chart', cv.toDataURL('image/jpeg', 0.95));
-    };
-    img.src = src;
-  };
-  reader.readAsDataURL(file);
-}
-
 function ConvDots({ n, sz = 6 }: { n: number; sz?: number }) {
   return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>{[0, 1, 2].map((i) => <span key={i} style={{ width: sz, height: sz, borderRadius: '50%', background: i < n ? '#7c5cff' : 'transparent', border: i < n ? 'none' : '1.5px solid #d3cfe6', boxSizing: 'border-box' }} />)}</span>;
 }
 
-// purple-band card header (label + icon), shared by Thesis / Your chart
-function CardHead({ label, icon, chevron, open, onClick }: { label: string; icon: React.ReactNode; chevron?: boolean; open?: boolean; onClick?: () => void }) {
-  return (
-    <div onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '13px 18px', borderBottom: chevron && !open ? 'none' : '1px solid #ebe2fb', background: 'linear-gradient(180deg,#ffffff 0%,#faf8ff 45%,#f0eafc 100%)', cursor: onClick ? 'pointer' : 'default' }}>
-      <span style={{ width: 7, height: 7, borderRadius: 2, background: '#7c5cff', flex: '0 0 auto' }} />
-      <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}>{icon}</svg>
-      <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#7c5cff' }}>{label}</span>
-      {chevron ? <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#b0a8c8" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto', flex: '0 0 auto', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="m6 9 6 6 6-6" /></svg> : null}
-    </div>
-  );
-}
 const cardBox: React.CSSProperties = { background: '#fff', border: '1px solid #ece9f2', borderRadius: 20, overflow: 'hidden' };
-const imgIcon = <><rect x={3} y={3} width={18} height={18} rx={2} /><circle cx={8.5} cy={8.5} r={1.6} /><path d="m21 15-5-5L5 21" /></>;
 
-// ── Your chart card — screenshot with tools, or a dashed drop zone ──
-function ChartCard({ p, onFull }: { p: Plan; onFull: (src: string) => void }) {
-  const [drag, setDrag] = useState(false);
-  const onDrop = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); readChart(e.dataTransfer.files?.[0], p.id); setDrag(false); };
-  const onOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); if (!drag) setDrag(true); };
-  const onLeave = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); if (drag) setDrag(false); };
-  const tool: React.CSSProperties = { cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 99 };
+const CHART_SYM_MAP: Record<string, string> = { BTC: 'BTC_USDT', ETH: 'ETH_USDT', SOL: 'SOL_USDT', XRP: 'XRP_USDT', DOGE: 'DOGE_USDT', BNB: 'BNB_USDT' };
+const CHART_HEIGHT = 650;
+const expandIcon = <><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1={21} y1={3} x2={14} y2={10} /><line x1={3} y1={21} x2={10} y2={14} /></>;
+
+// ── Live chart card — the standalone Volume Candle Chart, driven by this plan's own
+// levels + dates (no section header; content self-identifies). The plan is passed to the
+// iframe as a #embed=1&plan=<json> hash payload. Expand → full-viewport in-app overlay.
+function ChartCard({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
+  const [full, setFull] = useState(false);
+  // Esc closes the expand overlay (matches the dc's _chartEsc)
+  useEffect(() => {
+    if (!full) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFull(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [full]);
+
+  const rawFills = tpEntryRungs(d);
+  const fp = rawFills.map((r) => pctNum(r.pct));
+  const fNonLast = fp.slice(0, -1).reduce((s, x) => s + (isFinite(x) ? x : 0), 0);
+  const fRem = Math.max(0, 100 - fNonLast);
+  let fills = rawFills
+    .map((r, i) => ({ p: tpNum(r.price), pct: i === rawFills.length - 1 ? (isFinite(fp[i]) ? fp[i] : fRem) : (isFinite(fp[i]) ? fp[i] : 0) }))
+    .filter((f) => isFinite(f.p));
+  // a plan that never split its entry carries no percentages — treat it as one full fill
+  const fillSum = fills.reduce((s, f) => s + (isFinite(f.pct) ? f.pct : 0), 0);
+  if (fills.length && fillSum <= 0) fills = fills.map((f) => ({ ...f, pct: +(100 / fills.length).toFixed(2) }));
+  const targets = (c.levels || []).filter((l) => l.hasPrice).map((l) => ({ p: l.price, pct: isFinite(l.pct) ? l.pct : null }));
+
+  // follow live only while the planned window still runs; a closed window frames the trade
+  let end: string = 'live';
+  const eRaw = p.tradeDate || d.tradeDate || null;
+  if (eRaw) {
+    const ed = new Date(eRaw);
+    if (!isNaN(ed.getTime())) { const t0 = new Date(); t0.setHours(0, 0, 0, 0); end = ed > t0 ? 'live' : eRaw; }
+  }
+  const payload = {
+    contract: CHART_SYM_MAP[p.sym] || ((p.sym || 'BTC') + '_USDT'),
+    interval: '1h',
+    dir: p.dir,
+    qty: isFinite(c.qty) ? +c.qty.toFixed(4) : null,
+    unit: p.sym || 'BTC',
+    fills: fills.length ? fills.map((f) => ({ ...f, filled: true })) : (c.hasEntry ? [{ p: c.E, pct: 100, filled: true }] : []),
+    targets,
+    stop: c.hasStop ? c.S : null,
+    liq: isFinite(c.liq) ? c.liq : null,
+    start: p.startDate || d.startDate || null,
+    end,
+    // a start date is enough — an open-ended plan simply follows live (NOT !(start&&end))
+    needDates: !(p.startDate || d.startDate),
+  };
+  const chartSrc = '/candle-chart.html#embed=1&plan=' + encodeURIComponent(JSON.stringify(payload));
+  // remount when the window/timeframe changes, so a tweak or a date edit applies immediately
+  const chartKey = p.id + '_livechart|' + payload.contract + '|' + payload.interval + '|' + (payload.start || '') + '|' + payload.end;
+
   return (
     <div style={cardBox}>
-      <CardHead label="Your chart" icon={imgIcon} />
-      {p.chart ? (
-        <div onDrop={onDrop} onDragOver={onOver} onDragLeave={onLeave} style={{ position: 'relative', padding: 14 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img onClick={() => onFull(p.chart!)} src={p.chart} alt="chart" style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 11, border: '1px solid #ececea', cursor: 'zoom-in' }} />
-          <div style={{ position: 'absolute', top: 23, right: 23, display: 'flex', gap: 8 }}>
-            <label title="Replace" className="pd-chartbtn" style={tool}><input type="file" accept="image/*" style={{ display: 'none' }} onClick={(e) => e.stopPropagation()} onChange={(e) => { readChart(e.target.files?.[0], p.id); e.currentTarget.value = ''; }} /><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1={12} y1={3} x2={12} y2={15} /></svg></label>
-            <button title="Remove" className="pd-chartbtn pd-chartbtn-del" onClick={(e) => { e.stopPropagation(); planActions.updateThesis(p.id, 'chart', ''); }} style={tool}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg></button>
+      <div style={{ position: 'relative' }}>
+        <button type="button" title="Expand chart" aria-label="Expand chart" className="pd-icobtn"
+          onClick={(e) => { e.stopPropagation(); setFull(true); }}
+          style={{ position: 'absolute', top: 10, right: 10, zIndex: 3, width: 26, height: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.92)' }}>
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">{expandIcon}</svg>
+        </button>
+      </div>
+      <div style={{ position: 'relative', height: CHART_HEIGHT, background: '#fff' }}>
+        <iframe key={chartKey} src={chartSrc} title="Live chart" loading="lazy" style={{ display: 'block', width: '100%', height: '100%', border: 'none' }} />
+      </div>
+      {full ? createPortal(
+        <div onClick={() => setFull(false)} style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(26,24,19,0.55)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', height: '100%', maxWidth: 1680, background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 70px rgba(20,20,12,0.4)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '12px 16px', borderBottom: '1px solid #ebe2fb', background: 'linear-gradient(180deg,#ffffff 0%,#faf8ff 100%)', flex: '0 0 auto' }}>
+              <span style={{ width: 7, height: 7, borderRadius: 2, background: '#7c5cff', flex: '0 0 auto' }} />
+              <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#7c5cff' }}>Live chart</span>
+              <span style={{ fontWeight: 700, fontSize: 11, color: '#b3b0a6' }}>Esc to close</span>
+              <button type="button" title="Close" aria-label="Close" className="pd-icobtn" onClick={() => setFull(false)} style={{ marginLeft: 'auto', width: 28, height: 28, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round"><line x1={18} y1={6} x2={6} y2={18} /><line x1={6} y1={6} x2={18} y2={18} /></svg>
+              </button>
+            </div>
+            <iframe key={chartKey + '_full'} src={chartSrc} title="Live chart full screen" style={{ display: 'block', width: '100%', flex: '1 1 auto', border: 'none' }} />
           </div>
-          {drag ? <div style={{ position: 'absolute', inset: 14, borderRadius: 11, border: '2px dashed #7c5cff', background: 'rgba(124,92,255,0.12)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13, color: '#6a45d8', pointerEvents: 'none' }}>Drop to replace</div> : null}
-        </div>
-      ) : (
-        <label onDrop={onDrop} onDragOver={onOver} onDragLeave={onLeave} style={{ margin: 14, cursor: 'pointer', border: '1.5px dashed ' + (drag ? '#7c5cff' : '#ded9cf'), borderRadius: 13, padding: '30px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9, textAlign: 'center', background: drag ? 'rgba(124,92,255,0.07)' : '#fbfaf8', transition: 'border-color .14s, background .14s' }}>
-          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { readChart(e.target.files?.[0], p.id); e.currentTarget.value = ''; }} />
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: '#f3f0ff', display: 'grid', placeItems: 'center' }}><svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1={12} y1={3} x2={12} y2={15} /></svg></div>
-          <span style={{ fontWeight: 800, fontSize: 13.5, color: '#1a1813', letterSpacing: '-0.01em' }}>{drag ? 'Drop your screenshot' : 'Drop a chart screenshot'}</span>
-          <span style={{ fontWeight: 600, fontSize: 11.5, color: '#a8a294', maxWidth: 260, lineHeight: 1.5 }}>Drag an image here, or click to browse — so you can eyeball the levels.</span>
-          <span style={{ fontWeight: 800, fontSize: 11.5, color: '#7c5cff', marginTop: 2 }}>Browse files</span>
-        </label>
-      )}
+        </div>, document.body) : null}
     </div>
   );
 }
@@ -436,7 +457,7 @@ function PopRow({ children, active, onClick }: { children: React.ReactNode; acti
   );
 }
 
-const KF = `@keyframes pdIn{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes pdFade{from{opacity:0}to{opacity:1}}@keyframes lmpop{0%{transform:scale(1)}45%{transform:scale(1.42)}100%{transform:scale(1)}}@keyframes lmglow{0%{box-shadow:0 0 0 0 rgba(31,157,85,.5)}100%{box-shadow:0 0 0 13px rgba(31,157,85,0)}}.lmdot{cursor:pointer;transition:transform .15s ease}.lmdot:hover{transform:scale(1.13)}.lmnode{cursor:pointer;border-radius:11px;transition:background .14s}.lmnode:hover{background:#faf8f4}.lmpop{animation:lmpop .5s cubic-bezier(.34,1.56,.64,1)}.lmring{animation:lmglow .7s ease-out}.lmghost2:hover{background:#f1efe9 !important;color:#6a6357 !important}.pd-icobtn:hover{background:#1a1813 !important;border-color:#1a1813 !important;color:#fff !important}.pd-icobtn-del:hover{background:#df5338 !important;border-color:#df5338 !important;color:#fff !important}.pd-resize::before{content:"";position:absolute;left:0;top:0;height:100%;width:3px;background:transparent;transition:background .15s}.pd-resize:hover::before{background:#7c5cff}.pd-resize::after{content:"";position:absolute;left:3px;top:50%;transform:translateY(-50%);width:4px;height:34px;border-radius:3px;background:#d8d4ea;opacity:0;transition:opacity .15s}.pd-resize:hover::after{opacity:1}.pd-chartbtn{background:rgba(255,255,255,0.82) !important;color:#26221c !important;border:1px solid rgba(255,255,255,0.9) !important;box-shadow:0 2px 10px -2px rgba(20,18,12,0.28),0 0 0 0.5px rgba(20,18,12,0.04);backdrop-filter:blur(10px) saturate(1.3);transition:background .14s,transform .1s}.pd-chartbtn:hover{background:#fff !important;transform:translateY(-1px)}.pd-chartbtn-del{color:#c23d28 !important}.pd-chartbtn-del:hover{background:#fdece8 !important;color:#b8341f !important}`;
+const KF = `@keyframes pdIn{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes pdFade{from{opacity:0}to{opacity:1}}@keyframes lmpop{0%{transform:scale(1)}45%{transform:scale(1.42)}100%{transform:scale(1)}}@keyframes lmglow{0%{box-shadow:0 0 0 0 rgba(31,157,85,.5)}100%{box-shadow:0 0 0 13px rgba(31,157,85,0)}}.lmdot{cursor:pointer;transition:transform .15s ease}.lmdot:hover{transform:scale(1.13)}.lmnode{cursor:pointer;border-radius:11px;transition:background .14s}.lmnode:hover{background:#faf8f4}.lmpop{animation:lmpop .5s cubic-bezier(.34,1.56,.64,1)}.lmring{animation:lmglow .7s ease-out}.lmghost2:hover{background:#f1efe9 !important;color:#6a6357 !important}.pd-icobtn:hover{background:#1a1813 !important;border-color:#1a1813 !important;color:#fff !important}.pd-icobtn-del:hover{background:#df5338 !important;border-color:#df5338 !important;color:#fff !important}.pd-resize::before{content:"";position:absolute;left:0;top:0;height:100%;width:3px;background:transparent;transition:background .15s}.pd-resize:hover::before{background:#7c5cff}.pd-resize::after{content:"";position:absolute;left:3px;top:50%;transform:translateY(-50%);width:4px;height:34px;border-radius:3px;background:#d8d4ea;opacity:0;transition:opacity .15s}.pd-resize:hover::after{opacity:1}`;
 
 // the plan drawer has its own wide, independently-persisted width (tdplan_pdrawer_w)
 const PDW_MIN = 760;
@@ -454,7 +475,6 @@ function usePlanDrawerWidth(): [number, (v: number) => void] {
 
 export function PlanDrawer() {
   const { openPlanId, plans } = usePlanStore();
-  const [full, setFull] = useState<string | null>(null);
   const [drawerW, setDrawerW] = usePlanDrawerWidth();
   const { data: account } = useAccount();
   const { data: positions } = usePositions();
@@ -518,13 +538,11 @@ export function PlanDrawer() {
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', padding: '22px 26px 36px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <Tp3aStrip c={c} d={d} />
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,65fr) minmax(0,35fr)', gap: 20, alignItems: 'start', flexShrink: 0 }}>
-            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><ChartCard p={p} onFull={setFull} /></div>
+            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><ChartCard p={p} c={c} d={d} /></div>
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><LevelsMap p={p} c={c} d={d} /></div>
           </div>
         </div>
       </div>
-
-      {full ? <div onClick={() => setFull(null)} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(14,13,11,0.88)', display: 'grid', placeItems: 'center', padding: 40, cursor: 'zoom-out' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={full} alt="" style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', borderRadius: 10 }} /></div> : null}
     </>
   );
 }
