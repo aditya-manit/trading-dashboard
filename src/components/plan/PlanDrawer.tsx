@@ -433,7 +433,7 @@ export function PlanDrawer() {
         {/* body */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', padding: '22px 26px 36px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <EquityStrip c={c} d={d} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,65fr) minmax(0,35fr)', gap: 20, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,65fr) minmax(0,35fr)', gap: 20, alignItems: 'start', flexShrink: 0 }}>
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><ThesisCard p={p} /><ChartCard p={p} onFull={setFull} /></div>
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><LevelsMap p={p} c={c} d={d} /></div>
           </div>

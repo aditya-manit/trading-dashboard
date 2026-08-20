@@ -831,7 +831,7 @@ export function EquityStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: Plan
   const tdot = (left: number, col: string) => <span style={{ position: 'absolute', left: left + '%', top: '50%', width: 12, height: 12, borderRadius: '50%', background: '#fff', border: '3px solid ' + col, transform: 'translate(-50%,-50%)', boxShadow: '0 1px 3px rgba(20,20,12,0.25)' }} />;
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #ece9f2', borderRadius: 20, overflow: 'hidden', position: 'relative', zIndex: 6 }}>
+    <div style={{ background: '#fff', border: '1px solid #ece9f2', borderRadius: 20, overflow: 'hidden', position: 'relative', zIndex: 6, flexShrink: 0 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: 1, background: '#f1eff5' }}>
         {/* Risk */}
         <div style={cellS(1.15, 232)}>{lbl('Risk', RED)}
