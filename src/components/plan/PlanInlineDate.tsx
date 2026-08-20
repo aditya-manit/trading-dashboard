@@ -21,6 +21,15 @@ export function PlanInlineDate({ plan, children }: { plan: Plan; children: (o: {
   const [view, setView] = useState<{ y: number; m: number } | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   useEffect(() => setMounted(true), []);
+  // The popover is a fixed overlay anchored to the trigger's open-time position, so it
+  // can't follow the page as you scroll — dismiss it on any scroll/resize (standard UX).
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = () => setOpen(false);
+    window.addEventListener('scroll', dismiss, true); // capture → catches nested scroll containers
+    window.addEventListener('resize', dismiss);
+    return () => { window.removeEventListener('scroll', dismiss, true); window.removeEventListener('resize', dismiss); };
+  }, [open]);
 
   const start = parse(plan.startDate);
   const sel = parse(plan.tradeDate);
