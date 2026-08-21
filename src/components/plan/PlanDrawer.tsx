@@ -180,8 +180,12 @@ function ChartCard({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
     unit: p.sym || 'BTC',
     fills: fills.length ? fills.map((f) => ({ ...f, filled: true })) : (c.hasEntry ? [{ p: c.E, pct: 100, filled: true }] : []),
     targets,
-    stop: c.hasStop ? c.S : null,
-    liq: isFinite(c.liq) ? c.liq : null,
+    // send the EFFECTIVE stop (c.S = the user stop, or the liquidation when none is set) so the
+    // chart's Stop chip matches the strip's STOP figure and the handoff (Stop 79.9k), instead of
+    // the phantom "Stop 0" that `null` produced — the chart guards with isFinite(), and
+    // isFinite(null) is true (null→0). Omit (undefined → dropped by JSON) only when non-finite.
+    stop: isFinite(c.S) ? c.S : undefined,
+    liq: isFinite(c.liq) ? c.liq : undefined,
     start: p.startDate || d.startDate || null,
     end,
     needDates: !(p.startDate || d.startDate),
