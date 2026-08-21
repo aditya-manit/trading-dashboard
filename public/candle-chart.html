@@ -1381,7 +1381,9 @@ function spreadChips(rail){
   // rail mode only when there is genuine slack for positions to mean something
   rail.classList.remove('flat');
   if(row) row.classList.remove('capsule');
-  if(avail < need+110){
+  // when embedded (the dashboard's plan chart) always use the compact capsule — the
+  // spread-by-price rail is a wide-standalone look; the host wants the capsule in all cases
+  if(document.documentElement.hasAttribute('data-embed') || avail < need+110){
     rail.classList.add('flat');
     if(row) row.classList.add('capsule');
     [].slice.call(rail.querySelectorAll('.railtick')).forEach(function(t){
