@@ -26,7 +26,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Je
 .lvlrail.flat{display:inline-flex;align-items:stretch;justify-content:center;gap:0;flex:0 0 auto;
   min-width:max-content;height:auto;background:transparent;box-shadow:none}
 /* the capsule surface owns the chips AND the fill cell */
-#lvlChips.capsule{left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:calc(100% - 40px);
+#lvlChips.capsule{left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 190px);
   gap:0;background:#fff;border-radius:9px;overflow:hidden;
   box-shadow:0 0 0 1px rgba(26,24,19,.09),0 1px 2px rgba(26,24,19,.06)}
 .lvlrail.flat .railline,.lvlrail.flat .railtick{display:none}
@@ -208,6 +208,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Je
 .ndinner{display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;max-width:330px;color:#b0aca2}
 .ndttl{font:600 13.5px -apple-system,'Segoe UI',Roboto,sans-serif;color:#131722;letter-spacing:-.1px}
 .ndsub{font:500 11.5px -apple-system,'Segoe UI',Roboto,sans-serif;color:#8b8f9a;line-height:1.55}
+html[data-embed] .fitbtn{display:none}
 html[data-embed] body{background:#fff}
 html[data-embed] #root{height:100%}
 canvas{display:block}
@@ -1370,11 +1371,11 @@ function spreadChips(rail){
 
   // stage 1: full — prices + meter
   var need=chipsW(), avail=rowW-tailW();
-  // stage 2: drop prices
-  if(avail<need){ pxs.forEach(function(e){ e.style.display='none'; }); need=chipsW(); }
-  // stage 3: drop the "filled" word
+  // prices stay with their level at all times — shed the tail chrome instead; when the
+  // row still cannot fit inline it flips to the centered capsule, which is max-content
+  // stage 2: drop the "filled" word
   if(avail<need && lbl){ lbl.style.display='none'; avail=rowW-tailW(); }
-  // stage 4: drop the meter bar, keep the percentage
+  // stage 3: drop the meter bar, keep the percentage
   if(avail<need && meter){ meter.style.display='none'; avail=rowW-tailW(); }
 
   // rail mode only when there is genuine slack for positions to mean something
@@ -1547,6 +1548,16 @@ fitBtn.addEventListener('click',function(){
   fitBtn.classList.toggle('on',fitPlan);
   yManualRange=null;
   draw();
+});
+
+// host (the dashboard drawer) owns the Fit-plan control when embedded
+window.addEventListener('message',function(e){
+  if(!e.data||e.data.type!=='tdFitPlan') return;
+  fitPlan=!fitPlan;
+  fitBtn.classList.toggle('on',fitPlan);
+  yManualRange=null;
+  draw();
+  try{ if(window.parent&&window.parent!==window) window.parent.postMessage({type:'tdFitPlanState',on:fitPlan},'*'); }catch(_e){}
 });
 
 // clicking a level pill on the chart hides that level
@@ -2269,13 +2280,14 @@ var EMBED=false;
   if(Array.isArray(P.targets) || P.stop!=null || P.liq!=null){
     var TPC=['#4caf7d','#26a69a','#1f9d55','#3fbf8f','#2fa87a','#57c98a'];
     var out=[];
-    if(isFinite(P.liq))  out.push({ id:'liq',  p:+P.liq,  col:'#df5338', label:'Liquidation', short:'Liq',  dash:[7,5], lw:1.2, on:true });
-    if(isFinite(P.stop)) out.push({ id:'stop', p:+P.stop, col:'#e0663f', label:'Stop loss',   short:'Stop', dash:[7,5], lw:1.2, on:true });
+    // only the entry line is on by default — the rest are opt-in via the level chips
+    if(isFinite(P.liq))  out.push({ id:'liq',  p:+P.liq,  col:'#df5338', label:'Liquidation', short:'Liq',  dash:[7,5], lw:1.2, on:false });
+    if(isFinite(P.stop)) out.push({ id:'stop', p:+P.stop, col:'#e0663f', label:'Stop loss',   short:'Stop', dash:[7,5], lw:1.2, on:false });
     out.push({ id:'entry', p:null, col:'#7c5cff', label:'Avg entry', short:'Entry', dash:[7,5], lw:1.6, on:true });
     (P.targets||[]).forEach(function(t,i){
       if(!isFinite(t.p)) return;
       out.push({ id:'tp'+(i+1), p:+t.p, col:TPC[i%TPC.length], label:'TP'+(i+1), short:'TP'+(i+1),
-                 dash:[7,5], lw:1.2, on:true, bank:(t.pct!=null?+t.pct:null) });
+                 dash:[7,5], lw:1.2, on:false, bank:(t.pct!=null?+t.pct:null) });
     });
     if(out.length>1) LEVELS=out;
   }

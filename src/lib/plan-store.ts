@@ -25,7 +25,10 @@ interface PlanState {
   ready: boolean; // hydrated from localStorage (client only)
   booting: boolean; // first syncRemote() hasn't settled yet — don't show demo/empty state
   remote: boolean; // Supabase is the source of truth (else localStorage)
+  thesisCol: boolean; // plan detail page: thesis column open — GLOBAL pref (tdplan_thesis_col)
 }
+
+const THESIS_COL_KEY = 'tdplan_thesis_col';
 
 const SEED_LINKS: Record<string, string> = {
   'BTC/USDT.P': 'seed_BTC_idea',
@@ -42,6 +45,7 @@ let state: PlanState = {
   ready: false,
   booting: true,
   remote: false,
+  thesisCol: false,
 };
 
 const listeners = new Set<() => void>();
@@ -84,7 +88,9 @@ function hydrate() {
   const editingId = localStorage.getItem(PLAN_KEYS.editing) || null;
   const links = { ...SEED_LINKS, ...read<Record<string, string>>(PLAN_KEYS.links, {}) };
   const journal = read<Record<string, JournalRecord>>(PLAN_KEYS.journal, {});
-  state = { ...state, view, draft, editingId, links, journal, ready: true };
+  const tcRaw = localStorage.getItem(THESIS_COL_KEY);
+  const thesisCol = tcRaw !== null ? tcRaw === '1' : state.thesisCol;
+  state = { ...state, view, draft, editingId, links, journal, thesisCol, ready: true };
   emit();
   void syncRemote(); // if Supabase is configured, it becomes the source of truth
 }
@@ -223,6 +229,8 @@ export const planActions = {
   },
   openPlan(id: string) { set({ openPlanId: id }); },
   closePlan() { set({ openPlanId: null }); },
+  // Plan detail page: open/close the thesis column — a GLOBAL preference, not per-plan.
+  toggleThesisCol() { const next = !state.thesisCol; writeRaw(THESIS_COL_KEY, next ? '1' : '0'); set({ thesisCol: next }); },
   duplicatePlan(id: string) {
     const src = state.plans.find((p) => p.id === id);
     if (!src) return;

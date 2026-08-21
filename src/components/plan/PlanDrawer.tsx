@@ -1,125 +1,131 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useEffect, useRef } from 'react';
 import { usePlanStore, planActions } from '@/lib/plan-store';
 import { tpCompute, planToDraft, tpPlanName, tpMoney, TP_EQUITY, tpEntryRungs, pctNum, tpNum, type Plan, type Status, type PlanDraft, type Level } from '@/lib/plan-model';
 import { useAccount } from '@/hooks/useAccount';
 import { usePositions } from '@/hooks/usePositions';
 import { useBtcCandles } from '@/hooks/useBtcCandles';
 import { CoinIcon } from './coins';
-import { CalIcon } from './MiniCalendar';
-import { PlanInlineDate, planWindowLabel } from './PlanInlineDate';
-import { DirLevHeading } from './Editor';
+import { PlanInlineDate } from './PlanInlineDate';
 import { useLevelsProgress, levelsProgress } from '@/lib/levels-progress';
 
 const MONO = "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace";
+const PJS = "'Plus Jakarta Sans', sans-serif";
 const mny = (v: number) => (v < 0 ? '−' : '') + '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
-const STATUSES: { k: Status; label: string; c: string; bg: string }[] = [
-  { k: 'idea', label: 'Idea', c: '#6a45d8', bg: '#f3f0ff' },
-  { k: 'armed', label: 'Armed', c: '#1f8a52', bg: '#eef8f1' },
-  { k: 'triggered', label: 'Triggered', c: '#c9821f', bg: '#fbf2e3' },
+const STATUSES: { k: Status; label: string; c: string; bg: string; border: string }[] = [
+  { k: 'idea', label: 'Idea', c: '#6a45d8', bg: '#f3f0ff', border: '#e7ddfb' },
+  { k: 'armed', label: 'Armed', c: '#1f8a52', bg: '#eef8f1', border: '#cfe9da' },
+  { k: 'triggered', label: 'Triggered', c: '#c9821f', bg: '#fbf2e3', border: '#f0dcbb' },
 ];
 const CONVS = [{ k: 'low', label: 'Low', n: 1 }, { k: 'med', label: 'Medium', n: 2 }, { k: 'high', label: 'High', n: 3 }] as const;
 
-// ── "3a Verdict-last" stat strip (drawer only; the editor keeps tp4aStrip/EquityStrip) ──
-const S_PURP = '#7c5cff', S_GREEN = '#1f9d55', S_RED = '#df5338', S_ORANGE = '#ff7a00', S_INK = '#1a1813', S_MUT = '#a8a294', S_DIM = '#c6c1b6';
-function Tp3aStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
+// ── tp2bStrip — six figures on one bordered surface, R:R spanning both rows (handoff: 2b) ──
+const B_PURP = '#7c5cff', B_GREEN = '#1f9d55', B_RED = '#df5338', B_ORANGE = '#ff7a00', B_INK = '#1a1813', B_LBL = '#b3ada0', B_RULE = '#f1eff5';
+function Tp2bStrip({ c, d }: { c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
   const money = (v: number, dec = 0) => (isFinite(v) ? tpMoney(v, dec) : '—');
-  const chipSt: React.CSSProperties = { background: '#fff', border: '1px solid #ece9f2', borderRadius: 16, padding: '13px 17px', display: 'flex', flexDirection: 'column', gap: 8 };
-  const cap = (t: string) => <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 8.5, letterSpacing: '0.15em', color: S_MUT, whiteSpace: 'nowrap' }}>{t}</span>;
-  const pct = (txt: string, col: string, tag: string) => <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: col, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{txt}<span style={{ color: S_DIM, fontWeight: 500 }}>{' ' + tag}</span></span>;
+  const cap = (t: string) => <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 8.5, letterSpacing: '0.16em', color: B_LBL, whiteSpace: 'nowrap' }}>{t}</span>;
+  const big = (txt: string, col: string, size = 22) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: size, lineHeight: 1, letterSpacing: '-0.025em', color: col, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{txt}</span>;
+  const sub = (txt: string, col: string, tag: string) => <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: col, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{txt}<span style={{ color: B_LBL, fontWeight: 500 }}>{' ' + tag}</span></span>;
+  const cellSt = (extra?: React.CSSProperties): React.CSSProperties => ({ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, ...extra });
+  const rule: React.CSSProperties = { borderLeft: '1px solid ' + B_RULE };
 
   const slices = (c.levels || []).filter((l) => isFinite(l.rewardUSD));
   const denom = slices.reduce((s, l) => s + (l.rewardUSD > 0 ? l.rewardUSD : 0), 0);
-  const segCol = (l: Level) => (l.isRunner ? '#57c98a' : S_GREEN);
   const totalReward = c.planReward, hasReward = c.planRewardHas, planR = c.planR;
   const rrStr = isFinite(planR) ? planR.toFixed(2) : '—';
-  const rrColor = !isFinite(planR) ? '#b3b0a6' : planR >= 2.5 ? S_GREEN : planR >= 1.5 ? '#c9821f' : S_RED;
+  const rrColor = !isFinite(planR) ? '#b3b0a6' : planR >= 2.5 ? B_GREEN : planR >= 1.5 ? '#c9821f' : B_RED;
   const rrVerd = !isFinite(planR) ? 'Set levels' : planR >= 2.5 ? 'Strong edge' : planR >= 1.5 ? 'Fair edge' : 'Thin edge';
   let finalMove = NaN; (c.levels || []).forEach((l) => { if (l.hasPrice && isFinite(l.distPct)) { if (!isFinite(finalMove) || l.distPct > finalMove) finalMove = l.distPct; } });
   const rewEqPct = isFinite(totalReward) && isFinite(c.Q) && c.Q > 0 ? (totalReward / c.Q) * 100 : NaN;
-  const bignum = (txt: string, col: string, fs = 22) => <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: fs, lineHeight: 1, letterSpacing: fs >= 22 ? '-0.025em' : '-0.02em', color: col, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{txt}</span>;
 
-  const riskChip = (
-    <div style={{ ...chipSt, flex: '0 0 auto' }}>{cap('RISK')}
-      {bignum(isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : '—', S_RED)}
-      <div style={{ display: 'flex', gap: 11 }}>{isFinite(c.distStopPct) ? pct(c.distStopPct.toFixed(2) + '%', '#3a352c', 'pos') : null}{isFinite(c.riskPct) ? pct(c.riskPct.toFixed(2) + '%', S_PURP, 'eq') : null}</div>
+  // ── row 1: risk | reward + split bar | R:R (spans both rows)
+  const riskCell = (
+    <div style={cellSt({ flex: '0 0 auto', paddingLeft: 22, justifyContent: 'center' })}>{cap('RISK')}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+        {big(isFinite(c.riskUSD) ? '−' + money(c.riskUSD) : '—', B_RED, 21)}
+        {isFinite(c.distStopPct) ? sub(c.distStopPct.toFixed(2) + '%', '#3a352c', 'pos') : null}
+        {isFinite(c.riskPct) ? sub(c.riskPct.toFixed(2) + '%', B_PURP, 'eq') : null}
+      </div>
     </div>
   );
-  const rewChip = (
-    <div style={{ ...chipSt, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 20 }}>
-      <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>{cap('REWARD · PLAN')}
-        {bignum(hasReward ? '+' + money(totalReward) : '—', S_GREEN)}
-        <div style={{ display: 'flex', gap: 11 }}>{isFinite(finalMove) ? pct(finalMove.toFixed(2) + '%', '#3a352c', 'pos') : null}{isFinite(rewEqPct) ? pct(rewEqPct.toFixed(2) + '%', S_PURP, 'eq') : null}</div>
-      </div>
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <div style={{ display: 'flex', gap: 3, height: 6 }}>{slices.map((l, i) => { const s = denom > 0 ? Math.max(0, l.rewardUSD) / denom : 0; return s > 0 ? <div key={i} style={{ flexGrow: s, flexShrink: 1, flexBasis: 0, minWidth: 2, background: segCol(l), borderRadius: 99 }} /> : null; })}</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>{slices.map((l, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: i === 0 ? 'flex-start' : i === slices.length - 1 ? 'flex-end' : 'center' }}>
-            <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: S_GREEN, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(l.rewardUSD) ? '+' + money(l.rewardUSD) : '—'}</span>
-            <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 9, color: '#b3ada0', whiteSpace: 'nowrap' }}>{(l.isRunner ? 'Run' : 'TP' + l.i) + ' · ' + Math.round(l.pct) + '%'}</span>
+  const rewCell = (
+    <div style={cellSt({ flex: 1, minWidth: 0, justifyContent: 'center' })}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '0 0 auto' }}>{cap('REWARD · PLAN')}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+            {big(hasReward ? '+' + money(totalReward) : '—', B_GREEN, 21)}
+            {isFinite(finalMove) ? sub(finalMove.toFixed(2) + '%', '#3a352c', 'pos') : null}
+            {isFinite(rewEqPct) ? sub(rewEqPct.toFixed(2) + '%', B_PURP, 'eq') : null}
           </div>
-        ))}</div>
-      </div>
-    </div>
-  );
-
-  const price = c.mkt.mark;
-  const liqDist = isFinite(c.liq) ? (Math.abs(price - c.liq) / price) * 100 : NaN;
-  const stopDist = isFinite(c.S) ? (Math.abs(price - c.S) / price) * 100 : NaN;
-  const cushion = isFinite(liqDist) && isFinite(stopDist) && stopDist > 0 ? liqDist / stopDist : NaN;
-  const verd = !isFinite(cushion) ? { t: '—', c: '#b3b0a6' } : cushion >= 3 ? { t: 'Clear of liq', c: S_GREEN } : cushion >= 1.5 ? { t: 'Near liq', c: '#c9821f' } : { t: 'Close to liq', c: S_RED };
-  const stopPos = isFinite(liqDist) && isFinite(stopDist) && liqDist > 0 ? Math.max(4, Math.min(96, (1 - stopDist / liqDist) * 100)) : 50;
-  const tdot = (left: number, col: string) => <span style={{ position: 'absolute', left: left + '%', top: '50%', width: 11, height: 11, borderRadius: '50%', background: '#fff', border: '2.3px solid ' + col, transform: 'translate(-50%,-50%)' }} />;
-  const liqChip = (
-    <div style={{ ...chipSt, flex: 1, minWidth: 0, order: -1, gap: 9 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>{cap('STOP VS LIQ')}<span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 10.5, color: verd.c, whiteSpace: 'nowrap' }}>{verd.t}</span></div>
-      <div style={{ position: 'relative', height: 13, display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'absolute', left: 0, right: 0, height: 5, borderRadius: 99, background: S_ORANGE, overflow: 'hidden' }}><div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '9%', background: S_RED }} /></div>
-        {tdot(1, S_ORANGE)}{tdot(stopPos, S_RED)}{tdot(99, S_PURP)}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
-        <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10, color: '#3a352c', whiteSpace: 'nowrap' }}><span style={{ color: S_ORANGE }}>LIQ </span>{isFinite(c.liq) ? money(c.liq) : '—'}</span>
-        <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10, color: '#3a352c', whiteSpace: 'nowrap' }}><span style={{ color: S_RED }}>STOP </span>{isFinite(c.S) ? money(c.S) : '—'}</span>
-        <span style={{ marginLeft: 'auto', fontFamily: MONO, fontWeight: 600, fontSize: 10, color: S_PURP, whiteSpace: 'nowrap' }}>{'PRICE ' + money(price)}</span>
-      </div>
-    </div>
-  );
-  const posChip = (
-    <div style={{ ...chipSt, flex: '0 0 auto', gap: 7 }}>{cap('POSITION')}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>{bignum(isFinite(c.qty) ? c.qty.toFixed(c.qty < 10 ? 3 : 2) : '—', S_INK, 20)}<CoinIcon sym={d.sym} size={17} /></div>
-      <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 10.5, color: '#b3ada0', whiteSpace: 'nowrap' }}>{isFinite(c.notional) ? money(c.notional) + ' notional' : '—'}</span>
-    </div>
-  );
-  const marChip = (
-    <div style={{ ...chipSt, flex: '0 0 auto', gap: 7 }}>{cap('MARGIN')}
-      {bignum(isFinite(c.margin) ? money(c.margin) : '—', S_INK, 20)}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ width: 84, flex: '0 0 auto', height: 5, borderRadius: 99, background: '#f0edf9', overflow: 'hidden', display: 'block' }}><span style={{ display: 'block', height: '100%', width: Math.max(0, Math.min(100, c.marginPct || 0)) + '%', background: S_PURP, borderRadius: 99 }} /></span>
-        <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10.5, color: S_PURP, flex: '0 0 auto' }}>{isFinite(c.marginPct) ? c.marginPct.toFixed(0) + '%' : '—'}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 130, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div style={{ display: 'flex', gap: 2, height: 4 }}>{slices.map((l, i) => { const s = denom > 0 ? Math.max(0, l.rewardUSD) / denom : 0; return s > 0 ? <div key={i} style={{ flexGrow: s, flexShrink: 1, flexBasis: 0, minWidth: 2, background: i % 2 ? '#6cc492' : B_GREEN }} /> : null; })}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>{slices.map((l, i) => (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: i === 0 ? 'flex-start' : i === slices.length - 1 ? 'flex-end' : 'center' }}>
+              <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: '#3a352c', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{isFinite(l.rewardUSD) ? '+' + money(l.rewardUSD) : '—'}</span>
+              <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 8.5, letterSpacing: '0.14em', color: B_LBL, whiteSpace: 'nowrap' }}>{'TP' + l.i + ' · ' + Math.round(l.pct) + '%'}</span>
+            </div>
+          ))}</div>
+        </div>
       </div>
     </div>
   );
 
   const rLevels = (c.levels || []).filter((l) => isFinite(l.r));
   const rTotal = rLevels.reduce((s, l) => s + (l.r > 0 ? l.r : 0), 0);
-  const hero = (
-    <div style={{ width: 226, flex: '0 0 auto', background: '#fff', border: '1px solid #ece9f2', borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>{cap('R : R')}
-      <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 48, lineHeight: 1, letterSpacing: '-0.045em', color: rrColor, fontVariantNumeric: 'tabular-nums' }}>{rrStr}</span>
-      <span style={{ alignSelf: 'flex-start', fontWeight: 700, fontSize: 11.5, color: '#c9821f', background: '#fdf3e3', borderRadius: 6, padding: '4px 9px' }}>{rrVerd}</span>
-      {rLevels.length ? <div style={{ display: 'flex', gap: 3, height: 5, marginTop: 3 }}>{rLevels.map((l, i) => { const s = rTotal > 0 ? Math.max(0, l.r) / rTotal : 0; return s > 0 ? <div key={i} style={{ flexGrow: s, flexShrink: 1, flexBasis: 0, minWidth: 2, background: i % 2 ? '#6cc492' : S_GREEN, borderRadius: 99 }} /> : null; })}</div> : null}
-      {rLevels.length ? <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>{rLevels.map((l, i) => <span key={i} style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: '#3a352c', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{l.r.toFixed(2) + 'R'}</span>)}</div> : null}
+  const rrCell = (
+    <div style={cellSt({ width: 186, flex: '0 0 auto', paddingRight: 22, justifyContent: 'center', ...rule })}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>{cap('R : R')}<span style={{ fontFamily: PJS, fontWeight: 700, fontSize: 10.5, color: rrColor, whiteSpace: 'nowrap' }}>{rrVerd}</span></div>
+      {big(rrStr, rrColor, 40)}
+      {rLevels.length ? <div style={{ display: 'flex', gap: 2, height: 4 }}>{rLevels.map((l, i) => { const s = rTotal > 0 ? Math.max(0, l.r) / rTotal : 0; return s > 0 ? <div key={i} style={{ flexGrow: s, flexShrink: 1, flexBasis: 0, minWidth: 2, background: i % 2 ? '#6cc492' : B_GREEN }} /> : null; })}</div> : null}
+      {rLevels.length ? <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>{rLevels.map((l, i) => <span key={i} style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: '#3a352c', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{l.r.toFixed(2) + 'R'}</span>)}</div> : null}
+    </div>
+  );
+
+  // ── row 2: stop vs liq | position | margin
+  const price = c.mkt.mark;
+  const liqDist = isFinite(c.liq) ? (Math.abs(price - c.liq) / price) * 100 : NaN;
+  const stopDist = isFinite(c.S) ? (Math.abs(price - c.S) / price) * 100 : NaN;
+  const cushion = isFinite(liqDist) && isFinite(stopDist) && stopDist > 0 ? liqDist / stopDist : NaN;
+  const verd = !isFinite(cushion) ? { t: '—', c: '#b3b0a6' } : cushion >= 3 ? { t: 'Clear of liq', c: B_GREEN } : cushion >= 1.5 ? { t: 'Near liq', c: '#c9821f' } : { t: 'Close to liq', c: B_RED };
+  const stopPos = isFinite(liqDist) && isFinite(stopDist) && liqDist > 0 ? Math.max(4, Math.min(96, (1 - stopDist / liqDist) * 100)) : 50;
+  const tdot = (left: number, col: string) => <span style={{ position: 'absolute', left: left + '%', top: '50%', width: 10, height: 10, borderRadius: '50%', background: '#fff', border: '2.2px solid ' + col, transform: 'translate(-50%,-50%)' }} />;
+  const micro = (lab: string) => <span style={{ color: B_LBL, fontWeight: 500, letterSpacing: '0.14em', fontSize: 8.5 }}>{lab}</span>;
+  const liqCell = (
+    <div style={cellSt({ flex: 1, minWidth: 0, paddingLeft: 24 })}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>{cap('STOP VS LIQ')}<span style={{ fontFamily: PJS, fontWeight: 700, fontSize: 10.5, color: verd.c, whiteSpace: 'nowrap' }}>{verd.t}</span></div>
+      <div style={{ position: 'relative', height: 12, display: 'flex', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, height: 4, background: B_ORANGE, overflow: 'hidden' }}><div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '9%', background: B_RED }} /></div>
+        {tdot(1, B_ORANGE)}{tdot(stopPos, B_RED)}{tdot(99, B_PURP)}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+        <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10.5, color: '#3a352c', whiteSpace: 'nowrap' }}>{micro('LIQ ')}{isFinite(c.liq) ? money(c.liq) : '—'}</span>
+        <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 10.5, color: '#3a352c', whiteSpace: 'nowrap' }}>{micro('STOP ')}{isFinite(c.S) ? money(c.S) : '—'}</span>
+        <span style={{ marginLeft: 'auto', fontFamily: MONO, fontWeight: 600, fontSize: 10.5, color: B_PURP, whiteSpace: 'nowrap' }}>{micro('PRICE ')}{money(price)}</span>
+      </div>
+    </div>
+  );
+  const posCell = (
+    <div style={cellSt({ flex: '0 0 auto', justifyContent: 'center', ...rule })}>{cap('POSITION')}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>{big(isFinite(c.qty) ? c.qty.toFixed(c.qty < 10 ? 3 : 2) : '—', B_INK, 19)}<CoinIcon sym={d.sym} size={16} /></div>
+      <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 10.5, color: B_LBL, whiteSpace: 'nowrap' }}>{isFinite(c.notional) ? money(c.notional) + ' notional' : '—'}</span>
+    </div>
+  );
+  const marCell = (
+    <div style={cellSt({ flex: '0 0 auto', paddingRight: 22, justifyContent: 'center', ...rule })}>{cap('MARGIN')}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>{big(isFinite(c.margin) ? money(c.margin) : '—', B_INK, 19)}{isFinite(c.marginPct) ? <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: 11, color: B_PURP }}>{c.marginPct.toFixed(0) + '%'}</span> : null}</div>
+      <span style={{ display: 'block', width: 84, height: 4, background: '#f0efeb', overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: Math.max(0, Math.min(100, c.marginPct || 0)) + '%', background: B_PURP }} /></span>
     </div>
   );
 
   return (
-    <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', background: 'transparent', flexShrink: 0 }}>
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 10 }}>{riskChip}{rewChip}</div>
-        <div style={{ display: 'flex', gap: 10 }}>{posChip}{marChip}{liqChip}</div>
+    <div style={{ background: '#fff', border: '1px solid #ece9f2', borderRadius: 18, overflow: 'hidden', display: 'flex', alignItems: 'stretch' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'stretch' }}>{riskCell}<div style={{ display: 'flex', flex: 1, minWidth: 0, ...rule }}>{rewCell}</div></div>
+        <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid ' + B_RULE }}>{liqCell}{posCell}{marCell}</div>
       </div>
-      {hero}
+      {rrCell}
     </div>
   );
 }
@@ -131,15 +137,17 @@ function ConvDots({ n, sz = 6 }: { n: number; sz?: number }) {
 const cardBox: React.CSSProperties = { background: '#fff', border: '1px solid #ece9f2', borderRadius: 20, overflow: 'hidden' };
 
 const CHART_SYM_MAP: Record<string, string> = { BTC: 'BTC_USDT', ETH: 'ETH_USDT', SOL: 'SOL_USDT', XRP: 'XRP_USDT', DOGE: 'DOGE_USDT', BNB: 'BNB_USDT' };
-const CHART_HEIGHT = 650;
-const expandIcon = <><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1={21} y1={3} x2={14} y2={10} /><line x1={3} y1={21} x2={10} y2={14} /></>;
+const fitIcon = <><line x1={4} y1={4} x2={20} y2={4} /><line x1={4} y1={20} x2={20} y2={20} /><line x1={12} y1={8} x2={12} y2={16} /><polyline points="9 11 12 8 15 11" /><polyline points="9 13 12 16 15 13" /></>;
+const expandGlyph = <><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1={21} y1={3} x2={14} y2={10} /><line x1={3} y1={21} x2={10} y2={14} /></>;
+const collapseGlyph = <><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1={14} y1={10} x2={21} y2={3} /><line x1={3} y1={21} x2={10} y2={14} /></>;
 
 // ── Live chart card — the standalone Volume Candle Chart, driven by this plan's own
-// levels + dates (no section header; content self-identifies). The plan is passed to the
-// iframe as a #embed=1&plan=<json> hash payload. Expand → full-viewport in-app overlay.
+// levels + dates. Viewport-flexible height; expanding promotes the SAME box to full-screen
+// (no second iframe, so zoom/pan/fit survive). Fit-plan posts a message into the iframe.
 function ChartCard({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: PlanDraft }) {
   const [full, setFull] = useState(false);
-  // Esc closes the expand overlay (matches the dc's _chartEsc)
+  const [fitOn, setFitOn] = useState(false);
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
   useEffect(() => {
     if (!full) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFull(false); };
@@ -154,12 +162,10 @@ function ChartCard({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
   let fills = rawFills
     .map((r, i) => ({ p: tpNum(r.price), pct: i === rawFills.length - 1 ? (isFinite(fp[i]) ? fp[i] : fRem) : (isFinite(fp[i]) ? fp[i] : 0) }))
     .filter((f) => isFinite(f.p));
-  // a plan that never split its entry carries no percentages — treat it as one full fill
   const fillSum = fills.reduce((s, f) => s + (isFinite(f.pct) ? f.pct : 0), 0);
   if (fills.length && fillSum <= 0) fills = fills.map((f) => ({ ...f, pct: +(100 / fills.length).toFixed(2) }));
   const targets = (c.levels || []).filter((l) => l.hasPrice).map((l) => ({ p: l.price, pct: isFinite(l.pct) ? l.pct : null }));
 
-  // follow live only while the planned window still runs; a closed window frames the trade
   let end: string = 'live';
   const eRaw = p.tradeDate || d.tradeDate || null;
   if (eRaw) {
@@ -178,39 +184,29 @@ function ChartCard({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
     liq: isFinite(c.liq) ? c.liq : null,
     start: p.startDate || d.startDate || null,
     end,
-    // a start date is enough — an open-ended plan simply follows live (NOT !(start&&end))
     needDates: !(p.startDate || d.startDate),
   };
   const chartSrc = '/candle-chart.html#embed=1&plan=' + encodeURIComponent(JSON.stringify(payload));
-  // remount when the window/timeframe changes, so a tweak or a date edit applies immediately
   const chartKey = p.id + '_livechart|' + payload.contract + '|' + payload.interval + '|' + (payload.start || '') + '|' + payload.end;
 
+  const boxStyle: React.CSSProperties = full
+    ? { position: 'fixed', inset: 0, zIndex: 9000, height: 'auto', maxHeight: 'none', background: '#fff' }
+    : { position: 'relative', flex: '0 0 auto', height: 'calc(100vh - 362px)', minHeight: 360, background: '#fff' };
+  const fit = () => { const f = frameRef.current; if (f && f.contentWindow) f.contentWindow.postMessage({ type: 'tdFitPlan' }, '*'); setFitOn((v) => !v); };
+
   return (
-    <div style={cardBox}>
-      <div style={{ position: 'relative' }}>
-        <button type="button" title="Expand chart" aria-label="Expand chart" className="pd-icobtn"
-          onClick={(e) => { e.stopPropagation(); setFull(true); }}
-          style={{ position: 'absolute', top: 10, right: 10, zIndex: 3, width: 26, height: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.92)' }}>
-          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">{expandIcon}</svg>
-        </button>
+    <div style={{ ...cardBox, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="pl-chart" style={boxStyle}>
+        <iframe key={chartKey} ref={frameRef} src={chartSrc} title={full ? 'Live chart full screen' : 'Live chart'} loading="lazy" style={{ display: 'block', width: '100%', height: '100%', border: 'none' }} />
+        <div style={{ position: 'absolute', top: full ? 10 : 6, right: full ? 10 : 6, zIndex: 3, display: 'flex', gap: 3 }}>
+          <button type="button" title="Fit plan — scale the axis to show every level" aria-label="Fit plan" onClick={(e) => { e.stopPropagation(); fit(); }} className={'tpheadicon' + (fitOn ? ' tpheadicon-on' : '')} style={{ width: full ? 28 : 24, height: full ? 28 : 24, padding: 0, background: fitOn ? undefined : 'rgba(255,255,255,0.92)' }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">{fitIcon}</svg>
+          </button>
+          {full
+            ? <button type="button" title="Collapse chart (Esc)" aria-label="Collapse chart" onClick={(e) => { e.stopPropagation(); setFull(false); }} className="tpheadicon" style={{ width: 28, height: 28, padding: 0, background: 'rgba(255,255,255,0.92)' }}><svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">{collapseGlyph}</svg></button>
+            : <button type="button" title="Expand chart" aria-label="Expand chart" onClick={(e) => { e.stopPropagation(); setFull(true); }} className="tpheadicon" style={{ width: 24, height: 24, padding: 0, background: 'rgba(255,255,255,0.92)' }}><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">{expandGlyph}</svg></button>}
+        </div>
       </div>
-      <div style={{ position: 'relative', height: CHART_HEIGHT, background: '#fff' }}>
-        <iframe key={chartKey} src={chartSrc} title="Live chart" loading="lazy" style={{ display: 'block', width: '100%', height: '100%', border: 'none' }} />
-      </div>
-      {full ? createPortal(
-        <div onClick={() => setFull(false)} style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(26,24,19,0.55)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: '100%', height: '100%', maxWidth: 1680, background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 70px rgba(20,20,12,0.4)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '12px 16px', borderBottom: '1px solid #ebe2fb', background: 'linear-gradient(180deg,#ffffff 0%,#faf8ff 100%)', flex: '0 0 auto' }}>
-              <span style={{ width: 7, height: 7, borderRadius: 2, background: '#7c5cff', flex: '0 0 auto' }} />
-              <span style={{ fontWeight: 800, fontSize: 10.5, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#7c5cff' }}>Live chart</span>
-              <span style={{ fontWeight: 700, fontSize: 11, color: '#b3b0a6' }}>Esc to close</span>
-              <button type="button" title="Close" aria-label="Close" className="pd-icobtn" onClick={() => setFull(false)} style={{ marginLeft: 'auto', width: 28, height: 28, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round"><line x1={18} y1={6} x2={6} y2={18} /><line x1={6} y1={6} x2={18} y2={18} /></svg>
-              </button>
-            </div>
-            <iframe key={chartKey + '_full'} src={chartSrc} title="Live chart full screen" style={{ display: 'block', width: '100%', flex: '1 1 auto', border: 'none' }} />
-          </div>
-        </div>, document.body) : null}
     </div>
   );
 }
@@ -257,9 +253,9 @@ function LevelsMap({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
   const keyFor = (n: LNode) => n.kind === 'tp' ? 'tp' + n.t.i : n.kind === 'trail' ? 'trail' + n.t.i : n.kind === 'fill' ? 'fill' + n.f.i : n.kind;
   const grpOf = (n: LNode): 'targets' | 'entry' | 'risk' => (n.kind === 'tp' || n.kind === 'trail') ? 'targets' : n.kind === 'fill' ? 'entry' : 'risk';
   const grpMeta = {
-    targets: { t: 'Targets', sub: 'bank & trail out', c: GREEN, field: 'targetNote' as const, ph: 'how you scale out, and why here', order: 1 },
-    entry: { t: 'Entry', sub: 'limit-ladder in', c: PURPD, field: 'trigger' as const, ph: 'what has to happen before you fill', order: 2 },
-    risk: { t: 'Risk', sub: 'stop & liquidation', c: RED, field: 'invalidation' as const, ph: 'what would prove this thesis wrong', order: 3 },
+    targets: { t: 'Targets', sub: 'bank & trail out', c: GREEN },
+    entry: { t: 'Entry', sub: 'limit-ladder in', c: PURPD },
+    risk: { t: 'Risk', sub: 'stop & liquidation', c: RED },
   };
   const segBelow = (n: LNode): { bg: string; dashed: boolean } => {
     if (n.kind === 'tp') return hit['tp' + n.t.i] ? { bg: GREEN, dashed: false } : { bg: '#d8d3ca', dashed: true };
@@ -281,7 +277,6 @@ function LevelsMap({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
     if (firstInSec) { const m = grpMeta[g]; rows.push(
       <div key={'h' + i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: isFirst ? 0 : 17, marginBottom: 11 }}>
         <span style={{ fontWeight: 800, fontSize: 9.5, letterSpacing: '.09em', textTransform: 'uppercase', color: m.c }}>{m.t}</span>
-        <sup style={{ fontFamily: "'Newsreader',Georgia,serif", fontWeight: 500, fontSize: 10, color: m.c, marginLeft: -4, opacity: 0.75 }}>{m.order}</sup>
         <span style={{ fontWeight: 700, fontSize: 9.5, color: MUT }}>{m.sub}</span>
         <div style={{ flex: 1, height: 1, background: '#efece5' }} />
       </div>); }
@@ -397,47 +392,14 @@ function LevelsMap({ p, c, d }: { p: Plan; c: ReturnType<typeof tpCompute>; d: P
         </div>
         <div style={{ display: 'flex', height: 7, borderRadius: 99, overflow: 'hidden', background: '#eceae3' }}>{segs}</div>
       </div>
-      <div style={{ padding: '16px 20px 20px' }}>{rows}
-        {/* footnotes: the dissolved thesis fields, numbered to their group markers */}
-        <div style={{ marginTop: 20, paddingTop: 13, borderTop: '1px solid #efece5', display: 'flex', flexDirection: 'column', gap: 9 }}>
-          {(['targets', 'entry', 'risk'] as const).map((g) => { const m = grpMeta[g]; return (
-            <div key={'fn' + g} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <sup style={{ fontFamily: "'Newsreader',Georgia,serif", fontWeight: 500, fontSize: 11, lineHeight: 1.7, color: m.c, flex: '0 0 auto', opacity: 0.85 }}>{m.order}</sup>
-              <textarea key={p.id + '_' + m.field} defaultValue={(p[m.field] as string) || ''} placeholder={m.ph} rows={1}
-                onClick={(e) => e.stopPropagation()}
-                onBlur={(e) => { const v = e.target.value.trim(); if (v !== ((p[m.field] as string) || '')) planActions.updateThesis(p.id, m.field, v); }}
-                style={{ display: 'block', width: '100%', boxSizing: 'border-box', margin: 0, padding: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontFamily: "'Newsreader',Georgia,serif", fontWeight: 400, fontSize: 12.5, lineHeight: 1.55, color: '#5f5c52', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', overflowX: 'hidden', fieldSizing: 'content' } as React.CSSProperties} />
-            </div>
-          ); })}
-        </div>
-      </div>
+      <div style={{ padding: '16px 20px 20px' }}>{rows}</div>
     </div>
   );
 }
 
-// ── header pills ──
-function ConvPill({ p }: { p: Plan }) {
-  const [open, setOpen] = useState(false);
-  const cur = p.conv === 'high' ? 3 : p.conv === 'low' ? 1 : 2;
-  return (
-    <span style={{ position: 'relative', display: 'inline-flex' }}>
-      <button onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} title="Conviction" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', padding: 0 }}>
-        <ConvDots n={cur} /><svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#bbb3a8" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-      </button>
-      {open ? <PopMenu onClose={() => setOpen(false)} top={8}>{CONVS.map((cv) => <PopRow key={cv.k} active={cv.k === p.conv} onClick={() => { setOpen(false); if (cv.k !== p.conv) planActions.updateThesis(p.id, 'conv', cv.k); }}><ConvDots n={cv.n} />{cv.label}</PopRow>)}</PopMenu> : null}
-    </span>
-  );
-}
-function StatusPill({ p }: { p: Plan }) {
-  const [open, setOpen] = useState(false);
-  const sm = STATUSES.find((s) => s.k === p.status) || STATUSES[0];
-  return (
-    <span style={{ position: 'relative', display: 'inline-flex' }}>
-      <button onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 800, fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: sm.c, background: sm.bg, padding: '3px 6px 3px 9px', borderRadius: 99, border: 'none' }}>{sm.label}<svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.65 }}><polyline points="6 9 12 15 18 9" /></svg></button>
-      {open ? <PopMenu onClose={() => setOpen(false)} top={6}>{STATUSES.map((st) => <PopRow key={st.k} active={st.k === p.status} onClick={() => { setOpen(false); if (st.k !== p.status) planActions.movePlan(p.id, st.k); }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: st.c, flex: '0 0 auto' }} />{st.label}</PopRow>)}</PopMenu> : null}
-    </span>
-  );
-}
+// ── header baseline-row menus + thesis column ──
+function hexRgba(hex: string, a: number) { const n = parseInt(hex.slice(1), 16); return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+
 function PopMenu({ children, onClose, top }: { children: React.ReactNode; onClose: () => void; top: number }) {
   return (
     <>
@@ -446,36 +408,135 @@ function PopMenu({ children, onClose, top }: { children: React.ReactNode; onClos
     </>
   );
 }
-function PopRow({ children, active, onClick }: { children: React.ReactNode; active: boolean; onClick: () => void }) {
+function PopRow({ children, label, active, onClick }: { children?: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
   const [h, setH] = useState(false);
   return (
     <button onClick={(e) => { e.stopPropagation(); onClick(); }} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, border: 'none', background: active || h ? '#faf9f7' : 'transparent', fontFamily: 'inherit', textAlign: 'left', width: '100%' }}>
-      {children}<span style={{ flex: 1, fontWeight: 700, fontSize: 12.5, color: '#1a1813' }} />
+      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, border: 'none', background: active || h ? '#faf9f7' : 'transparent', fontFamily: PJS, textAlign: 'left', width: '100%' }}>
+      {children}
+      <span style={{ flex: 1, fontWeight: 700, fontSize: 12.5, color: '#1a1813' }}>{label}</span>
       {active ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#1f9d55" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : null}
     </button>
   );
 }
 
-const KF = `@keyframes pdIn{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes pdFade{from{opacity:0}to{opacity:1}}@keyframes lmpop{0%{transform:scale(1)}45%{transform:scale(1.42)}100%{transform:scale(1)}}@keyframes lmglow{0%{box-shadow:0 0 0 0 rgba(31,157,85,.5)}100%{box-shadow:0 0 0 13px rgba(31,157,85,0)}}.lmdot{cursor:pointer;transition:transform .15s ease}.lmdot:hover{transform:scale(1.13)}.lmnode{cursor:pointer;border-radius:11px;transition:background .14s}.lmnode:hover{background:#faf8f4}.lmpop{animation:lmpop .5s cubic-bezier(.34,1.56,.64,1)}.lmring{animation:lmglow .7s ease-out}.lmghost2:hover{background:#f1efe9 !important;color:#6a6357 !important}.pd-icobtn:hover{background:#1a1813 !important;border-color:#1a1813 !important;color:#fff !important}.pd-icobtn-del:hover{background:#df5338 !important;border-color:#df5338 !important;color:#fff !important}.pd-resize::before{content:"";position:absolute;left:0;top:0;height:100%;width:3px;background:transparent;transition:background .15s}.pd-resize:hover::before{background:#7c5cff}.pd-resize::after{content:"";position:absolute;left:3px;top:50%;transform:translateY(-50%);width:4px;height:34px;border-radius:3px;background:#d8d4ea;opacity:0;transition:opacity .15s}.pd-resize:hover::after{opacity:1}`;
-
-// the plan drawer has its own wide, independently-persisted width (tdplan_pdrawer_w)
-const PDW_MIN = 760;
-const pdwClamp = (v: number) => Math.max(PDW_MIN, Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.98 : 1760, v));
-function usePlanDrawerWidth(): [number, (v: number) => void] {
-  const [w, setW] = useState(1296);
-  useEffect(() => {
-    let init = Math.min(1760, window.innerWidth * 0.9);
-    try { const s = localStorage.getItem('tdplan_pdrawer_w'); if (s) init = pdwClamp(parseFloat(s)); } catch { /* ignore */ }
-    setW(init);
-  }, []);
-  const set = (v: number) => { const c = pdwClamp(v); setW(c); try { localStorage.setItem('tdplan_pdrawer_w', String(Math.round(c))); } catch { /* ignore */ } };
-  return [w, set];
+function StatusChip({ p }: { p: Plan }) {
+  const [open, setOpen] = useState(false);
+  const sm = STATUSES.find((s) => s.k === p.status) || STATUSES[0];
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex' }}>
+      <button onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: PJS, fontWeight: 800, fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: sm.c, background: 'transparent', padding: '3px 6px', borderRadius: 4, border: '1px solid ' + sm.border }}>
+        {sm.label}
+        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.65 }}><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      {open ? <PopMenu onClose={() => setOpen(false)} top={6}>{STATUSES.map((st) => <PopRow key={st.k} active={st.k === p.status} label={st.label} onClick={() => { setOpen(false); if (st.k !== p.status) planActions.movePlan(p.id, st.k); }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: st.c, flex: '0 0 auto' }} /></PopRow>)}</PopMenu> : null}
+    </span>
+  );
 }
 
+function ConvChip({ p }: { p: Plan }) {
+  const [open, setOpen] = useState(false);
+  const cur = p.conv === 'high' ? 3 : p.conv === 'low' ? 1 : 2;
+  const word = p.conv === 'high' ? 'High' : p.conv === 'low' ? 'Low' : 'Medium';
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+      <span style={{ position: 'relative', display: 'inline-flex' }}>
+        <button onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} title="Conviction" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', padding: 0 }}>
+          <ConvDots n={cur} />
+          <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#bbb3a8" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+        </button>
+        {open ? <PopMenu onClose={() => setOpen(false)} top={8}>{CONVS.map((cv) => <PopRow key={cv.k} active={cv.k === p.conv} label={cv.label} onClick={() => { setOpen(false); if (cv.k !== p.conv) planActions.updateThesis(p.id, 'conv', cv.k); }}><ConvDots n={cv.n} /></PopRow>)}</PopMenu> : null}
+      </span>
+      <span style={{ fontFamily: PJS, fontWeight: 700, fontSize: 11.5, color: '#3a352c', whiteSpace: 'nowrap' }}>{word}</span>
+    </span>
+  );
+}
+
+const WMONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function parseISO(s?: string): Date | null { if (!s) return null; const q = String(s).split('-'); return new Date(+q[0], +q[1] - 1, +q[2]); }
+function dayN(x: Date | null): number | null { return x ? new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime() : null; }
+function WindowChip({ p }: { p: Plan }) {
+  const start = parseISO(p.startDate), sel = parseISO(p.tradeDate);
+  const hasVal = !!(start || sel);
+  const fmtD = (x: Date) => WMONS[x.getMonth()] + ' ' + x.getDate();
+  const compact = start && sel ? fmtD(start) + ' → ' + (start.getMonth() === sel.getMonth() ? String(sel.getDate()) : fmtD(sel)) : start ? fmtD(start) + ' → ?' : sel ? fmtD(sel) : 'Set window';
+  const holdDays = start && sel ? Math.round(((dayN(sel) as number) - (dayN(start) as number)) / 86400000) : null;
+  return (
+    <PlanInlineDate plan={p}>{({ onToggle }) => (
+      <button onClick={onToggle} title={hasVal ? 'Change planned window' : 'Set planned window'} className="tpheadicon" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'baseline', gap: 7, background: 'transparent', border: 'none', borderRadius: 6, padding: '1px 3px', width: 'auto', height: 'auto', color: 'inherit' }}>
+        <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: hasVal ? '#1a1813' : '#b3ada0', whiteSpace: 'nowrap' }}>{compact}</span>
+        {holdDays != null ? <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 11, color: '#b3ada0', whiteSpace: 'nowrap' }}>{holdDays + 'd'}</span> : null}
+      </button>
+    )}</PlanInlineDate>
+  );
+}
+
+function RationaleField({ p }: { p: Plan }) {
+  return (
+    <textarea key={'th_rationale_' + (p.rationale || '')} rows={1} defaultValue={p.rationale || ''} placeholder="why this trade — the one-line case" spellCheck={false} className="tp-thline"
+      onBlur={(e) => { const v = e.target.value.trim(); if (v !== (p.rationale || '')) planActions.updateThesis(p.id, 'rationale', v); }}
+      style={{ display: 'block', width: '100%', boxSizing: 'border-box', margin: 0, padding: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontFamily: "'Newsreader',Georgia,serif", fontStyle: 'italic', fontWeight: 400, fontSize: 15, lineHeight: 1.5, color: '#5f5c52', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', overflowX: 'hidden', fieldSizing: 'content' } as React.CSSProperties} />
+  );
+}
+
+const THESIS_FIELDS: [keyof PlanDraft, string, string][] = [['rationale', 'Rationale', '#7c5cff'], ['trigger', 'Trigger', '#1f9d55'], ['invalidation', 'Invalidation', '#df5338'], ['targetNote', 'Target / exit', '#c9821f']];
+function thFilled(p: Plan) { return THESIS_FIELDS.filter((f) => String((p as unknown as Record<string, unknown>)[f[0]] || '').trim()).length; }
+
+function ThesisStub({ p }: { p: Plan }) {
+  const filled = thFilled(p);
+  return (
+    <button type="button" onClick={() => planActions.toggleThesisCol()} title={'Open thesis · ' + filled + ' of 4 written'} aria-label="Open thesis"
+      style={{ width: 26, alignSelf: 'stretch', minHeight: 190, cursor: 'pointer', background: '#faf8ff', border: '1px solid #ece9f2', borderRadius: 12, padding: '9px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#7c5cff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+      <span style={{ writingMode: 'vertical-rl', fontFamily: PJS, fontWeight: 800, fontSize: 9.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#8c7ad6' }}>Thesis</span>
+      <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, color: filled === 4 ? '#7c5cff' : '#c2410c' }}>{filled}</span>
+    </button>
+  );
+}
+
+function ThesisCol({ p }: { p: Plan }) {
+  const filled = thFilled(p);
+  const rec = p as unknown as Record<string, string>;
+  const tRow = (field: keyof PlanDraft, lab: string, dot: string, last: boolean) => (
+    <div key={field as string} className="tp-thesis-cell" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 18px', borderBottom: last ? 'none' : '1px solid #f3f2ef', ['--tint' as string]: hexRgba(dot, 0.05), ['--tintHover' as string]: hexRgba(dot, 0.028) } as React.CSSProperties}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: PJS, fontWeight: 800, fontSize: 9.5, letterSpacing: '0.07em', textTransform: 'uppercase', color: hexRgba(dot, 0.92) }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flex: '0 0 auto' }} />{lab}
+      </span>
+      <textarea key={p.id + '_' + (field as string) + '_' + (rec[field as string] || '')} className="tp-thesis-edit" rows={1} defaultValue={rec[field as string] || ''} placeholder={'Add ' + lab.toLowerCase() + '…'}
+        onBlur={(e) => { const v = e.target.value.trim(); if (v !== (rec[field as string] || '')) planActions.updateThesis(p.id, field, v); }}
+        style={{ display: 'block', width: '100%', maxWidth: '100%', margin: 0, padding: 0, boxSizing: 'border-box', resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontFamily: PJS, fontWeight: 500, fontSize: 13, lineHeight: 1.55, color: '#3a382f', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', overflowX: 'hidden', fieldSizing: 'content' } as React.CSSProperties} />
+    </div>
+  );
+  return (
+    <div style={cardBox}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderBottom: '1px solid #f4f1ea', background: 'linear-gradient(180deg,#ffffff,#faf8ff)' }}>
+        <span style={{ width: 7, height: 7, borderRadius: 2, background: '#7c5cff', flex: '0 0 auto' }} />
+        <span style={{ fontFamily: PJS, fontWeight: 800, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7c5cff' }}>Thesis</span>
+        <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10, color: '#c0bbb0', marginLeft: 'auto' }}>{filled + '/4'}</span>
+        <button type="button" onClick={() => planActions.toggleThesisCol()} title="Close thesis" aria-label="Close thesis" className="tpheadicon">
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round"><path d="m6 17 5-5-5-5" /><path d="m13 17 5-5-5-5" /></svg>
+        </button>
+      </div>
+      <div>{THESIS_FIELDS.map((f, i) => tRow(f[0], f[1], f[2], i === THESIS_FIELDS.length - 1))}</div>
+    </div>
+  );
+}
+
+function computeHold(d: PlanDraft): string | null {
+  if (!d.tradeDate) return null;
+  const pp = String(d.tradeDate).split('-'); const sel = new Date(+pp[0], +pp[1] - 1, +pp[2]);
+  let st: Date;
+  if (d.startDate) { const sp = String(d.startDate).split('-'); st = new Date(+sp[0], +sp[1] - 1, +sp[2]); }
+  else { const n = new Date(); st = new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+  const days = Math.round((sel.getTime() - st.getTime()) / 86400000);
+  if (isNaN(days) || days < 0) return null;
+  return days === 0 ? 'today' : days >= 14 ? '~' + Math.round(days / 7) + 'w' : '~' + days + 'd';
+}
+
+const KF = `@keyframes pdFadeIn{from{opacity:0}to{opacity:1}}@keyframes lmpop{0%{transform:scale(1)}45%{transform:scale(1.42)}100%{transform:scale(1)}}@keyframes lmglow{0%{box-shadow:0 0 0 0 rgba(31,157,85,.5)}100%{box-shadow:0 0 0 13px rgba(31,157,85,0)}}.lmdot{cursor:pointer;transition:transform .15s ease}.lmdot:hover{transform:scale(1.13)}.lmnode{cursor:pointer;border-radius:11px;transition:background .14s}.lmnode:hover{background:#faf8f4}.lmpop{animation:lmpop .5s cubic-bezier(.34,1.56,.64,1)}.lmring{animation:lmglow .7s ease-out}.lmghost2:hover{background:#f1efe9 !important;color:#6a6357 !important}.tpheadicon{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;color:#7c5cff;background:transparent;border:1px solid transparent;cursor:pointer;transition:background .14s,border-color .14s,color .14s}.tpheadicon:hover{background:rgba(124,92,255,0.11);border-color:rgba(124,92,255,0.22);color:#5b3fd6}.tpheadicon:active{background:rgba(124,92,255,0.18)}.tpheadicon-on{background:rgba(124,92,255,0.14);border-color:rgba(124,92,255,0.28);color:#5b3fd6}.tpheadicon-on:hover{background:rgba(124,92,255,0.2)}.tpdrawericon{transition:background .14s,border-color .14s,color .14s}.tpdrawericon:hover{background:#1a1813 !important;border-color:#1a1813 !important;color:#fff !important}.tpdrawericon-del:hover{background:#df5338 !important;border-color:#df5338 !important;color:#fff !important}.tp-thesis-edit{cursor:text}.tp-thesis-edit::placeholder{color:#c5c3b9;font-style:italic}.tp-thesis-cell{transition:background .12s}.tp-thesis-cell:focus-within{background:var(--tint)}.tp-thline::placeholder{color:#c5c3b9;font-style:italic}@media(max-width:1160px){.pl-grid{grid-template-columns:1fr !important}.pl-chart{height:520px !important;flex:0 0 auto !important;max-height:none !important}}@media(max-height:720px){.pl-chart{height:440px !important;flex:0 0 auto !important;max-height:none !important}}`;
+
 export function PlanDrawer() {
-  const { openPlanId, plans } = usePlanStore();
-  const [drawerW, setDrawerW] = usePlanDrawerWidth();
+  const { openPlanId, plans, thesisCol } = usePlanStore();
   const { data: account } = useAccount();
   const { data: positions } = usePositions();
   const { data: candles } = useBtcCandles(Math.floor(Date.now() / 1000) - 20 * 86400);
@@ -487,59 +548,59 @@ export function PlanDrawer() {
   if (!p) return null;
   const d = planToDraft(p), c = tpCompute(d, equity, p.sym === 'BTC' ? btcMark : undefined);
   const close = () => planActions.closePlan();
-  const dot = <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#d6d4cc' }} />;
-  const ico = (title: string, onClick: () => void, kids: React.ReactNode, del?: boolean) => (
-    <button onClick={onClick} title={title} className={'pd-icobtn' + (del ? ' pd-icobtn-del' : '')} style={{ cursor: 'pointer', border: '1px solid #ebe9e4', background: '#fff', width: 36, height: 36, borderRadius: 11, color: '#8c897f', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(20,20,12,0.04)', transition: 'color .12s, border-color .12s, background .12s' }}>{kids}</button>
+  const isShort = d.dir === 'short';
+  const levTxt = (tpNum(d.lev) || 5) + '×';
+  const holdTxt = computeHold(d);
+
+  const iconBtn = (title: string, onClick: () => void, kids: React.ReactNode, del?: boolean) => (
+    <button onClick={onClick} title={title} className={'tpdrawericon' + (del ? ' tpdrawericon-del' : '')} style={{ cursor: 'pointer', border: '1px solid #ece9f2', background: '#fff', width: 30, height: 30, borderRadius: 9, color: '#9b978d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{kids}</button>
   );
+  const cLbl = (t: string) => <span style={{ fontFamily: MONO, fontWeight: 500, fontSize: 8.5, letterSpacing: '0.16em', color: '#b3ada0', whiteSpace: 'nowrap' }}>{t}</span>;
+  const hCell = (lbl: string, kids: React.ReactNode, extra?: React.CSSProperties) => <div style={{ padding: '10px 20px 11px', display: 'flex', alignItems: 'center', gap: 8, borderLeft: '1px solid #f1eff5', ...extra }}>{cLbl(lbl)}{kids}</div>;
 
   return (
     <>
       <style>{KF}</style>
-      <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(20,18,12,0.34)', animation: 'pdFade .2s both' }} />
-      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: drawerW, maxWidth: '98vw', zIndex: 91, background: '#fff', boxShadow: '-30px 0 80px rgba(20,18,12,0.26)', display: 'flex', flexDirection: 'column', animation: 'pdIn .4s cubic-bezier(.22,.9,.28,1) both' }}>
-        <div className="pd-resize" onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX, startW = drawerW; const move = (ev: MouseEvent) => setDrawerW(startW + (startX - ev.clientX)); const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); }; window.addEventListener('mousemove', move); window.addEventListener('mouseup', up); }}
-          title="Drag to resize" style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: 9, cursor: 'ew-resize', zIndex: 93 }} />
-        {/* header */}
-        <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap', padding: '18px 26px', borderBottom: '1px solid #ece9e2', background: 'linear-gradient(180deg,#ffffff,#faf9f7)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 13, minWidth: 0 }}>
-              <div style={{ width: 42, height: 42, flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '1px solid #ece9e2', borderRadius: 13, boxShadow: '0 1px 2px rgba(20,20,12,0.04)' }}><div style={{ transform: 'scale(2.5)', display: 'flex' }}><CoinIcon sym={p.sym} /></div></div>
-              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2 }}>
-                <span style={{ fontWeight: 700, fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a99ce4' }}>Trade plan</span>
-                <span style={{ fontWeight: 800, fontSize: 24, lineHeight: 1.08, letterSpacing: '-0.025em', color: '#1a1813', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tpPlanName(p)}</span>
-                {/* rationale — the dissolved thesis's one-line "why", moved beside the title */}
-                <textarea key={p.id + '_rationale'} rows={1} defaultValue={p.rationale || ''} placeholder="why this trade — the one-line case" spellCheck={false}
-                  onClick={(e) => e.stopPropagation()}
-                  onBlur={(e) => { const v = e.target.value.trim(); if (v !== (p.rationale || '')) planActions.updateThesis(p.id, 'rationale', v); }}
-                  style={{ display: 'block', width: '100%', boxSizing: 'border-box', margin: '3px 0 0', padding: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontFamily: "'Newsreader',Georgia,serif", fontStyle: 'italic', fontWeight: 400, fontSize: 15, lineHeight: 1.45, color: '#5f5c52', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', overflowX: 'hidden', fieldSizing: 'content' } as React.CSSProperties} />
+      <div style={{ position: 'fixed', inset: 0, zIndex: 91, background: '#fff', display: 'flex', flexDirection: 'column', animation: 'pdFadeIn .22s ease', fontFamily: PJS }}>
+        {/* header — 2b Swiss spine */}
+        <div style={{ flex: '0 0 auto', display: 'flex', borderBottom: '1px solid #ece9e2', background: '#fff' }}>
+          <div style={{ flex: '0 0 auto', width: 46, borderRight: '1px solid #f1eff5', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fcfcfb' }}>
+            <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontFamily: MONO, fontWeight: 600, fontSize: 9, letterSpacing: '0.3em', color: '#a99ce4', whiteSpace: 'nowrap' }}>TRADE PLAN</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, padding: '22px 24px 16px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minWidth: 320 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                  <div style={{ flex: '0 0 auto', display: 'flex' }}><CoinIcon sym={p.sym} size={30} /></div>
+                  <span style={{ fontFamily: PJS, fontWeight: 800, fontSize: 31, lineHeight: 1, letterSpacing: '-0.038em', color: '#1a1813', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tpPlanName(p)}</span>
+                </div>
+                <RationaleField p={p} />
+              </div>
+              <div style={{ display: 'flex', gap: 5, flex: '0 0 auto' }}>
+                {iconBtn('Edit plan', () => planActions.startEdit(p.id, planToDraft(p)), <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)}
+                {iconBtn('Duplicate', () => planActions.duplicatePlan(p.id), <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><rect x={9} y={9} width={13} height={13} rx={2} /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>)}
+                {iconBtn('Delete', () => { planActions.deletePlan(p.id); close(); }, <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>, true)}
+                {iconBtn('Close', close, <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m6 17 5-5-5-5" /><path d="m13 17 5-5-5-5" /></svg>)}
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <ConvPill p={p} />{dot}<StatusPill p={p} />{dot}
-              <PlanInlineDate plan={p}>{({ onToggle }) => { const w = planWindowLabel(p); return (
-                <button onClick={onToggle} title={w ? 'Change planned window' : 'Set planned window'}
-                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 800, fontSize: 10, letterSpacing: '0.03em', color: w ? '#6b46e0' : '#a99ce4', background: w ? '#f3eefe' : 'transparent', border: '1px solid ' + (w ? '#e5dcfa' : '#e3dcf6'), borderRadius: 99, padding: '3px 9px 3px 7px', borderStyle: w ? 'solid' : 'dashed', fontFamily: 'inherit' }}>
-                  <CalIcon size={11} stroke="currentColor" />{w ? w.main + (w.sub ? ' · ' + w.sub : '') : 'Set date'}
-                </button>
-              ); }}</PlanInlineDate>
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column-reverse', alignItems: 'flex-end', gap: 13, flex: '0 0 auto' }}>
-            <DirLevHeading d={d} />
-            <div style={{ display: 'flex', gap: 8 }}>
-              {ico('Edit plan', () => planActions.startEdit(p.id, planToDraft(p)), <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)}
-              {ico('Duplicate', () => planActions.duplicatePlan(p.id), <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><rect x={9} y={9} width={13} height={13} rx={2} /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>)}
-              {ico('Delete', () => { planActions.deletePlan(p.id); close(); }, <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>, true)}
-              {ico('Close', close, <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m6 17 5-5-5-5" /><path d="m13 17 5-5-5-5" /></svg>)}
+            <div style={{ display: 'flex', alignItems: 'center', borderTop: '1px solid #f1eff5', flexWrap: 'wrap' }}>
+              {hCell('STATUS', <StatusChip p={p} />, { paddingLeft: 24, borderLeft: 'none' })}
+              {hCell('WINDOW', <WindowChip p={p} />)}
+              {hCell('CONV', <ConvChip p={p} />)}
+              <div style={{ flex: 1, minWidth: 16 }} />
+              {hCell('DIR', <span style={{ fontFamily: PJS, fontWeight: 800, fontSize: 13, color: isShort ? '#df5338' : '#1f9d55' }}>{isShort ? 'Short' : 'Long'}</span>)}
+              {hCell('LEV', <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: '#1a1813' }}>{levTxt}</span>)}
+              {holdTxt ? hCell('HOLD', <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: '#6b46e0' }}>{holdTxt}</span>, { paddingRight: 24 }) : null}
             </div>
           </div>
         </div>
         {/* body */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', padding: '22px 26px 36px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <Tp3aStrip c={c} d={d} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,65fr) minmax(0,35fr)', gap: 20, alignItems: 'start', flexShrink: 0 }}>
-            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><ChartCard p={p} c={c} d={d} /></div>
-            <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><LevelsMap p={p} c={c} d={d} /></div>
+          <div style={{ position: 'relative', flexShrink: 0 }}><Tp2bStrip c={c} d={d} /></div>
+          <div className="pl-grid" style={{ display: 'grid', flex: '1 0 auto', minHeight: 'min-content', gridTemplateColumns: 'minmax(0,71fr) minmax(0,29fr) ' + (thesisCol ? '266px' : '26px'), gap: thesisCol ? 20 : 12, alignItems: 'start' }}>
+            <div style={{ position: 'relative', minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><ChartCard p={p} c={c} d={d} /></div>
+            <div style={{ position: 'relative', minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 20 }}><LevelsMap p={p} c={c} d={d} /></div>
+            {thesisCol ? <div style={{ minWidth: 0 }}><ThesisCol p={p} /></div> : <ThesisStub p={p} />}
           </div>
         </div>
       </div>
