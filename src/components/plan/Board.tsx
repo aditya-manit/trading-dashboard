@@ -260,6 +260,37 @@ function ArchiveToggle({ st, count, active, onToggle }: { st: Status; count: num
   );
 }
 
+// Quiet loading skeleton shown while the store's first remote sync is still in flight
+// (store.booting) and there are no plans yet — replaces the old flash of demo/seed cards.
+function BoardLoading() {
+  const bar = (h: number, w: string | number, r = 8) => (
+    <div style={{ height: h, width: w, borderRadius: r, background: 'linear-gradient(90deg,#efece6,#f7f5f0,#efece6)', backgroundSize: '200% 100%', animation: 'tpBoardSh 1.2s ease-in-out infinite' }} />
+  );
+  const card = (key: number) => (
+    <div key={key} style={{ background: '#fbfaf8', border: '1px solid #efece6', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>{bar(16, 16, 6)}{bar(10, 54)}</div>
+      {bar(14, '72%')}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>{bar(12, 70)}{bar(12, 58)}</div>
+    </div>
+  );
+  return (
+    <>
+      <style>{'@keyframes tpBoardSh{0%{background-position:200% 0}100%{background-position:-200% 0}}'}</style>
+      <div style={{ background: '#fff', border: '1px solid #efece6', borderRadius: 20, padding: 22, display: 'flex', gap: 30 }}>
+        {[0, 1, 2, 3, 4].map((i) => <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>{bar(9, 70)}{bar(28, '80%')}{bar(6, '100%', 3)}</div>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: 16 }}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ background: '#f6f4ef', border: '1px solid #efece6', borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 11, alignItems: 'center' }}>{bar(30, 24, 7)}<div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>{bar(11, 60)}{bar(9, 44)}</div></div>
+            {[0, ...(i !== 0 ? [1] : [])].map((k) => card(k))}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 // Variation-C column header chip tokens (light→mid gradient, border, accent number, subtitle, blob glow).
 const COL: Record<Status, { light: string; mid: string; border: string; accent: string; subtitle: string; blob: string; blobOp: number }> = {
   idea: { light: '#fff8ee', mid: '#fbecd4', border: '#f0ddb8', accent: '#e8920f', subtitle: '#c9a46a', blob: '#ffa31a', blobOp: 0.28 },
@@ -296,6 +327,7 @@ export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
         </button>
       </div>
 
+      {store.booting && plans.length === 0 ? <BoardLoading /> : <>
       {/* own layer so the lane glows below never bleed onto the stats card */}
       <div style={{ position: 'relative', zIndex: 2 }}><StatsBar plans={plans} /></div>
 
@@ -334,6 +366,7 @@ export function Board({ onOpen }: { onOpen: (p: Plan) => void }) {
           );
         })}
       </div>
+      </>}
     </div>
   );
 }

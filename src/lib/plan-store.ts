@@ -23,6 +23,7 @@ interface PlanState {
   links: Record<string, string>;
   journal: Record<string, JournalRecord>;
   ready: boolean; // hydrated from localStorage (client only)
+  booting: boolean; // first syncRemote() hasn't settled yet — don't show demo/empty state
   remote: boolean; // Supabase is the source of truth (else localStorage)
 }
 
@@ -39,6 +40,7 @@ let state: PlanState = {
   links: {},
   journal: {},
   ready: false,
+  booting: true,
   remote: false,
 };
 
@@ -74,28 +76,38 @@ function hydrate() {
   hydrated = true;
   const view = (localStorage.getItem(PLAN_KEYS.view) as PlanView) || 'workbook';
   const draft = read<PlanDraft>(PLAN_KEYS.draft, TP_BLANK());
-  let plans = read<Plan[]>(PLAN_KEYS.board, []);
-  if (!plans.length) plans = TP_SEED();
-  { const a = autoArmToday(plans); plans = a.plans; if (a.changed.length) write(PLAN_KEYS.board, plans); }
+  // NB: `plans` is intentionally left empty here and filled by syncRemote() below.
+  // Rendering the localStorage board (or a TP_SEED() fallback) at hydrate flashed stale/
+  // demo cards on every refresh before the real Supabase plans loaded. We now defer the
+  // board source until we know the mode: remote → server; not-configured (501) → the
+  // localStorage board (seeded if empty). The skeleton (store.booting) covers the gap.
   const editingId = localStorage.getItem(PLAN_KEYS.editing) || null;
   const links = { ...SEED_LINKS, ...read<Record<string, string>>(PLAN_KEYS.links, {}) };
   const journal = read<Record<string, JournalRecord>>(PLAN_KEYS.journal, {});
-  state = { ...state, view, draft, plans, editingId, links, journal, ready: true };
+  state = { ...state, view, draft, editingId, links, journal, ready: true };
   emit();
   void syncRemote(); // if Supabase is configured, it becomes the source of truth
 }
 
-// Pull plans/links/journal from Supabase. A 501 means the backend isn't
-// configured → stay in localStorage mode (local dev). Server data replaces the
-// local view (no seed injection — a real account starts as it is).
+// Decide the board's source and fill `plans`. A 501 means the backend isn't configured →
+// localStorage mode (local dev): use the saved board, or seed the demo set if it's empty.
+// A real (Supabase) account starts from the server; any other error shows empty (never the
+// demo board). `booting` is cleared once settled so the board's skeleton yields to content.
 async function syncRemote() {
   try {
     const [pr, lr, jr] = await Promise.all([
       fetch('/api/plans'), fetch('/api/links'), fetch('/api/journal'),
     ]);
-    if (pr.status === 501) return; // not configured → localStorage mode
-    if (!pr.ok) return;
-    const patch: Partial<PlanState> = { remote: true };
+    if (pr.status === 501) {
+      // not configured → localStorage mode. Read the saved board; seed it only if empty.
+      let localPlans = autoArmToday(read<Plan[]>(PLAN_KEYS.board, [])).plans;
+      if (!localPlans.length) localPlans = autoArmToday(TP_SEED()).plans;
+      write(PLAN_KEYS.board, localPlans);
+      set({ plans: localPlans, booting: false });
+      return;
+    }
+    if (!pr.ok) { set({ booting: false }); return; } // configured but errored → empty, no seed
+    const patch: Partial<PlanState> = { remote: true, booting: false };
     const pj = await pr.json();
     const armed = autoArmToday((pj.plans as Plan[]) || []);
     patch.plans = armed.plans;
@@ -103,7 +115,11 @@ async function syncRemote() {
     if (lr.ok) { const lj = await lr.json(); patch.links = (lj.links as Record<string, string>) || {}; }
     if (jr.ok) { const jj = await jr.json(); patch.journal = (jj.journal as Record<string, JournalRecord>) || {}; }
     set(patch);
-  } catch { /* offline / not configured → localStorage mode */ }
+  } catch {
+    // network throw (a configured account that's momentarily unreachable) → show empty,
+    // never the demo seed. A refresh retries. (Pure local dev returns 501, handled above.)
+    set({ booting: false });
+  }
 }
 
 // Upload a base64 chart to Storage and swap it for the returned URL (top-level
